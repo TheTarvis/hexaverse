@@ -23,7 +23,6 @@ function SearchCard() {
       panels={[
         { id: 'objects', label: 'Objects', children: <SystemObjectIndex compact objects={objects} selected={selected} open={active} onOpen={setActive} onSelect={select} onFocus={() => {}} systemName="Solace" /> },
         { id: 'command', label: 'Command', children: <p>Command state is separate from object browsing.</p> },
-        { id: 'console', label: 'Console', children: <p>Console state is separate from object browsing.</p> },
       ]} />
   </div>
 }

@@ -192,9 +192,6 @@
 .workspace [data-testid='space-command-column'] > * { flex-shrink: 0; }
 .workspace [data-testid='space-fleet-panel'] { max-width: none; width: 100%; }
 
-/* Console tabs and object details are content inside the workspace-owned frame. */
-.workspace [data-hud-inline='true'] [data-testid='console-dock-region'] { background: transparent; border: 0; backdrop-filter: none; }
-
 /* Recovery keeps its existing modal owner; the accepted shell supplies chrome. */
 .commandView .guideLayer .transmission, .commandView .transmission { padding: 0; border: 0; background: transparent; backdrop-filter: none; text-shadow: none; overflow: visible; }
 .recoveryCard { width: 100%; min-height: 0; max-height: 100%; }
@@ -221,3 +218,16 @@
 }
 
 .workspaceCommand > [data-testid="fleet-roster"] { width: 100%; }
+
+/* Recovery uses the shared illuminated frame; this wrapper owns geometry only. */
+.commandView .guideLayer .transmission { z-index: 80; max-height: calc(100% - 64px); }
+.recoveryContent { display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+@media (min-width: 761px) and (min-height: 501px) {
+  .commandView .guideLayer .transmission { width: min(520px, calc(100% - 48px)); max-height: calc(100% - 64px); }
+  .recoveryCard { max-height: calc(100dvh - 64px); }
+  .resumeGuide { top: 120px; right: 32px; }
+}
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .commandView .guideLayer:has(.transmission) { z-index: 80; }
+  .commandView .guideLayer .transmission { max-height: none; }
+}

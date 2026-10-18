@@ -4,7 +4,7 @@
 //
 // Uses the same viewport, heading, vitals and configurable workspace as System.
 // Objects supplies the galaxy browser/inspector; Command retains fleet controls;
-// Console retains galaxy intel and market data. This route owns its reads,
+// This route owns its reads,
 // inspection, commands and renderer; changing panel visibility never issues a command.
 //
 // migrate-fleet-to-continuous-burns (design.md Decision 12): the galaxy view's
@@ -29,7 +29,6 @@ import { useCorporationSessionOptional } from '@/components/corporation-provider
 import { BOARD_POLL_MS } from '@/lib/realtime'
 
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { HudHeading as CardHeading } from '@/components/hud/HudTypography'
 import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
 import { GalaxyObjectBrowser } from './GalaxyObjectBrowser'
 import dynamic from 'next/dynamic'
@@ -37,25 +36,24 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Heading, Subheading } from '@/components/catalyst/heading'
 import { Button } from '@/components/catalyst/button'
-import { Text, TextLink, Strong } from '@/components/catalyst/text'
+import { Text } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
 import { useMarketBoard } from '@/hooks/use-market'
-import { MarketBoardPanel } from '@/components/market/MarketBoardPanel'
 import type { Quote } from '@/lib/types/market'
 import { useCoarseWorldTime, useWorldClock } from '@/lib/client-clock'
 import { toast } from '@/lib/toast'
 import { burnErrorCopy, commandErrorReason } from '@/lib/rejection-copy'
 import { jumpErrorCopy, jumpErrorReason } from '@/lib/jump-copy'
 import type { Fleet } from '@/lib/types/fleet'
-import type { Galaxy, GalaxyNode, Region } from '@/lib/types/galaxy'
+import type { GalaxyNode, Region } from '@/lib/types/galaxy'
 import { FleetRoster } from '@/components/fleet/FleetRoster'
 import {
   CanvasRegionBoundary,
   RendererStateNotice,
 } from '@/components/render-guard'
 import type { RendererSnapshot } from '@/components/render-guard/renderer-owner'
-import { REGION_PALETTE, REGIONS, regionColor } from './region-palette'
+import { REGION_PALETTE, regionColor } from './region-palette'
 import { ownFleetPresenceSystemIds, recenterTargetSystemId } from './presence'
 import type { GalaxyGraphController } from './GalaxyGraph'
 
@@ -175,19 +173,15 @@ export function GalaxyView() {
   const homeSystemId = recenterTargetSystemId(ownFleets) ?? wakeFocus
 
   // Per-system lane (connection) counts and region tallies, derived once.
-  const { laneCountById, regionCounts } = useMemo(() => {
+  const { laneCountById } = useMemo(() => {
     const laneCountById = new Map<string, number>()
-    const regionCounts = new Map<Region, number>()
     if (galaxy) {
       for (const l of galaxy.links) {
         laneCountById.set(l.source, (laneCountById.get(l.source) ?? 0) + 1)
         laneCountById.set(l.target, (laneCountById.get(l.target) ?? 0) + 1)
       }
-      for (const n of galaxy.nodes) {
-        regionCounts.set(n.region, (regionCounts.get(n.region) ?? 0) + 1)
-      }
     }
-    return { laneCountById, regionCounts }
+    return { laneCountById }
   }, [galaxy])
 
   const selected = useMemo(
@@ -210,7 +204,6 @@ export function GalaxyView() {
     controllerRef.current?.focusSystem(systemId)
   }, [])
 
-  const handleRecenter = () => controllerRef.current?.recenter()
   const handleEnterSystem = useCallback(
     (systemId: string) => router.push(`/systems/${systemId}`),
     [router],
@@ -411,112 +404,10 @@ export function GalaxyView() {
 
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
-        { id: 'console', label: 'Console', children: <div className="flex min-w-0 flex-col gap-4">
-          <IntelPanel galaxy={galaxy} isStartArea={isStartArea} regionCounts={regionCounts} onRecenter={handleRecenter} available={canvasAvailable} />
-          {/* The market board's first mount point (the second is the station
-              inspector on the board view). The SAME shared panel: it ranks and
-              presents; this view decides that a row selection FOCUSES that
-              system on the graph. */}
-          {!isStartArea && (
-            <MarketBoardPanel
-              board={marketBoard.data}
-              isLoading={marketBoard.isLoading}
-              isError={marketBoard.isError}
-              homeSystemId={homeSystemId}
-              onSelectSystem={handleSelectSystemId}
-            />
-          )}
-        </div> },
       ]} />
-      {isStartArea && <GameViewVitals><div className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><Button href="/login" color="cyan">Sign in</Button></div></GameViewVitals>}
+      {isStartArea && <GameViewVitals><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><Button href="/login" color="cyan">Sign in</Button></div></GameViewVitals>}
 
     </GameViewShell>
-  )
-}
-
-// ---- Left intel panel ----
-
-function IntelPanel({
-  galaxy,
-  isStartArea,
-  regionCounts,
-  onRecenter,
-  available,
-}: {
-  galaxy: Galaxy
-  isStartArea: boolean
-  regionCounts: Map<Region, number>
-  onRecenter: () => void
-  // add-renderer-availability-states (tasks.md 3.4): recenter is a
-  // canvas-only control — with no graph, it is a silent dead control —
-  // disabled while the canvas region shows the unsupported/interrupted
-  // state, rather than presented as operable.
-  available: boolean
-}) {
-  return (
-    <HudCardShell
-      data-testid="intel-panel"
-      className="flex flex-col gap-4 p-4"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div><CardHeading variant="section" level={3}>{isStartArea ? 'Start Area' : 'Live Galaxy'}</CardHeading><Text>{isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'}</Text></div>
-        <Button
-          plain
-          onClick={onRecenter}
-          disabled={!available}
-          data-testid="galaxy-recenter"
-          title="Recenter the view"
-          aria-label="Recenter"
-          className="!text-lg !text-white"
-        >
-          ⌖
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <StatTile label="Systems" value={galaxy.nodes.length} />
-        <StatTile label="Lanes" value={galaxy.links.length} />
-      </div>
-
-      <div>
-        <p className="mb-1.5 text-xs font-medium tracking-wide text-zinc-400 uppercase">Regions</p>
-        <ul className="flex flex-col gap-1.5">
-          {REGIONS.filter((r) => (regionCounts.get(r) ?? 0) > 0).map((r) => (
-            <li key={r} className="flex items-center justify-between text-sm text-white">
-              <span className="flex items-center gap-2">
-                <RegionDot region={r} />
-                {REGION_PALETTE[r].label}
-              </span>
-              <span className="font-mono text-zinc-400">{regionCounts.get(r) ?? 0}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {isStartArea && (
-        <HudCardShell
-          data-testid="signin-prompt"
-          className="p-3"
-        >
-          <Text className="!text-xs !text-zinc-300">
-            You’re exploring the frozen start area. <Strong className="!text-white">Sign in</Strong>{' '}
-            to command a fleet and claim a system.
-          </Text>
-          <TextLink href="/login" className="mt-1 inline-block text-xs !text-sky-400">
-            Sign in →
-          </TextLink>
-        </HudCardShell>
-      )}
-    </HudCardShell>
-  )
-}
-
-function StatTile({ label, value }: { label: string; value: number }) {
-  return (
-    <HudCardShell className="min-w-0 px-3 py-2">
-      <div className="font-mono text-xl leading-none text-white">{value}</div>
-      <div className="mt-1 text-[11px] tracking-wide text-zinc-400 uppercase">{label}</div>
-    </HudCardShell>
   )
 }
 

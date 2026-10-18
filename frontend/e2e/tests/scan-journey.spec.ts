@@ -39,10 +39,7 @@ import {
 const cfg = resolveE2EConfig()
 
 async function openScanTab(page: Page): Promise<void> {
-  if (await page.getByTestId('console-dock-open').isVisible()) {
-    await page.getByTestId('console-dock-open').click()
-  }
-  await page.getByTestId('console-tab-scan').click()
+  await page.getByRole('navigation', { name: 'HUD panels', exact: true }).getByRole('button', { name: 'Command', exact: true }).click()
   await expect(page.getByTestId('scan-control')).toBeVisible()
 }
 
@@ -73,7 +70,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 test.setTimeout(1_800_000)
 
 test.describe('the focused-scan journey, end to end through the space view', () => {
-  test('commit a sweep against the served target, watch it settle, see the log row — a clean sweep', async ({
+  test('commit a sweep against the served target, watch it settle and retain historical ghosts without Console', async ({
     page,
   }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
@@ -138,50 +135,10 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     // the LOG ROW below, never to the report's own filed-vs-fizzled text.
     expect(reportText.toLowerCase()).toMatch(/filed/)
 
-    // The report lives in the Scan tab. Its link switches to Log and
-    // transfers focus while the mounted log contains the settled record.
-    await expect(page.getByTestId('console-tab-scan')).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByTestId('sighting-log')).toBeHidden()
-    await page.getByTestId('scan-report').getByRole('button', { name: /open the sighting log/i }).click()
-    // The report link activates Log and transfers focus to its tab.
-    await expect(page.getByTestId('console-dock-collapse'), 'the report link expanded the dock').toBeVisible({
-      timeout: 10_000,
-    })
-    await expect(page.getByTestId('console-tab-log')).toHaveAttribute('aria-selected', 'true')
-    // "The report's link to the log moves focus to the Log tab"
-    await expect(page.getByTestId('console-tab-log'), 'the report link moved focus to the Log tab').toBeFocused()
-    await expect(page.getByTestId('console-panel-log').getByTestId('sighting-log')).toBeVisible({ timeout: 10_000 })
-    const rows = page.locator('[data-testid^="sighting-row-"]')
-    await expect(rows.first(), 'the settled sweep\'s record is in the log').toHaveCount(1, { timeout: 10_000 })
-    await expect(rows.first()).toContainText(chosen.hostId)
-    await expect(
-      rows.first(),
-      'the settled sweep minted a CLEAN-SWEEP record (3.12 excludes the scanner from its own minted set) — ' +
-        'the log row must carry the clean-sweep marker',
-    ).toContainText(/clean/i)
-
-    // REVISED 2026-09-03 (orchestrator-stopped run: the SDET's own bug, not
-    // a production defect or a spec misread). The old
-    // `.getByRole('button', { name: /close|dismiss/i }).click().catch(() =>
-    // {})` matched nothing and silently swallowed the failure, leaving the
-    // log OPEN over `scan-control` and hanging the next pick's
-    // `scrollIntoViewIfNeeded()`. REVISED add-console-dock (3.2): the floating
-    // log and its `sighting-log-open` toggle are gone; the close affordance is
-    // the dock's collapse control. Assert the collapse actually happened
-    // (log hidden, "Console" control back) rather than assuming the click
-    // did anything, and sighting-log's "Closing the log returns to the view
-    // intact" (the space view stays mounted, the same acting fleet stays
-    // selected).
-    await page.getByTestId('console-dock-collapse').click()
-    await expect(page.getByTestId('sighting-log')).toBeHidden({ timeout: 10_000 })
-    await expect(page.getByTestId('console-dock-open'), 'collapsing returns the dock to the strip alone').toBeVisible({
-      timeout: 10_000,
-    })
-    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 10_000 })
-    await expect(
-      page.getByTestId('vitals-fleet-id'),
-      'sighting-log "Closing the log returns to the view intact": the same acting fleet must still be selected',
-    ).toHaveText(fleetId)
+    // Console and the full log UI were removed; the settled command report remains.
+    await expect(page.locator('[data-panel="command"]')).toContainText(reportText)
+    await expect(page.getByTestId('sighting-log')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /open the sighting log/i })).toHaveCount(0)
 
     // ------------------------------------------- 6. double-submit (10.3)
     // A REAL double-click, counting POSTs to /scan on the wire — the leg
@@ -243,8 +200,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await page.reload()
     await prepareCommandHud(page)
     await expect(page.getByTestId('renderer-unsupported').filter({ hasText: 'system' })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId('console-dock-open')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('console-dock-region')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Console', exact: true })).toHaveCount(0)
     await openScanTab(page)
     await expect(page.getByTestId('scan-target-select')).toContainText(stationId!)
     await page.evaluate(() => sessionStorage.removeItem('scan-block-renderer'))
@@ -281,125 +237,20 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await expect(page.getByTestId(`sighting-mark-${seededRecordId}`), 'the seeded ghost is drawn on first render').toBeVisible({
       timeout: 20_000,
     })
-    // The log is behind the dock (collapsed on this fresh mount): open it
-    // through the "Console" control, written here, not in a helper.
-    await expect(page.getByTestId('console-dock-open'), 'a fresh mount shows the dock collapsed').toBeVisible({
-      timeout: 10_000,
-    })
-    await page.getByTestId('console-dock-open').click()
-    await page.getByTestId('console-tab-log').click()
-    await expect(page.getByTestId('console-tab-log')).toBeFocused({ timeout: 10_000 })
-    await expect(page.getByTestId(`sighting-row-${seededRecordId}`), 'the seeded record is in the log on mount').toBeVisible(
-      { timeout: 20_000 },
-    )
-
-    // "A reload shows the dock collapsed" (add-console-dock 3.2): expanded
-    // here, a reload comes back collapsed — the toggle-reload leg of old.
-    await page.reload()
-    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
-    await prepareCommandHud(page)
-    await expect(page.getByTestId('console-dock-open'), 'a reload shows the dock collapsed').toBeVisible({
-      timeout: 20_000,
-    })
-    await expect(page.getByTestId('console-dock-region')).toBeHidden()
-    await expect(page.getByTestId('sighting-log')).toBeHidden()
-  })
-
-  // 10.2b — the ghost leg, isolated: a seeded target-naming fixture renders
-  // as a ghost and cross-highlights with its log row, in both directions.
-  test('a seeded target-naming sighting renders as a ghost and cross-highlights with its log row', async ({ page }) => {
-    test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
-
-    const interiors = captureInteriors(page)
-    const corpBox = captureCorporationId(page)
-    const { homeSystemId } = await wakeNewCorp(page, 'E2E Ghost Reader', 'scan-ghost')
-    await expect.poll(() => corpBox.id, { timeout: 30_000 }).not.toBeNull()
-    const corpId = corpBox.id!
-
-    const home = await interiors.get(homeSystemId)
-    expect(home).toBeTruthy()
-    const hostId = home.features.find((feature) => feature.type !== 'star')!.id
-
-    const actionId = 'e2e-ghost-action-' + Date.now()
-    const targetId = 'e2e-ghost-target-' + Date.now()
-    const recordId = await seedSightingFixture({
-      corporationId: corpId,
-      actionId,
-      targetId,
-      systemId: homeSystemId,
-      hostId,
-      asOf: 1,
-      position: { X: 8, Y: 0, Z: 4 },
-      velocity: { X: 0, Y: 0, Z: 0.2 },
-      hullCount: 1,
-      hullTypes: ['scout'],
-    })
-
-    await page.reload()
-    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
-    await prepareCommandHud(page)
-    const ghost = page.getByTestId(`sighting-mark-${recordId}`)
-    await expect(ghost).toBeVisible({ timeout: 20_000 })
-
-    // add-console-dock (3.2). The dock is collapsed (every mount), and the
-    // ghost is activated FIRST, before any click on a log row: a row click
-    // sets the same highlighted id as the ghost does, so the other order would
-    // make ghost activation vacuous.
-    // "Activating a ghost while the dock is collapsed highlights the ghost and
-    // leaves the dock collapsed".
-    await expect(page.getByTestId('console-dock-open'), 'precondition: the dock is collapsed').toBeVisible({
-      timeout: 10_000,
-    })
+    await expect(page.getByTestId('sighting-log')).toHaveCount(0)
+    const ghost = page.getByTestId(`sighting-mark-${seededRecordId}`)
     await ghost.click()
     await expect(ghost).toHaveAttribute('data-highlighted', 'true')
-    await expect(page.getByTestId('console-dock-open'), 'a ghost activation leaves the dock collapsed').toBeVisible()
-    await expect(page.getByTestId('console-dock-region')).toBeHidden()
-
-    // "The row for an activated ghost is highlighted when the tab is next
-    // shown": expand through the "Console" control, then read the row.
-    await page.getByTestId('console-dock-open').click()
-    await page.getByTestId('console-tab-log').click()
-    const row = page.getByTestId(`sighting-row-${recordId}`)
-    await expect(row).toBeVisible({ timeout: 10_000 })
-    await expect(row, 'the activated ghost\'s row is highlighted when the tab is shown').toHaveAttribute(
-      'data-highlighted',
-      'true',
-    )
-
-    // The row -> ghost direction ("Selecting a row highlights its ghost",
-    // re-homed by this change), made non-vacuous: a RELOAD clears the highlight
-    // (and collapses the dock), so the ghost starts unhighlighted; then a row
-    // click must be what highlights it.
     await page.reload()
-    await expect(page.getByTestId('space-view')).toBeVisible({ timeout: 30_000 })
     await prepareCommandHud(page)
-    await expect(ghost).toBeVisible({ timeout: 20_000 })
-    await expect(
-      ghost,
-      'precondition: after the reload no ghost is highlighted, so the row click below is what does it',
-    ).not.toHaveAttribute('data-highlighted', 'true')
-    await expect(page.getByTestId('console-dock-open'), 'precondition: the reload collapsed the dock').toBeVisible({
-      timeout: 10_000,
-    })
-    await page.getByTestId('console-dock-open').click()
-    await page.getByTestId('console-tab-log').click()
-    await expect(row).toBeVisible({ timeout: 10_000 })
-    await expect(row, 'precondition: the row is not highlighted before it is clicked').not.toHaveAttribute(
-      'data-highlighted',
-      'true',
-    )
-    await row.click()
-    await expect(ghost, 'a row click highlights the stage ghost for that record').toHaveAttribute(
-      'data-highlighted',
-      'true',
-      { timeout: 10_000 },
-    )
+    await expect(page.getByTestId(`sighting-mark-${seededRecordId}`)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'Console', exact: true })).toHaveCount(0)
   })
 
   // The current HUD intentionally retires the visible Burn/fleet command
   // panel. This checks its replacement inspection surface and the independent
-  // Scan tab; movement execution remains covered at unit/backend level.
-  test('station inspection and Plot course preserve the independent Scan tab while legacy commands stay hidden', async ({ page }) => {
+  // Scan command; movement execution remains covered at unit/backend level.
+  test('station inspection and travel review preserve Scan in Command', async ({ page }) => {
     test.skip(cfg.env !== 'local', 'drives the auth emulator (local only)')
     const interiors = captureInteriors(page)
     const { homeSystemId } = await wakeNewCorp(page, 'E2E Scan-Beside-Panel', 'scan-beside-panel')
@@ -410,9 +261,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await expect(details).toContainText(stationId!)
     await page.getByTestId('details-plot').click()
     await expect(page.getByTestId('system-index-search')).toBeHidden()
-    await expect(page.getByTestId('preview-panel')).toBeHidden()
-    await expect(page.getByTestId('burn-button')).toBeHidden()
-    await expect(page.getByTestId('space-fleet-panel')).toBeHidden()
+    await expect(page.getByTestId('compact-travel-card')).toBeVisible()
     await openScanTab(page)
     await expect(page.getByTestId('scan-target-select')).toContainText(stationId!)
   })
@@ -448,7 +297,7 @@ test.describe('the focused-scan journey, end to end through the space view', () 
     await expect.poll(() => scanTargetsByFleet.has(fleetId), { timeout: 30_000 }).toBe(true)
     expect(scanTargetsByFleet.get(fleetId)).toHaveLength(0)
     await expect(page.getByText('No host is in range to sweep.')).toBeVisible()
-    await page.getByTestId('console-dock-collapse').click()
+    // Command stays mounted while viewing the map; Scan freshness is independent of it.
 
     // API movement is fixture setup only: this leg proves Scan refresh,
     // not the retired Burn control. The low commanded acceleration leaves

@@ -797,3 +797,35 @@ mobile full-page sheet/focus ownership, 16px fields, sticky search, shared camer
 controls and public assets retain their existing contracts. Pixel comparisons
 check both opposed rim regions against the same rendered card with the signal
 layer hidden, separately from original chrome/layout assertions.
+
+
+## Recovery card and Console removal — 2026-10-18
+
+Travis requested the current shared tutorial card and removal of Console. Recovery
+transmission already composed HudCardShell, but explicitly disabled its signal
+lighting. It now inherits the shared two-highlight frame, original title/close
+chrome and reduced-motion behavior. Tutorial isolation is owned only while its
+visible dialog is mounted on desktop and phone. Opening Objects or Command hands
+off that ownership; Resume guide restores the saved lesson. Visible dismiss and
+Escape remain available and release background inert state on unmount.
+
+Console is no longer a panel or navigation destination in Galaxy or System. Its
+empty bottom layout reservation, full log UI, Galaxy statistics/market overview
+and log links are removed. Focused Scan remains in Command's Sensors section,
+including its existing served target list, commit/cancel/report behavior and
+settlement refresh. No log/statistics UI is relocated. Selected-system station
+quotes, historical map ghosts and sensing services remain; no gameplay records
+are deleted. Scan announcements use the shared workspace outlet outside hidden
+panel content.
+
+Objects and Command retain the existing per-corporation v1 browser layout key.
+Reading an old Console entry removes that entry and writes the sanitized remaining
+layout without changing valid panel visibility/order/docks. Arrange/reset remains
+reachable when both panels are hidden. Historical Console descriptions above are
+superseded by this section. Standalone legacy component tests do not imply Console
+is mounted in either game view.
+
+Verification and the protected-preview build are recorded in
+[task evidence](../.scratch/tutorial-console/README.md). Physical iPhone rendering
+and focus-zoom acceptance still require a device retest; no viewport zoom lock was
+introduced by this change.

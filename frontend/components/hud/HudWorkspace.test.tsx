@@ -8,8 +8,7 @@ const key = (corporation: string) => `hexaverse:hud-layout:v1:${corporation}`
 let saved: Map<string, string>
 const panels: HudWorkspacePanel[] = [
   { id: 'objects', label: 'Objects', children: <input aria-label="Object search" defaultValue="" /> },
-  { id: 'command', label: 'Command', children: <button>Review course</button> },
-  { id: 'console', label: 'Console', children: <input aria-label="Console draft" defaultValue="" /> },
+  { id: 'command', label: 'Command', children: <><button>Review course</button><input aria-label="Command draft" defaultValue="" /></> },
 ]
 beforeEach(() => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
@@ -82,7 +81,7 @@ it('ignores duplicate entries and preserves valid preferences while restoring mi
   render(<HudWorkspace corporationId="one" panels={panels} />)
   expect(screen.getByLabelText('Object search')).not.toBeVisible()
   expect(screen.getByRole('button', { name: 'Command' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Console' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Command' })).toBeInTheDocument()
 })
 
 it('restores defaults and removes only the current corporation layout key', () => {
@@ -90,7 +89,7 @@ it('restores defaults and removes only the current corporation layout key', () =
   saved.set('session', 'keep-session')
   render(<HudWorkspace corporationId="one" panels={panels} />)
   settings()
-  for (const label of ['Objects', 'Command', 'Console']) fireEvent.click(screen.getByRole('button', { name: `Show ${label}` }))
+  for (const label of ['Objects', 'Command']) fireEvent.click(screen.getByRole('button', { name: `Show ${label}` }))
   expect(screen.getByRole('button', { name: 'Arrange HUD' })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Reset HUD layout' }))
   expect(screen.getByLabelText('Object search')).toBeVisible()
@@ -110,17 +109,17 @@ it('closes settings with Escape and restores recovery-control focus', () => {
 
 it('reveals and activates requested panels, repeats focus without losing mounted draft state', async () => {
   const view = render(<HudWorkspace corporationId="one" panels={panels} />)
-  const draft = screen.getByLabelText('Console draft')
+  const draft = screen.getByLabelText('Command draft')
   fireEvent.change(draft, { target: { value: 'Hold position' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Console' }))
-  view.rerender(<HudWorkspace corporationId="one" panels={panels} request={{ id: 'console', sequence: 1 }} />)
-  await waitFor(() => expect(screen.getByRole('region', { name: 'Console panel' })).toHaveFocus())
-  expect(screen.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Command' }))
+  view.rerender(<HudWorkspace corporationId="one" panels={panels} request={{ id: 'command', sequence: 1 }} />)
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Command panel' })).toHaveFocus())
+  expect(screen.getByRole('button', { name: 'Command' })).toHaveAttribute('aria-pressed', 'true')
   expect(draft).toHaveValue('Hold position'); expect(draft).toBeVisible()
   screen.getByRole('button', { name: 'Arrange HUD' }).focus()
-  view.rerender(<HudWorkspace corporationId="one" panels={panels} request={{ id: 'console', sequence: 2 }} />)
-  await waitFor(() => expect(screen.getByRole('region', { name: 'Console panel' })).toHaveFocus())
-  expect(within(screen.getByRole('region', { name: 'Console panel' })).getByLabelText('Console draft')).toBe(draft)
+  view.rerender(<HudWorkspace corporationId="one" panels={panels} request={{ id: 'command', sequence: 2 }} />)
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Command panel' })).toHaveFocus())
+  expect(within(screen.getByRole('region', { name: 'Command panel' })).getByLabelText('Command draft')).toBe(draft)
 })
 
 it('allows transient layout changes when storage access is unavailable', () => {
@@ -134,19 +133,19 @@ it('allows transient layout changes when storage access is unavailable', () => {
 
 
 it('lets a requested panel child own focus when its open event selects a tab', () => {
-  function ConsoleChild({ sequence }: { sequence: number }) {
+  function CommandChild({ sequence }: { sequence: number }) {
     const tab = useRef<HTMLButtonElement>(null)
     useEffect(() => { if (sequence) tab.current?.focus() }, [sequence])
     return <button ref={tab}>Orders tab</button>
   }
   function Host({ sequence }: { sequence: number }) {
-    return <HudWorkspace corporationId="one" panels={panels.map(panel => panel.id === 'console' ? { ...panel, children: <ConsoleChild sequence={sequence} /> } : panel)} {...(sequence ? { request: { id: 'console' as const, sequence } } : {})} />
+    return <HudWorkspace corporationId="one" panels={panels.map(panel => panel.id === 'command' ? { ...panel, children: <CommandChild sequence={sequence} /> } : panel)} {...(sequence ? { request: { id: 'command' as const, sequence } } : {})} />
   }
   const view = render(<Host sequence={0} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Console' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Command' }))
   view.rerender(<Host sequence={1} />)
   expect(screen.getByRole('button', { name: 'Orders tab' })).toHaveFocus()
-  expect(screen.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Command' })).toHaveAttribute('aria-pressed', 'true')
 })
 
 it('does not steal focus moved elsewhere between a request and passive effect flush', () => {
@@ -155,14 +154,14 @@ it('does not steal focus moved elsewhere between a request and passive effect fl
     // Parent layout effects run after the workspace captures the request origin,
     // before passive reveal/focus work: the user has moved to another control.
     useLayoutEffect(() => { if (sequence) outside.current?.focus() }, [sequence])
-    return <><button ref={outside}>Navigation</button><HudWorkspace corporationId="one" panels={panels} {...(sequence ? { request: { id: 'console' as const, sequence } } : {})} /></>
+    return <><button ref={outside}>Navigation</button><HudWorkspace corporationId="one" panels={panels} {...(sequence ? { request: { id: 'command' as const, sequence } } : {})} /></>
   }
   const view = render(<Host sequence={0} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Console' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Command' }))
   view.rerender(<Host sequence={1} />)
   expect(screen.getByRole('button', { name: 'Navigation' })).toHaveFocus()
-  expect(screen.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.getByLabelText('Console draft')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Command' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByLabelText('Command draft')).toBeVisible()
 })
 
 it('collapses the active phone drawer without hiding the panel or losing its draft', () => {
@@ -185,18 +184,18 @@ it('uses a modal page sheet on phones, returns to map, and retains mounted draft
   try {
     render(<><button>Map action</button><HudWorkspace corporationId="phone" panels={panels} /></>)
     expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
-    const sheet = screen.getByRole('dialog', { name: 'Console panel' })
+    fireEvent.click(screen.getByRole('button', { name: /^Command$/ }))
+    const sheet = screen.getByRole('dialog', { name: 'Command panel' })
     expect(sheet).toHaveAttribute('aria-modal', 'true')
     expect(screen.getByText('Map action').parentElement).not.toHaveAttribute('inert')
     expect(screen.getByText('Map action')).toHaveAttribute('inert')
-    expect(screen.getByRole('button', { name: 'Close Console panel' })).toHaveFocus()
-    fireEvent.change(screen.getByLabelText('Console draft'), { target: { value: 'Saved local draft' } })
+    expect(screen.getByRole('button', { name: 'Close Command panel' })).toHaveFocus()
+    fireEvent.change(screen.getByLabelText('Command draft'), { target: { value: 'Saved local draft' } })
     fireEvent.click(within(sheet).getByRole('button', { name: /^Objects$/ }))
     expect(screen.getByRole('dialog', { name: 'Objects panel' })).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
-    expect(screen.getByLabelText('Console draft')).toHaveValue('Saved local draft')
-    fireEvent.click(screen.getByRole('button', { name: 'Close Console panel' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Command$/ }))
+    expect(screen.getByLabelText('Command draft')).toHaveValue('Saved local draft')
+    fireEvent.click(screen.getByRole('button', { name: 'Close Command panel' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByText('Map action')).not.toHaveAttribute('inert')
     expect(window.localStorage.setItem).not.toHaveBeenCalled()
@@ -209,10 +208,10 @@ it('closes phone settings to map with Escape and keeps layout edits', () => {
     render(<HudWorkspace corporationId="phone" panels={panels} />)
     settings()
     expect(screen.getByRole('dialog', { name: 'Arrange HUD' })).toHaveAttribute('aria-modal', 'true')
-    const move = screen.getByRole('button', { name: 'Move Console to left' })
+    const move = screen.getByRole('button', { name: 'Move Command to left' })
     fireEvent.click(move); fireEvent.keyDown(move, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(JSON.parse(saved.get(key('phone'))!)).toContainEqual({ id: 'console', lane: 'left', visible: true })
+    expect(JSON.parse(saved.get(key('phone'))!)).toContainEqual({ id: 'command', lane: 'left', visible: true })
     expect(screen.getByRole('button', { name: 'Arrange HUD' })).toHaveFocus()
   } finally { media.mockRestore() }
 })
@@ -239,7 +238,7 @@ it('keeps phone focus in the page when a travel-like transition removes its focu
 it('uses one shared frame per workspace panel and treats framed child cards as sections', () => {
   const children = panels.map(panel => ({ ...panel, children: <HudCardShell title={`${panel.label} content`} lighting="none">{panel.children}</HudCardShell> }))
   const view = render(<HudWorkspace corporationId="baseline" panels={children} />)
-  for (const id of ['objects', 'command', 'console']) {
+  for (const id of ['objects', 'command']) {
     const panel = view.container.querySelector(`[data-panel="${id}"]`)!
     expect(panel.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
     expect(panel.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(1)
@@ -256,19 +255,19 @@ it('notifies the content owner when its phone panel is dismissed without unmount
   window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
   const dismiss = vi.fn(), activate = vi.fn()
   render(<HudWorkspace corporationId="dismiss" panels={panels} onPanelDismiss={dismiss} onPanelActivate={activate} />)
-  fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
-  expect(activate).toHaveBeenCalledExactlyOnceWith('console')
-  const draft = screen.getByLabelText('Console draft')
+  fireEvent.click(screen.getByRole('button', { name: /^Command$/ }))
+  expect(activate).toHaveBeenCalledExactlyOnceWith('command')
+  const draft = screen.getByLabelText('Command draft')
   fireEvent.change(draft, { target: { value: 'Still here' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Close Console panel' }))
-  expect(dismiss).toHaveBeenCalledExactlyOnceWith('console')
-  fireEvent.click(screen.getByRole('button', { name: /^Console$/ }))
-  expect(screen.getByLabelText('Console draft')).toBe(draft)
+  fireEvent.click(screen.getByRole('button', { name: 'Close Command panel' }))
+  expect(dismiss).toHaveBeenCalledExactlyOnceWith('command')
+  fireEvent.click(screen.getByRole('button', { name: /^Command$/ }))
+  expect(screen.getByLabelText('Command draft')).toBe(draft)
   expect(draft).toHaveValue('Still here')
 })
 
 
-it('keeps all four phone destinations and one sheet owner through Arrange handoffs', () => {
+it('keeps all three phone destinations and one sheet owner through Arrange handoffs', () => {
   vi.mocked(window.matchMedia).mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList)
   const activate = vi.fn(), dismiss = vi.fn()
   render(<><button>Map background</button><HudWorkspace corporationId="navigation" panels={panels} onPanelActivate={activate} onPanelDismiss={dismiss} /></>)
@@ -276,16 +275,16 @@ it('keeps all four phone destinations and one sheet owner through Arrange handof
   const search = screen.getByLabelText('Object search')
   fireEvent.change(search, { target: { value: 'Keep search' } })
   const go = (name: string) => fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name }))
-  for (const name of ['Arrange HUD', 'Command', 'Arrange HUD', 'Console', 'Arrange HUD', 'Objects']) {
+  for (const name of ['Arrange HUD', 'Command', 'Arrange HUD', 'Objects']) {
     go(name)
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
-    expect(within(navigation).getAllByRole('button')).toHaveLength(4)
+    expect(within(navigation).getAllByRole('button')).toHaveLength(3)
     expect(within(navigation).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Map background')).toHaveAttribute('inert')
   }
   expect(search).toHaveValue('Keep search')
-  expect(activate.mock.calls.map(([id]) => id)).toEqual(['objects', 'command', 'console', 'objects'])
+  expect(activate.mock.calls.map(([id]) => id)).toEqual(['objects', 'command', 'objects'])
   fireEvent.click(screen.getByRole('button', { name: 'Close Objects panel' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.getByText('Map background')).not.toHaveAttribute('inert')
@@ -300,23 +299,23 @@ it('offers direct labeled phone icons with one visible navigation and restores i
   render(<><button>Map action</button><HudWorkspace corporationId="direct-icons" panels={panels} onPanelActivate={activate} /></>)
   const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
   expect(screen.queryByRole('button', { name: 'HUD menu' })).toBeNull()
-  expect(within(navigation).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Objects', 'Command', 'Console', 'Arrange HUD'])
+  expect(within(navigation).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Objects', 'Command', 'Arrange HUD'])
   for (const button of within(navigation).getAllByRole('button')) {
     expect(button.tagName).toBe('BUTTON')
     expect(button).toHaveAttribute('aria-pressed', 'false')
     expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     expect(button).not.toHaveAttribute('aria-expanded')
   }
-  const trigger = within(navigation).getByRole('button', { name: 'Console' })
+  const trigger = within(navigation).getByRole('button', { name: 'Command' })
   trigger.focus(); fireEvent.click(trigger)
-  expect(activate).toHaveBeenCalledWith('console')
+  expect(activate).toHaveBeenCalledWith('command')
   expect(screen.getAllByRole('navigation', { name: 'HUD panels' })).toHaveLength(1)
-  expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true')
-  fireEvent.change(screen.getByLabelText('Console draft'), { target: { value: 'Preserve icon navigation draft' } })
+  expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Command' })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.change(screen.getByLabelText('Command draft'), { target: { value: 'Preserve icon navigation draft' } })
   fireEvent.click(screen.getByRole('button', { name: 'Arrange HUD' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Console' }))
-  expect(screen.getByLabelText('Console draft')).toHaveValue('Preserve icon navigation draft')
-  fireEvent.keyDown(screen.getByRole('button', { name: 'Close Console panel' }), { key: 'Escape' })
+  fireEvent.click(screen.getByRole('button', { name: 'Command' }))
+  expect(screen.getByLabelText('Command draft')).toHaveValue('Preserve icon navigation draft')
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Close Command panel' }), { key: 'Escape' })
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(trigger).toHaveFocus()
   expect(screen.getByText('Map action')).not.toHaveAttribute('inert')
@@ -326,8 +325,17 @@ it('offers direct labeled phone icons with one visible navigation and restores i
 it('uses one shared signal layer per owning panel and settings without lighting nested sections', async () => {
   const content = panels.map(panel => ({ ...panel, children: <HudCardShell title={`${panel.label} details`}>{panel.children}</HudCardShell> }))
   const { container } = render(<HudWorkspace corporationId="lighting" panels={content} />)
-  await waitFor(() => expect(container.querySelectorAll('[data-panel] > [data-slot="hud-card"] > [data-slot="hud-frame-lighting"]')).toHaveLength(3))
+  await waitFor(() => expect(container.querySelectorAll('[data-panel] > [data-slot="hud-card"] > [data-slot="hud-frame-lighting"]')).toHaveLength(2))
   expect(container.querySelectorAll('[data-hud-framing="section"] [data-slot="hud-frame-lighting"]')).toHaveLength(0)
   settings()
   await waitFor(() => expect(screen.getByRole('region', { name: 'Arrange HUD' }).querySelector(':scope > [data-slot="hud-frame-lighting"]')).not.toBeNull())
+})
+
+
+it('migrates legacy Console entries without changing remaining hidden/dock preferences', () => {
+  saved.set(key('legacy'), JSON.stringify([{ id: 'console', lane: 'bottom', visible: true }, { id: 'objects', lane: 'right', visible: false }, { id: 'command', lane: 'left', visible: false }]))
+  render(<HudWorkspace corporationId="legacy" panels={panels} />)
+  expect(JSON.parse(saved.get(key('legacy'))!)).toEqual([{ id: 'objects', lane: 'right', visible: false }, { id: 'command', lane: 'left', visible: false }])
+  expect(screen.queryByRole('button', { name: /Console/ })).toBeNull()
+  settings(); expect(screen.getByRole('button', { name: 'Reset HUD layout' })).toBeVisible()
 })

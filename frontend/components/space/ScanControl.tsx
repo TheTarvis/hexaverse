@@ -17,21 +17,16 @@
 // keeping the capability boundary and the file boundary aligned is the
 // whole point of the split.
 //
-// HOME: the console dock's Scan tab (openspec change
-// `move-scan-control-to-console-dock`, `system-console`). The panel stays
-// mounted while its tab is hidden, so its error live region goes through
-// `ConsoleLivePortal` to the dock's outlet outside the hidden subtree;
-// standalone (tests) the portal renders it in place.
-//
-// EVERY TARGET, DURATION AND REASON CODE IS SERVED. No range or occlusion
-// predicate is computed here — a body absent from the served set is simply
-// never offered, whatever the interior read shows.
+// HOME: the shared workspace's Command panel. It remains mounted while hidden;
+// command announcements use HudLivePortal outside the hidden panel subtree.
+// Targets, durations and rejection reasons are served; no local range/occlusion
+// predicate can add a target absent from that list.
 
 import { useEffect, useState } from 'react'
 import { HudHeading } from '@/components/hud/HudTypography'
 import { Button } from '@/components/catalyst/button'
 import { figureAttrs, Figure } from '@/components/figure/Figure'
-import { ConsoleLivePortal } from './ConsoleDock'
+import { HudLivePortal } from '@/components/hud/HudLiveAnnouncements'
 import { useCancelAction, useRunningScan, useAcknowledgeAction } from '@/hooks/use-actions'
 import { useScan, useScanTargets, useSettledScan } from '@/hooks/use-scan'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
@@ -189,7 +184,7 @@ export function ScanControl({
   return (
     <aside data-testid="scan-control" className="flex flex-col gap-3 py-4">
       <HudHeading variant="section" level={3}>Focused Scan</HudHeading>
-      <ConsoleLivePortal>
+      <HudLivePortal>
         <span
           className="sr-only"
           role="status"
@@ -198,7 +193,7 @@ export function ScanControl({
         >
           {errorAnnouncement}
         </span>
-      </ConsoleLivePortal>
+      </HudLivePortal>
 
       {runningScan.isError ? (
         <div className="mt-2 text-sm text-zinc-400">

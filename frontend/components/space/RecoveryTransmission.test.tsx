@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { RecoveryTransmission } from './RecoveryTransmission'
 import { newGuide } from '@/lib/command-onboarding'
@@ -60,4 +60,24 @@ it('introduces Objects, station services and scanning before travel', () => {
   rerender(<RecoveryTransmission {...props} guide={{ ...props.guide, phase: 'scan' }} />)
   fireEvent.click(screen.getByTestId('guide-open-scan'))
   expect(props.onScan).toHaveBeenCalled()
+})
+
+// Actual isolation ownership must exist only while the tutorial is mounted.
+it('uses the shared illuminated card and releases modal isolation and focus on unmount', async () => {
+  const origin = document.createElement('button')
+  origin.textContent = 'Map origin'
+  document.body.append(origin)
+  origin.focus()
+  const view = render(<RecoveryTransmission {...props} />)
+  const dialog = screen.getByRole('dialog', { name: 'Recovery transmission' })
+  expect(dialog).toHaveAttribute('aria-modal', 'true')
+  expect(origin).toHaveAttribute('inert')
+  expect(dialog.contains(document.activeElement)).toBe(true)
+  await waitFor(() => expect(dialog.querySelector('[data-slot="hud-frame-lighting"]')).not.toBeNull())
+  fireEvent.keyDown(dialog, { key: 'Escape' })
+  expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ phase: 'dismissed' }))
+  view.unmount()
+  expect(origin).not.toHaveAttribute('inert')
+  expect(document.activeElement).toBe(origin)
+  origin.remove()
 })

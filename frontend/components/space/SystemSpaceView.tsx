@@ -38,7 +38,6 @@ import { CelestialActions } from './CelestialActions'
 
 import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
 import { Button } from '@/components/catalyst/button'
-import { usePhoneHud } from '@/hooks/use-phone-sheet'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
 import { HudCardShell } from '@/components/hud/HudCardShell'
@@ -72,16 +71,14 @@ import { useScanTargets, useSettledScan, type ScanCommitMarker } from '@/hooks/u
 import { useSightings } from '@/hooks/use-sightings'
 import { useSystemSpace } from '@/hooks/use-system-space'
 import { useCoarseWorldTime, useWorldClock, wallMsUntil, type WorldClock } from '@/lib/client-clock'
-import { CONSOLE_DOCK_LANE_LEFT_CENTER } from '@/lib/console-dock-layout'
 import { queryKeys } from '@/lib/query-keys'
 import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { Sighting } from '@/lib/types/sighting'
-import { ConsoleDock, ConsolePanelWaiting, isConsoleTabId, type ConsoleTabId } from './ConsoleDock'
+import { HudAnnouncementScope } from '@/components/hud/HudLiveAnnouncements'
 import { FleetActionsPanel } from './FleetActionsPanel'
 import { ScanControl } from './ScanControl'
-import { SightingLog } from './SightingLog'
 import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
 import { buildSceneModel } from './space-scene'
@@ -303,7 +300,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const travelGuard = useSubmitGuard()
   const stopGuard = useSubmitGuard()
   const cutDriveGuard = useSubmitGuard()
-  const phoneHud = usePhoneHud()
   const [guidePageVisible, setGuidePageVisible] = useState(true)
   const [travelMode, setTravelMode] = useState<'review' | 'status' | null>(null)
   const [travelNotice, setTravelNotice] = useState<string | null>(null)
@@ -338,38 +334,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   ghostFeedRefetchRef.current = ghostFeed.refetch
   const refetchGhostFeed = useCallback(() => ghostFeedRefetchRef.current(), [])
   const [highlightedGhostId, setHighlightedGhostId] = useState<string | null>(null)
-  // The console dock's state, reset on every mount (a cross-system navigation
-  // remounts the view). `openDockOn` is the one entry point that expands it:
-  // open-only by construction, so the report's link can never toggle it shut.
-  // `tab` is the selected tab: the first tab in bar order until a selection is
-  // made, then remembered across collapses — the "Console" control re-opens on
-  // it. Only a member of the closed `ConsoleTabId` set is ever stored.
-  const [dock, setDock] = useState<{ expanded: boolean; openSeq: number; tab: ConsoleTabId }>({
-    expanded: false,
-    openSeq: 0,
-    tab: 'scan',
-  })
   const [hudRequest, setHudRequest] = useState<{ id: HudPanelId; sequence: number }>()
-  const [consoleAnnouncementOutlet, setConsoleAnnouncementOutlet] = useState<HTMLDivElement | null>(null)
+  const [announcementOutlet, setAnnouncementOutlet] = useState<HTMLDivElement | null>(null)
   const requestHudPanel = useCallback((id: HudPanelId) => {
     setGuidePageVisible(false)
     setHudRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))
   }, [])
-  const openDockOn = useCallback((tab: ConsoleTabId) => {
-    if (!isConsoleTabId(tab)) return
-    setDock((d) => ({ expanded: true, openSeq: d.openSeq + 1, tab }))
-    requestHudPanel('console')
-  }, [requestHudPanel])
-  const selectDockTab = useCallback((tab: ConsoleTabId) => {
-    if (!isConsoleTabId(tab)) return
-    setDock((d) => ({ ...d, tab }))
-  }, [])
-  const collapseDock = useCallback(() => setDock((d) => ({ ...d, expanded: false })), [])
-  // The Log tab's content latch: opens at the first render of this mount in
-  // which no interior read is in flight, and never closes (the view re-reads the
-  // interior every 20 s, so a live condition would unmount the log).
-  const [logLatched, setLogLatched] = useState(false)
-  const openLog = useCallback(() => openDockOn('log'), [openDockOn])
+  const openScan = useCallback(() => requestHudPanel('command'), [requestHudPanel])
   const galaxy = useGalaxy()
   const systemNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -424,11 +395,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       if (destination) {
         setDiscoveredGuide(null)
         saveCommandGuide({ ...guide, phase: 'target', targetId: destination.id })
-        collapseDock()
       }
     })
     return () => { cancelled = true }
-  }, [guiding, guide, acting?.attachedTo, refreshGuideInterior, saveCommandGuide, collapseDock])
+  }, [guiding, guide, acting?.attachedTo, refreshGuideInterior, saveCommandGuide])
 
   // Read inside an effect below without becoming a dependency of it.
   const actingIdRef = useRef(acting?.id ?? null)
@@ -648,23 +618,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // A STABLE callback: the inline arrow this replaces would re-fire the
   // stage's announce effect on every render.
   const handleFirstFrame = useCallback(() => setFirstFrame(true), [])
-
-  // QA return (sighting-log "A Log Row and Its Ghost Address the Same
-  // Record By Its Served Id"): the log answers "does this row have a mark"
-  // by MEMBERSHIP in the set the scene actually drew, never by a list of
-  // reasons a mark might be absent -- a list that silently omits the
-  // origin-omission rule, the ghost layer's own single-page bound, and
-  // canvas unavailability, all three of which this derivation covers for
-  // free by reading them off the SAME scene model and the SAME
-  // `canvasAvailable` flag the canvas region itself already reports.
-  const drawnSightingRecordIds = useMemo(() => {
-    const ids = new Set<string>()
-    if (!canvasAvailable) return ids
-    for (const mark of scene.marks) {
-      if (mark.kind === 'sighting' && mark.recordId) ids.add(mark.recordId)
-    }
-    return ids
-  }, [scene, canvasAvailable])
 
   // --- realtime refetch rules ---------------------------------------------
 
@@ -1011,24 +964,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
 
 
-  // The Log tab's content: present from the first render of this mount in which
-  // no interior read is in flight (`logLatched`, a latch), hidden by the dock
-  // shell's own `hidden` attribute while the tab is not shown, with the dock's
-  // waiting indication until the latch opens. It never reads `dock.expanded`.
-  const interiorAtRest = !interior.isLoading && !interior.isFetching
-  if (!logLatched && interiorAtRest) setLogLatched(true)
-  const logTabContent = logLatched ? (
-    <SightingLog
-      systemId={systemId}
-      highlightedGhostId={highlightedGhostId}
-      onHighlightRow={setHighlightedGhostId}
-      galaxySystemNames={systemNames}
-      drawnRecordIds={drawnSightingRecordIds}
-      scale={servedScale}
-    />
-  ) : (
-    <ConsolePanelWaiting />
-  )
   const stationActionsHost = acting && !actingRemote && (dockedFeature?.type === 'station' || acting.attachedTo === stationRead.data?.featureId) ? acting.attachedTo : null
   const marketNotices = <>
 {stationFailed && (
@@ -1204,11 +1139,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {ghostFeed.isError && (
           <div
             data-testid="sightings-unavailable"
-            // Raised above the console dock (the strip's 56px row, or the
-            // expanded 220px dock) + a 16px gap, from the dock's published
-            // height (`lib/console-dock-layout`), so its retry stays
-            // reachable, never occluded by the dock.
-            className={`absolute ${CONSOLE_DOCK_LANE_LEFT_CENTER} left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]`}
+            className={`absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]`}
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
@@ -1224,9 +1155,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         )}
       </GameViewScene>
 
-      {phoneHud && guiding && !guidePageVisible && <Button plain className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
+      {guiding && !guidePageVisible && <Button plain className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
       <div className={commandStyles.guideLayer}>
-      {(!phoneHud || guidePageVisible) && guiding && guide && acting && !dock.expanded && !(discoveryStarted && !interiorFailed) && (
+      {guidePageVisible && guiding && guide && acting && !(discoveryStarted && !interiorFailed) && (
         <RecoveryTransmission
           guide={guide}
           fleet={acting}
@@ -1238,7 +1169,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onRetryAction={() => void commandGuide.retryAction()}
           onSave={commandGuide.save}
           onTarget={(bodyId) => { setInspectedFleetId(null); setSelection({ bodyId }); openObjectIndex(true) }}
-          onScan={() => openDockOn('scan')}
+          onScan={openScan}
           onObjects={() => openObjectIndex(true)}
         />
       )}
@@ -1246,8 +1177,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       </div>
       <GameViewWorkspace
         navigationAction={<SceneNavigationAction destination="galaxy" />}
-        onPanelActivate={id => { if (id === 'objects') openObjectIndex(true); else if (id === 'console') openDockOn(dock.tab) }}
-        onPanelDismiss={id => { if (id === 'objects') setObjectIndexOpen(false); else if (id === 'console') collapseDock() }}
+        onPanelActivate={id => { setGuidePageVisible(false); if (id === 'objects') openObjectIndex(true) }}
+        onPanelDismiss={id => { if (id === 'objects') setObjectIndexOpen(false) }}
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
         className={commandStyles.workspace}
         request={hudRequest}
@@ -1297,7 +1228,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       </div>
           ) },
-          { id: 'command', label: 'Command', children: (
+          { id: 'command', label: 'Command', children: (<>
 <div className={commandStyles.workspaceCommand}>
         <FleetRoster worldTime={worldTime} scale={servedScale} commandOwner="view" activeFleetId={acting?.id ?? null} currentSystemId={systemId} onSelect={selectFleet} selectionDisabled={travelPending || fleets.isError} />
       <GameViewVitals placement="panel" aria-label="Command fleet telemetry">
@@ -1387,55 +1318,27 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 
       </HudColumn>
       </div>
-          ) },
-          { id: 'console', label: 'Console', children: (
-      <ConsoleDock
-        expanded={dock.expanded}
-        openSeq={dock.openSeq}
-        selectedTab={dock.tab}
-        onOpen={openDockOn}
-        onSelectTab={selectDockTab}
-        onCollapse={collapseDock}
-        tabs={[
-          {
-            id: 'scan',
-            label: 'Scan',
-            // The focused-scan surface (openspec change
-            // `move-scan-control-to-console-dock`). Never nested inside
-            // FleetActionsPanel (link8b-impl-contract.md §1.10) — a sweep
-            // needs no attachment, so `docked-fleet-actions`' own capability
-            // boundary stays out of it. Remains invokable while the canvas is
-            // unavailable, per its own data anchoring (`fleet`'s own served
-            // state and the server-served target list, never a canvas
-            // selection). Mounted in both dock states; its error live region
-            // is portalled out of the hidden subtree by the dock's outlet.
-            content: (
+      <HudAnnouncementScope outlet={announcementOutlet}>
+        <section aria-label="Sensors" data-testid="command-sensors">
+          <HudText variant="label">Sensors</HudText>
               <ScanControl
                 fleet={acting}
                 worldTime={worldTime}
                 scale={servedScale}
-                onOpenLog={openLog}
                 committedPending={committedPending}
                 onCommitAccepted={(accepted) => {
                   if (guiding && guide?.phase === 'scan' && accepted?.id === guide.fleetId && accepted.activeScanId) {
                     saveCommandGuide({ ...guide, phase: 'scanning', scanActionId: accepted.activeScanId })
-                    collapseDock()
                   }
                 }}
                 earlySettleHandoff={earlySettleHandoff}
               />
-            ),
-          },
-          { id: 'log', label: 'Log', content: logTabContent },
-        ]}
-        strip={null}
-        placement="panel"
-        announcementOutlet={consoleAnnouncementOutlet}
-      />
-          ) },
+        </section>
+      </HudAnnouncementScope>
+          </>) },
         ]}
       />
-      <div ref={setConsoleAnnouncementOutlet} data-testid="workspace-console-announcements" />
+      <div ref={setAnnouncementOutlet} data-testid="workspace-announcements" />
 
     </GameViewShell>
   )

@@ -324,18 +324,11 @@ describe('GalaxyView', () => {
     expect(pushSpy).not.toHaveBeenCalled()
   })
 
-  it('renders the intel panel with system/lane/region stats', async () => {
-    mockGalaxyState()
-    renderView()
-
-    const panel = screen.getByTestId('intel-panel')
-    expect(panel).toBeInTheDocument()
-    // 2 systems, 1 lane.
-    expect(panel).toHaveTextContent('2')
-    expect(panel).toHaveTextContent('1')
-    // Region breakdown labels (only regions present).
-    expect(panel).toHaveTextContent('Star-rich')
-    expect(panel).toHaveTextContent('Dead zone')
+  it('removes Console and its statistics without relocating the overview', () => {
+    mockGalaxyState(); renderView()
+    expect(screen.queryByRole('button', { name: 'Console' })).toBeNull()
+    expect(screen.queryByTestId('intel-panel')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Objects panel' })).toBeInTheDocument()
   })
 
   it('shows the inspector empty state until a node is selected', async () => {
@@ -411,16 +404,9 @@ describe('GalaxyView', () => {
     expect(sessionStorage.getItem('wakeFocus')).toBeNull()
   })
 
-  it('drives the graph controller from the ⌖ recenter control', async () => {
-    mockGalaxyState()
-    renderView()
-
-    // Mount precedes the owner-ready effect; wait for usable controls.
-    await screen.findByTestId('mock-graph')
-    await waitFor(() => expect(screen.getByTestId('galaxy-recenter')).toBeEnabled())
-    fireEvent.click(screen.getByTestId('galaxy-recenter'))
-
-    await waitFor(() => expect(recenterSpy).toHaveBeenCalled())
+  it('does not retain the removed Console recenter button (Home belongs to shared camera controls)', () => {
+    mockGalaxyState(); renderView()
+    expect(screen.queryByTestId('galaxy-recenter')).toBeNull()
   })
 
   it('shows the sign-in prompt only when viewing the frozen start area', () => {
@@ -903,7 +889,7 @@ describe('GalaxyView', () => {
       expect(await screen.findByTestId('renderer-unsupported')).toHaveTextContent(
         /browser|graphics hardware|webgl|gpu/i,
       )
-      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Objects panel' })).toBeInTheDocument()
     })
 
     it('is independent of the galaxy data read: the galaxy read succeeds, but the unsupported state still shows because rendering cannot be created (Scenario: The unsupported state is independent of the galaxy data read)', async () => {
@@ -938,7 +924,7 @@ describe('GalaxyView', () => {
       renderView()
       await screen.findByTestId('renderer-unsupported')
 
-      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Objects panel' })).toBeInTheDocument()
       expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
     })
 
@@ -973,10 +959,6 @@ describe('GalaxyView', () => {
       renderView()
       await screen.findByTestId('renderer-unsupported')
 
-      const panel = screen.getByTestId('intel-panel')
-      expect(panel).toHaveTextContent('2') // systems
-      expect(panel).toHaveTextContent('1') // lanes
-      expect(panel).toHaveTextContent('Star-rich')
       expect(screen.getByTestId('signin-prompt')).toBeInTheDocument()
       expect(screen.queryByTestId('fleet-row-fleet_1')).not.toBeInTheDocument()
     })
@@ -999,7 +981,7 @@ describe('GalaxyView', () => {
       renderView()
       await screen.findByTestId('renderer-unsupported')
 
-      expect(screen.getByTestId('galaxy-recenter')).toBeDisabled()
+      expect(screen.queryByTestId('galaxy-recenter')).toBeNull()
     })
 
     it('an in-flight system selection survives a transition into the unsupported state, by construction — `selectedId` lives in GalaxyView\'s own state, a sibling of `<GalaxyGraph>`, never inside it (Scenario: In-flight selection survives a context loss)', async () => {
@@ -1075,7 +1057,7 @@ describe('GalaxyView', () => {
 
       expect(await screen.findByTestId('renderer-unsupported')).toBeInTheDocument()
       expect(screen.getByTestId('galaxy-view')).toBeInTheDocument()
-      expect(screen.getByTestId('intel-panel')).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Objects panel' })).toBeInTheDocument()
       expect(screen.getByTestId('inspector')).toBeInTheDocument()
       // SDET-added (security audit MINOR-2): the caught error's raw message
       // never reaches the DOM — CanvasRegionBoundary discards it

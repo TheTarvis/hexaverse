@@ -5,11 +5,11 @@ import clsx from 'clsx'
 import { Button } from '@/components/catalyst/button'
 import { HudCardShell } from './HudCardShell'
 import { HudIcon } from './HudIcon'
-import { MagnifyingGlassIcon, RocketLaunchIcon, ChatBubbleLeftRightIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
+import { MagnifyingGlassIcon, RocketLaunchIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
 import styles from './hud-workspace.module.css'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
-export type HudPanelId = 'objects' | 'command' | 'console'
+export type HudPanelId = 'objects' | 'command'
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
 export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode }
@@ -17,7 +17,6 @@ export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; 
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
   { id: 'command', lane: 'right', visible: true },
-  { id: 'console', lane: 'bottom', visible: true },
 ]
 
 function readLayout(raw: string | null): Layout {
@@ -73,7 +72,12 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   }, [phone, sheetOpen])
 
   useEffect(() => {
-    try { setLayout(readLayout(window.localStorage.getItem(storageKey))) }
+    try {
+      const raw = window.localStorage.getItem(storageKey), clean = readLayout(raw)
+      setLayout(clean)
+      const previous: unknown = raw ? JSON.parse(raw) : null
+      if (Array.isArray(previous) && previous.some(entry => entry?.id === 'console')) window.localStorage.setItem(storageKey, JSON.stringify(clean))
+    }
     catch { setAnnouncement('Preferences unavailable on this device. You can still arrange the HUD.') }
     setReady(true)
   }, [storageKey])
@@ -149,7 +153,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
   }, [phone, sheetOpen, settings, activeId])
 
   function navigation(selected: HudPanelId | 'arrange' | null, floating = false) {
-    const icons = { objects: MagnifyingGlassIcon, command: RocketLaunchIcon, console: ChatBubbleLeftRightIcon }
+    const icons = { objects: MagnifyingGlassIcon, command: RocketLaunchIcon }
     return <nav className={styles.cardNavigation} aria-label="HUD panels" data-testid="hud-icon-navigation">
       {known.map(entry => {
         const destination = panels.find(panel => panel.id === entry.id)!

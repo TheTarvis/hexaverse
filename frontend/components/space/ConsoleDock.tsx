@@ -17,9 +17,7 @@
 // its live region where it always was.
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useId,
   useLayoutEffect,
@@ -29,7 +27,8 @@ import {
   type ReactNode,
 } from 'react'
 import { HudText } from '@/components/hud/HudTypography'
-import { createPortal } from 'react-dom'
+import { HudAnnouncementScope } from '@/components/hud/HudLiveAnnouncements'
+export { HudLivePortal as ConsoleLivePortal } from '@/components/hud/HudLiveAnnouncements'
 import {
   CONSOLE_DOCK_HEIGHT_COLLAPSED,
   CONSOLE_DOCK_HEIGHT_EXPANDED,
@@ -75,18 +74,6 @@ export interface ConsoleDockProps {
 
 const CONTROL =
   'min-h-6 min-w-6 rounded-md px-2 font-mono text-[11px] uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400'
-
-const ConsoleLiveOutletContext = createContext<HTMLElement | null>(null)
-
-/**
- * Renders its children in the dock's live outlet — outside the `hidden`
- * region, so an `aria-live` region inside a hidden tab is still announced.
- * Outside a dock, or before the outlet has mounted, renders them in place.
- */
-export function ConsoleLivePortal({ children }: { children: ReactNode }) {
-  const outlet = useContext(ConsoleLiveOutletContext)
-  return outlet ? createPortal(children, outlet) : <>{children}</>
-}
 
 export function ConsolePanelWaiting() {
   return (
@@ -269,7 +256,7 @@ export function ConsoleDock({
             <span aria-hidden="true">▾</span>
           </button>
         </div>
-        <ConsoleLiveOutletContext.Provider value={announcementOutlet ?? liveOutlet}>
+        <HudAnnouncementScope outlet={announcementOutlet ?? liveOutlet}>
           {tabs.map((tab) => (
             <div
               key={tab.id}
@@ -283,7 +270,7 @@ export function ConsoleDock({
               {tab.content}
             </div>
           ))}
-        </ConsoleLiveOutletContext.Provider>
+        </HudAnnouncementScope>
       </div>
     </div>
   )
