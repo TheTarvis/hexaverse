@@ -1275,3 +1275,33 @@ two prior aborted GETs, with no new record after activation. The
 [evidence record](../.scratch/shared-map-controls/README.md) retains the interrupted
 QA run and completed profile reruns. Physical-iPhone and full emulator gameplay
 acceptance remain unverified.
+
+### Shared card highlights deployed — 2026-10-18 22:18 UTC
+
+Build **LIQ5XAA0mkhVDiW0hfwKs** and the protected static Storybook enable the existing
+signal effect on Plain and owning workspace cards. Wide already used that effect;
+Plain's original explicit none override was the cause of the visual difference.
+Static Frame retains the CSS-only variant. Shader constants, materials, original
+header/close CSS and frozen fixtures remain unchanged. Source commit: 5e00e95.
+
+Final supervisor activation was 22:18:53 UTC (frontend 30127, gateway 30128, ngrok
+30129). The preceding Storybook copies and config are preserved under
+/tmp/hexaverse-weekend-supervision. Frontend/build pins and Storybook index pin
+changed; auth/email policy, gateway/ngrok commands, routes, 57 public assets, iOS
+files, shared controls and 2026-10-19T00:00:00Z cutoff are unchanged. Backend,
+emulators and local Storybook 20203 were not restarted. Candidate 20218 is stopped.
+
+584 scoped tests / 41 files, types/lint, Next and audited Storybook builds pass.
+Twenty lit/static pixel comparisons cover Plain/Wide and real Galaxy/System cards
+at phone/landscape/desktop sizes. Both actual Storybook URLs on 20203 and deployed
+Storybook variants pass Chromium/WebKit; game candidate profiles and final live
+phone checks pass. Multiple visible owners retain stable renderer counts, bounded
+submissions, reduced-motion stop and exact disposal. The browser engines exercised
+WebGL2 fallback; physical native-WebGPU/iPhone acceptance remains separate.
+
+Live HTML/36 initial assets match; seven pins pass. Storybook 200, debug/QA 404 and
+foreign-Origin POST 403 remain correct. Initial bare-HTTP Storybook module 403s
+confirmed exact-Origin enforcement; final checks use the configured HTTPS origin.
+No policy was weakened. [Evidence](../.scratch/card-lighting/README.md) preserves
+the initial WebKit blob-error run and passing isolated rerun, comparisons and
+main-branch integration. No live writes, sign-out activation or push occurred.

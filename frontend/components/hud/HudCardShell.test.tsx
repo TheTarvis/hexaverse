@@ -153,3 +153,23 @@ it('keeps mobile dismissal and navigation outside its content scroll viewport', 
   fireEvent.click(screen.getByRole('button', { name: 'Close card' }))
   expect(close).toHaveBeenCalledOnce()
 })
+
+it('bounds submissions for multiple visible owners and releases all renderers on departure', async () => {
+  const view = render(<>{['Objects', 'Command', 'Console'].map(title => <HudCardShell key={title} title={title}>Panel</HudCardShell>)}</>)
+  await waitFor(() => expect(renderer.entries).toHaveLength(3))
+  for (let now = 16; now <= 2016; now += 16) await frame(now)
+  expect(renderer.entries).toHaveLength(3)
+  for (const entry of renderer.entries) {
+    expect(entry.render.mock.calls.length).toBeGreaterThan(0)
+    expect(entry.render.mock.calls.length).toBeLessThanOrEqual(61)
+  }
+  act(() => { motion.matches = true; motion.dispatchEvent(new Event('change')) })
+  await frame(3000)
+  expect(frames.size).toBe(0)
+  const counts = renderer.entries.map(entry => entry.render.mock.calls.length)
+  await frame(4000)
+  expect(renderer.entries.map(entry => entry.render.mock.calls.length)).toEqual(counts)
+  view.unmount()
+  expect(renderer.entries.every(entry => entry.dispose.mock.calls.length === 1)).toBe(true)
+  expect(frames.size).toBe(0)
+})
