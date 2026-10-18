@@ -8,7 +8,7 @@
 }
 .recovery {
   position: absolute;
-  top: 76px;
+  top: var(--workspace-toolbar-top, 76px);
   left: 16px;
   right: 16px;
   display: flex;
@@ -25,10 +25,10 @@
 .settings {
   position: absolute;
   z-index: 3;
-  top: 124px;
+  top: var(--workspace-panels-top, 124px);
   left: 16px;
   width: min(400px, calc(100% - 32px));
-  max-height: calc(100% - 144px);
+  max-height: calc(100% - var(--workspace-settings-reserve, 144px));
   display: flex;
   pointer-events: auto;
 }
@@ -41,7 +41,7 @@
 .settingRow button[aria-pressed='true'] { background: #76e3ef20; }
 .stage {
   position: absolute;
-  inset: 122px 16px 112px;
+  inset: var(--workspace-panels-top, 122px) 16px 112px;
   display: grid;
   grid-template-columns: minmax(0, 320px) minmax(24px, 1fr) minmax(0, 360px);
   grid-template-rows: repeat(6, minmax(0, 1fr)) repeat(3, minmax(0, max-content));

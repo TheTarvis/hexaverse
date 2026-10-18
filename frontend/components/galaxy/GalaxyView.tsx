@@ -2,13 +2,10 @@
 
 // GalaxyView — the container the home page renders (spec #0002).
 //
-// Composes the three.js <GalaxyGraph> renderer with two Catalyst overlays:
-//  - LEFT  intel panel: galaxy / player summary + stat tiles (system count,
-//          region breakdown with colored dots, lane count) and a live-vs-frozen
-//          badge (isStartArea).
-//  - RIGHT inspector: empty state until a node is selected, then name / region /
-//          connections + the major-body skeleton (ALWAYS visible, never gated by
-//          `discovered` — spec Decision #7).
+// Uses the same viewport, heading, vitals and configurable workspace as System.
+// Objects supplies the galaxy browser/inspector; Command retains fleet controls;
+// Console retains galaxy intel and market data. This route owns its reads,
+// inspection, commands and renderer; changing panel visibility never issues a command.
 //
 // migrate-fleet-to-continuous-burns (design.md Decision 12): the galaxy view's
 // select→preview→commit travel gesture and its transit-fleet card have no
@@ -30,7 +27,10 @@ import { rosterRowStatus } from '@/components/fleet/roster-status'
 import { useCorporationSessionOptional } from '@/components/corporation-provider'
 import { BOARD_POLL_MS } from '@/lib/realtime'
 
-import { HudRoot, HudPanel, HudHeading, HudColumn } from '@/components/hud/GameHud'
+import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudHeading as CardHeading } from '@/components/hud/HudTypography'
+import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
+import { GalaxyObjectBrowser } from './GalaxyObjectBrowser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -318,30 +318,32 @@ export function GalaxyView() {
 
   if (isLoading) {
     return (
-      <HudRoot data-testid="galaxy-view">
+      <GameViewShell data-testid="galaxy-view">
         <GraphFallback label="Charting the galaxy…" />
-      </HudRoot>
+      </GameViewShell>
     )
   }
 
   if (isError || !galaxy) {
     return (
-      <HudRoot
+      <GameViewShell
         data-testid="galaxy-view"
         className="grid place-items-center px-6"
       >
-        <HudPanel className="p-4">
+        <HudCardShell className="p-4">
           <Subheading className="!text-white">Couldn’t load the galaxy</Subheading>
           <Text className="mt-1 !text-zinc-400">
             {error?.message ?? 'The galaxy read failed. Try again shortly.'}
           </Text>
-        </HudPanel>
-      </HudRoot>
+        </HudCardShell>
+      </GameViewShell>
     )
   }
 
   return (
-    <HudRoot data-testid="galaxy-view">
+    <GameViewShell data-testid="galaxy-view">
+      <GameViewHeading eyebrow="Command network" title={isStartArea ? 'Start Area' : 'Live Galaxy'} detail={isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'} />
+      <GameViewScene>
       <CanvasRegionBoundary
         key={attempt}
         onError={reportRenderError}
@@ -364,17 +366,19 @@ export function GalaxyView() {
         />
       </div>}
 
-      {/* Overlay layer — panels catch pointer events, the gap between lets the
-          graph receive orbit/pan/zoom/clicks. */}
-      <div className="pointer-events-none absolute inset-0">
-        <HudColumn side="left" paired data-testid="galaxy-command-column">
-          <IntelPanel
-            galaxy={galaxy}
-            isStartArea={isStartArea}
-            regionCounts={regionCounts}
-            onRecenter={handleRecenter}
+      </GameViewScene>
+      <GameViewWorkspace corporationId={isStartArea ? 'guest' : session.corporation?.id ?? 'unavailable'} panels={[
+        { id: 'objects', label: 'Objects', children: <GalaxyObjectBrowser nodes={galaxy.nodes} selectedId={selectedId} onSelect={handleSelectSystemId}>
+          <Inspector
+            node={selected}
+            connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
+            stationQuotes={selectedStationQuotes}
+            onEnter={isStartArea ? null : handleEnterSystem}
             available={canvasAvailable}
+            hasOwnFleet={ownFleets.length > 0}
           />
+        </GalaxyObjectBrowser> },
+        { id: 'command', label: 'Command', children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
           {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={id => activeFleet.jump ? handleSelectSystemId(id) : handleEnterSystem(id)} onOpen={handleEnterSystem} />}
           {/* This view mounts no command panel of its own, so the roster
               rows ARE the fleet command surface here — declared explicitly
@@ -397,6 +401,10 @@ export function GalaxyView() {
             onJump={handleJump}
             enabled={!isStartArea}
           />
+          {isStartArea && <Text>Sign in to command a fleet.</Text>}
+        </div> },
+        { id: 'console', label: 'Console', children: <div className="flex min-w-0 flex-col gap-4">
+          <IntelPanel galaxy={galaxy} isStartArea={isStartArea} regionCounts={regionCounts} onRecenter={handleRecenter} available={canvasAvailable} />
           {/* The market board's first mount point (the second is the station
               inspector on the board view). The SAME shared panel: it ranks and
               presents; this view decides that a row selection FOCUSES that
@@ -410,26 +418,17 @@ export function GalaxyView() {
               onSelectSystem={handleSelectSystemId}
             />
           )}
-        </HudColumn>
-        <HudColumn paired data-testid="galaxy-inspector-column">
-          <Inspector
-            node={selected}
-            connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
-            stationQuotes={selectedStationQuotes}
-            onEnter={isStartArea ? null : handleEnterSystem}
-            available={canvasAvailable}
-            hasOwnFleet={ownFleets.length > 0}
-          />
-        </HudColumn>
-      </div>
-      {!isStartArea && <div className="absolute inset-x-0 bottom-0 overflow-x-auto" data-testid="galaxy-vitals">
+        </div> },
+      ]} />
+      {isStartArea && <GameViewVitals><div className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><Button href="/login" color="cyan">Sign in</Button></div></GameViewVitals>}
+      {!isStartArea && <GameViewVitals data-testid="galaxy-vitals">
         <VitalsStrip acting={activeFleet} ownedFleets={ownFleets} fleetsFailed={!!fleetsFailed}
           status={!fleetsFailed && activeFleet ? rosterRowStatus(activeFleet, worldTime, id => systemNames[id] ?? id) : null}
           onSelectFleet={f => { setActiveFleetId(f.id); handleShowFleet(f) }} systemNames={systemNames}
           credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
           worldTime={worldTime} serverWorldTime={servedWorldTime} />
-      </div>}
-    </HudRoot>
+      </GameViewVitals>}
+    </GameViewShell>
   )
 }
 
@@ -453,16 +452,12 @@ function IntelPanel({
   available: boolean
 }) {
   return (
-    <HudPanel as="aside"
+    <HudCardShell
       data-testid="intel-panel"
       className="flex flex-col gap-4 p-4"
     >
       <div className="flex items-start justify-between gap-2">
-        <HudHeading
-          eyebrow="Command network"
-          title={isStartArea ? 'Start Area' : 'Live Galaxy'}
-          detail={isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'}
-        />
+        <div><CardHeading variant="section" level={3}>{isStartArea ? 'Start Area' : 'Live Galaxy'}</CardHeading><Text>{isStartArea ? 'Frozen · read-only' : 'Live · your galaxy'}</Text></div>
         <Button
           plain
           onClick={onRecenter}
@@ -497,7 +492,7 @@ function IntelPanel({
       </div>
 
       {isStartArea && (
-        <HudPanel as="div" tone="inset"
+        <HudCardShell
           data-testid="signin-prompt"
           className="p-3"
         >
@@ -508,18 +503,18 @@ function IntelPanel({
           <TextLink href="/login" className="mt-1 inline-block text-xs !text-sky-400">
             Sign in →
           </TextLink>
-        </HudPanel>
+        </HudCardShell>
       )}
-    </HudPanel>
+    </HudCardShell>
   )
 }
 
 function StatTile({ label, value }: { label: string; value: number }) {
   return (
-    <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
+    <HudCardShell className="min-w-0 px-3 py-2">
       <div className="font-mono text-xl leading-none text-white">{value}</div>
       <div className="mt-1 text-[11px] tracking-wide text-zinc-400 uppercase">{label}</div>
-    </HudPanel>
+    </HudCardShell>
   )
 }
 
@@ -551,7 +546,7 @@ function Inspector({
 }) {
   if (!node) {
     return (
-      <HudPanel as="aside"
+      <HudCardShell
         data-testid="inspector"
         className="flex flex-col p-4"
       >
@@ -562,12 +557,12 @@ function Inspector({
               ? 'Select an own fleet in the roster to inspect its system.'
               : 'Select an own fleet in the roster, or wait until the graph is available to pick any other system.'}
         </p>
-      </HudPanel>
+      </HudCardShell>
     )
   }
 
   return (
-    <HudPanel as="aside"
+    <HudCardShell
       data-testid="inspector"
       className="flex flex-col gap-3 p-4"
     >
@@ -588,14 +583,14 @@ function Inspector({
       </div>
 
       <dl className="grid grid-cols-2 gap-2 text-sm">
-        <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
+        <HudCardShell className="min-w-0 px-3 py-2">
           <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Lanes</dt>
           <dd className="font-mono text-white">{connections}</dd>
-        </HudPanel>
-        <HudPanel as="div" tone="inset" className="min-w-0 px-3 py-2">
+        </HudCardShell>
+        <HudCardShell className="min-w-0 px-3 py-2">
           <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Star</dt>
           <dd className="font-mono text-white">Class {node.skeleton.starClass}</dd>
-        </HudPanel>
+        </HudCardShell>
       </dl>
 
       {/* Drill-in to the tactical board (#0002 Follow-ups 2026-07-11 —
@@ -622,13 +617,13 @@ function Inspector({
         ) : (
           <ul className="flex flex-col gap-1">
             {node.skeleton.bodies.map((b, i) => (
-              <HudPanel as="li" tone="inset"
+              <li
                 key={i}
                 className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
               >
                 <span className="capitalize">{b.type.replace('_', ' ')}</span>
                 <span className="font-mono text-xs text-zinc-400">ring {b.ring}</span>
-              </HudPanel>
+              </li>
             ))}
           </ul>
         )}
@@ -650,7 +645,7 @@ function Inspector({
               )
               if (!top) return null
               return (
-                <HudPanel as="li" tone="inset"
+                <li
                   key={q.kind}
                   data-testid={`inspector-quote-${q.kind}`}
                   className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
@@ -669,7 +664,7 @@ function Inspector({
                   <span className="font-mono text-xs text-zinc-300 tabular-nums">
                     {top.unitPrice} cr/t
                   </span>
-                </HudPanel>
+                </li>
               )
             })}
           </ul>
@@ -681,7 +676,7 @@ function Inspector({
           Uncharted — survey or travel to chart subspace routes and reveal its worth.
         </p>
       )}
-    </HudPanel>
+    </HudCardShell>
   )
 }
 

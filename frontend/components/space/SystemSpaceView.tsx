@@ -35,15 +35,15 @@ import { CelestialActions } from './CelestialActions'
 // the interior read has failed, at the FLEET read's served scale, because
 // that is then the only clock on screen.
 
-import { SystemViewport } from './SystemViewport'
+import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
 import { Button } from '@/components/catalyst/button'
 import { usePhoneHud } from '@/hooks/use-phone-sheet'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudText } from '@/components/hud/HudTypography'
-import { HudWorkspace, type HudPanelId } from '@/components/hud/HudWorkspace'
-import { HudHeading, HudColumn } from '@/components/hud/GameHud'
+import { type HudPanelId } from '@/components/hud/HudWorkspace'
+import { HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -1096,11 +1096,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   )
 
   return (
-    <SystemViewport
+    <GameViewShell
       data-testid="space-view"
       className={commandStyles.commandView}
     >
-      <HudHeading className={commandStyles.identity} data-testid="command-system-identity"
+      <GameViewHeading className={commandStyles.identity} data-testid="command-system-identity"
         eyebrow="Local space / Command network"
         title={systemNames[systemId] ?? systemId}
         detail={fleets.isError ? 'Fleet telemetry unavailable' : fleets.isLoading ? 'Synchronizing fleets…' : `${allFleets.length} fleets · ${allFleets.reduce((count, fleet) => count + (fleet.roster?.ships.length ?? 0), 0)} ships`}
@@ -1142,7 +1142,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       {/* The canvas IS the window (spec #0002's canvas model, as the galaxy
           view does it): the stage fills the viewport and every panel floats
           over it. */}
-      <div className="absolute inset-0 isolate z-0">
+      <GameViewScene>
         {interiorFailed ? (
           <div className="absolute inset-0 grid place-items-center p-6">
           <div
@@ -1219,7 +1219,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             </button>
           </div>
         )}
-      </div>
+      </GameViewScene>
 
       {phoneHud && guiding && !guidePageVisible && <Button plain className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
       <div className={commandStyles.guideLayer}>
@@ -1241,7 +1241,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       )}
       {guiding && guide && <HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell>}
       </div>
-      <HudWorkspace
+      <GameViewWorkspace
         onPanelActivate={id => { if (id === 'objects') openObjectIndex(true); else if (id === 'console') openDockOn(dock.tab) }}
         onPanelDismiss={id => { if (id === 'objects') setObjectIndexOpen(false); else if (id === 'console') collapseDock() }}
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}
@@ -1422,7 +1422,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         ]}
       />
       <div ref={setConsoleAnnouncementOutlet} data-testid="workspace-console-announcements" />
-      <div className={commandStyles.workspaceVitals}>
+      <GameViewVitals className={commandStyles.workspaceVitals}>
 <VitalsStrip
           acting={acting}
           ownedFleets={allFleets}
@@ -1438,8 +1438,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
             : {})}
         />
-      </div>
-    </SystemViewport>
+      </GameViewVitals>
+    </GameViewShell>
   )
 }
 

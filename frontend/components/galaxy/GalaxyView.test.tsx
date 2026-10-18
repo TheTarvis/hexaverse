@@ -307,6 +307,23 @@ describe('GalaxyView', () => {
     mockUseMarketBoard.mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMarketBoard>)
   })
 
+  it('retains Galaxy search and inspection through hide/reopen without navigating', () => {
+    mockGalaxyState()
+    renderView()
+    const search = screen.getByRole('searchbox', { name: 'Find a galaxy system' })
+    fireEvent.change(search, { target: { value: 'Axion' } })
+    fireEvent.click(screen.getByTestId('galaxy-object-sys-0'))
+    expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+    expect(pushSpy).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+    expect(search).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to galaxy systems' }))
+    expect(search).toHaveValue('Axion')
+    expect(screen.queryByTestId('galaxy-object-sys-1')).not.toBeInTheDocument()
+    expect(pushSpy).not.toHaveBeenCalled()
+  })
+
   it('renders the intel panel with system/lane/region stats', async () => {
     mockGalaxyState()
     renderView()

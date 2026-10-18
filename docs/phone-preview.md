@@ -1152,3 +1152,21 @@ IMG_1048 reference itself remains unpublished. Temporary candidate20218 stopped;
 development services and protected preview remain running. Shared production
 files are ready for the separately authorized shell/Galaxy work; no such refactor
 was attempted in this fix.
+
+### Shared game shell candidate — 2026-10-18, not deployed
+
+Validated candidate **ZxLqLPRswDR9eUMPSekHj** introduces the shared Galaxy/System
+presentation shell and Galaxy workspace. It preserves all 57 public assets,
+original 624c4ff card CSS, released input/viewport corrections, authentication and
+routes. 438 tests/30 files, types/scoped lint and isolated production build pass;
+Chromium/WebKit synthetic route checks cover guest/auth, search, shared preferences,
+corporation isolation, original chrome and first-login/mobile navigation.
+
+Automatic approval review rejected the supervisor stop needed to activate the
+candidate: a brief interruption to this shared protected preview requires trusted
+explicit authorization to reload it. No live process/config/policy changed. The
+existing iOS build **LZQ850NK0eM1Mfbe64zJo** remains the configured preview.
+[Candidate evidence and handoff](../.scratch/shared-game-shell/README.md) records
+snapshot/config paths, checks and the pending restart. The exact protected endpoint,
+Google identity policy and 2026-10-19T00:00:00Z cutoff remain unchanged. Native
+physical-iPhone acceptance and full emulator gameplay journeys remain unverified.

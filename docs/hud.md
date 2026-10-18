@@ -658,3 +658,29 @@ clearing stale keyboard pan. At browser scale≠1 the game retains its layout an
 lets the browser own accessible zoom. Focus changes never force scale back to1.
 A page already magnified before deployment may retain its browser zoom; resetting
 that existing view remains a user action, not an automatic accessibility override.
+
+## Shared Galaxy and System shell — 2026-10-18
+
+Both production routes compose [GameViewShell](../frontend/components/hud/GameViewShell.tsx)
+and its heading, scene layer, workspace and vitals slots. Shared geometry lives in
+`game-view-shell.module.css`; System retains tutorial/recovery and local-action
+styles. The shell reuses the released SystemViewport owner, including keyboard
+viewport recovery and unrestricted accessibility zoom. Route controllers retain
+queries, world clocks, inspection and command ownership.
+
+Galaxy now uses the same Objects, Command, Console and Arrange workspace. Objects
+lists every supplied system with pinned name/region/star-class search and details
+with Back. Command retains fleet location, roster commands and navigation; Console
+retains system/lane/region statistics, recenter and market information. Logged-out
+visitors retain frozen browsing and a map-visible sign-in link; authenticated
+reads/actions stay disabled. Workspace preferences keep the existing per-corporation
+storage format and share the three panel identities across scenes; guest preferences
+use their own scope. Hidden panels retain browsing and content state.
+
+The original 624c4ff card chrome, direct phone icons, full-page sheet isolation,
+16px phone fields and safe-area/internal scrolling contracts remain unchanged.
+Inspecting a system does not choose a command fleet. Enter system remains explicit;
+Galaxy commands retain their original fleet/gate and local-destination boundaries.
+The two renderers, canvas allocation, camera implementations and data-settlement
+lifecycles are unchanged. A shared canvas host and persistent renderer are later
+slices, not claims of this extraction.
