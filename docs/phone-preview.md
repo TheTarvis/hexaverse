@@ -1110,3 +1110,45 @@ Evidence: /tmp/hexaverse-objects-search-{regression,candidate-final,live,deploym
 {phone,desktop}.png. Supervisor errors and post-reboot transport logs remain0bytes.
 Stopped only temporary candidate20218 after validation; all requested development
 services, emulators and protected preview remain running. No push.
+
+### Shared input-focus fix deployed — 2026-10-18
+
+Source commit602e8da, build **LZQ850NK0eM1Mfbe64zJo**, replaces dzvUlXJ5gttS9vxBEcbSW
+through the same supervisor. IMG_1048 was inspected locally: the initial Recovery
+Signal is enlarged/clipped after input interaction, but the exact focused field
+is not visible. Actual preceding login and autofocus wake/name controls computed
+14px in the served baseline, with no reducing transforms; the earlier16px fix
+covered only HUD cards. Shared global form sizing now applies max(16px,1rem) on
+mobile/short-landscape/coarse-pointer surfaces before focus, including portalled
+controls. Desktop fine-pointer controls retain14px. Focus/blur now clears stale
+keyboard viewport pan without resetting browser scale. Original card/navigation
+CSS, all57 assets, touch gestures and unrestricted viewport zoom remain unchanged.
+
+430tests/28files, types/scoped lint and production/Storybook builds pass. Candidate
+and live-route login/signup-confirm/wake-invalid audits compute16px with effective
+scale1 and no ancestor shrink. Both-engine shared-control checks cover17 native
+variants/states and a portalled naming field at320/390/844 widths. Candidate
+mining/sell/refuel, sticky Objects, guide/inert and first-login/camera checks pass.
+All Auth/game traffic is intercepted synthetic data; no live commands submitted.
+
+Deployment verification: complete compressed pages200 (system no-store),33initial
+served JS/CSS assets byte-identical,7valid pins, anonymous302,Storybook200,
+debug/QA404 and foreignOriginPOST403. Same exact identity/cutoff/routes and pinned
+published Storybook/art. Error/transport logs0bytes. No push or security changes.
+Native iPhone focus magnification/software keyboard and local user-Chrome remain
+unverified. Existing magnification is not forcibly reset because that could also
+be deliberate accessibility zoom. See docs/hud.md and input-focus-evidence.json.
+
+Live gateway final runs pass in Chromium and WebKit: login/signup/name-invalid
+at16px, sell/refuel and sticky Objects fields at16px/effective scale1, 320/375/390
+portrait/landscape/desktop layout, guide/icon/inert/Back handoffs and first-login/
+camera checks. Errors[]; no live writes. A QA resource-forwarder teardown race
+was limited to post-assertion cleanup; its handler now ignores errors only once
+teardown begins, while active request errors still fail the run. Final runs exit0.
+Shared-control placeholder/font and modal checks also exit0 in both engines.
+Saved compact audit: .scratch/hud-card-baseline/input-focus-evidence.json; matching
+initial Recovery Signal capture: input-focus-recovery-phone.png. The private
+IMG_1048 reference itself remains unpublished. Temporary candidate20218 stopped;
+development services and protected preview remain running. Shared production
+files are ready for the separately authorized shell/Galaxy work; no such refactor
+was attempted in this fix.

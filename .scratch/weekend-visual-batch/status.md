@@ -617,3 +617,25 @@ Oct19 00UTC cutoff and pinned published Storybook/art; public assets unchanged.
 Post-reboot supervisor/transport logs0bytes. Temporary candidate20218 stopped;
 GoLand services/emulators and protected preview remain online. No push. Operational
 evidence and remaining physical iPhone/local-Chrome limitations: docs/phone-preview.md.
+
+### iPhone input-focus follow-up — 2026-10-18
+
+IMG_1048 inspected; initial system Recovery Signal is magnified/right-clipped,
+with no field visible. Served login and autofocused Corporation name fields were
+14px outside the earlier HUD16px rule. Shared mobile/coarse form minimum now
+covers them before focus; original desktop14px and shared card/navigation CSS
+remain. Keyboard pan clears on settled focus/blur without forcing viewport scale.
+602e8da deployed as LZQ850NK0eM1Mfbe64zJo through the same exact protected preview
+and Oct19 00UTC deadline. 430tests/28files, types/scoped lint, production/Storybook
+builds and candidate Chromium/WebKit input/Objects/first-login/camera/forms pass.
+Actual native iPhone focus zoom/software keyboard remain acceptance checks.
+No architecture refactor or game writes; all57 public assets unchanged. Source
+and diagnostic evidence are linked from docs/hud.md and docs/phone-preview.md.
+
+Final live Chromium/WebKit runs exit0 for input/Objects/station/guide checks and
+first-login/camera, errors[] and no live writes. Shared-controls/placeholder/modal
+checks exit0. Before/after styles and viewport metadata are retained in
+.scratch/hud-card-baseline/input-focus-evidence.json; initial-guide capture is
+input-focus-recovery-phone.png. Temporary candidate20218 stopped. Shared runtime
+files are limited to app/globals.css and space/system-viewport-lock.ts; the separate
+shell/Galaxy migration can proceed from602e8da without overlapping this work.

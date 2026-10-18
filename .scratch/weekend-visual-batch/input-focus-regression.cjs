@@ -18,7 +18,7 @@ async function run(type, options, name) {
   for (const size of [{ width: 320, height: 667 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
    await page.setViewportSize(size)
    const fields = await read(page); assert.equal(fields.length, 17)
-   for (const field of fields) { assert.ok(field.font >= 16, JSON.stringify(field)); assert.ok(field.ratio >= .99, JSON.stringify(field)) }
+   for (const field of fields) { assert.ok(field.font >= 16 && field.placeholderFont >= 16, JSON.stringify(field)); assert.ok(field.ratio >= .99, JSON.stringify(field)) }
    assert.equal(fields.find(f => f.label === 'Invalid field').invalid, 'true'); assert.equal(fields.find(f => f.label === 'Disabled field').disabled, true)
    for (const label of ['text', 'search', 'email', 'password', 'number', 'tel', 'url', 'date', 'datetime-local', 'month', 'time', 'week', 'Invalid field', 'Read-only field', 'Draft message', 'Resource']) {
     const field = page.getByLabel(label, { exact: true }); await field.focus()

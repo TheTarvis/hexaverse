@@ -301,16 +301,18 @@ async function checkOrbit(p,c,name){
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-gesture-phone.png'})
 }
 async function run(type,options,name){
- const b=await type.launch({headless:true,...options});const errors=[],bad=[],requests=[],writes=[],fixtureWrites=[];let spawned=process.env.QA_FIRST_LOGIN!=='1'
+ const b=await type.launch({headless:true,...options});const errors=[],bad=[],requests=[],writes=[],fixtureWrites=[];let spawned=process.env.QA_FIRST_LOGIN!=='1',closing=false
  try{
  const c=await b.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await c.newPage()
  p.on('pageerror',e=>errors.push(e.message.slice(0,1200)));p.on('console',m=>{if(m.type()==='error')errors.push(m.text().replace(/\?.*/g,'?<redacted>').slice(0,500))});p.on('response',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/_next/')&&r.status()>=400)bad.push({path:u.pathname,status:r.status()})});p.on('requestfailed',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/_next/'))bad.push({path:u.pathname,error:r.failure()?.errorText})})
  if(origin.startsWith('https://'))await p.route(origin+'/**',async route=>{
+ try{
  const req=route.request(),u=new URL(req.url());const headers={...req.headers()};delete headers.host;delete headers.cookie;delete headers.authorization
  // Retry one reset GET connection in the QA resource forwarder; app writes stay intercepted.
  const response=await c.request.fetch((process.env.QA_UPSTREAM||'http://127.0.0.1:20204')+u.pathname+u.search,{method:req.method(),headers,data:req.postDataBuffer()||undefined,failOnStatusCode:false,maxRetries:req.method()==='GET'?1:0})
  const hs={...response.headers()};for(const key of['content-encoding','content-length','transfer-encoding','connection','set-cookie'])delete hs[key]
- return route.fulfill({status:response.status(),headers:hs,body:await response.body()})
+ return await route.fulfill({status:response.status(),headers:hs,body:await response.body()})
+ }catch(error){if(!closing)throw error} // Only ignore a resource forwarder's race after all assertions, during teardown.
  })
  await p.route('**/emulator/auth/iframe**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic Auth frame</title>'}))
  await p.route('**/identitytoolkit.googleapis.com/**',async route=>{const path=new URL(route.request().url()).pathname;if(path.includes('signInWithPassword'))return route.fulfill({json:{localId:uid,email:'isolated@example.invalid',idToken:token,refreshToken:'synthetic-refresh',expiresIn:'3600',registered:true}});if(path.includes('lookup'))return route.fulfill({json:{users:[{localId:uid,email:'isolated@example.invalid',emailVerified:true,displayName:'Isolated QA',providerUserInfo:[],createdAt:'1000',lastLoginAt:'1000'}]}});return route.fulfill({status:400,json:{error:{message:'QA_AUTH_ROUTE_BLOCKED'}}})})
@@ -334,7 +336,7 @@ async function run(type,options,name){
  return route.fulfill({status,json:data})})
  await p.goto(origin+'/login');await p.getByTestId('login-email').waitFor();await auditInputs(p,name,'login-rest');await p.getByTestId('login-email').focus();await auditInputs(p,name,'login-focus');if(process.env.QA_INPUT_FOCUS==='1'){await p.getByRole('button',{name:'Sign up',exact:true}).click();await p.getByTestId('login-confirm-password').focus();await auditInputs(p,name,'signup-confirm-focus');await p.getByRole('button',{name:'Sign in',exact:true}).click()}await p.getByTestId('login-email').fill('isolated@example.invalid');await p.getByTestId('login-password').fill('synthetic-not-a-credential');await p.getByTestId('login-submit').tap()
  await p.waitForFunction(()=>!document.querySelector('[data-testid="login-submit"]'),{timeout:15000}).catch(()=>{})
- if(process.env.QA_FIRST_LOGIN==='1'){await p.goto(origin+'/systems/'+system);await p.getByTestId('wake-name-input').waitFor();await auditInputs(p,name,'wake-autofocus');await p.getByTestId('wake-name-input').fill('W'.repeat(41));await auditInputs(p,name,'wake-invalid');await p.getByTestId('wake-name-input').fill('Isolated QA');await p.getByTestId('wake-submit').tap();await p.waitForURL('**/systems/'+system);await p.getByTestId('begin-guide').waitFor();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'wake');await p.getByTestId('begin-guide').tap();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'objects');assert.equal(fixtureWrites.length,1)}
+ if(process.env.QA_FIRST_LOGIN==='1'){await p.goto(origin+'/systems/'+system);await p.getByTestId('wake-name-input').waitFor();await auditInputs(p,name,'wake-autofocus');await p.getByTestId('wake-name-input').fill('W'.repeat(41));await auditInputs(p,name,'wake-invalid');await p.getByTestId('wake-name-input').fill('Isolated QA');await p.getByTestId('wake-submit').tap();await p.waitForURL('**/systems/'+system);await p.getByTestId('begin-guide').waitFor();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'wake');if(process.env.QA_INPUT_FOCUS==='1')await p.screenshot({path:out+'/'+name.toLowerCase()+'-wake-before-guide.png'});await p.getByTestId('begin-guide').tap();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'objects');assert.equal(fixtureWrites.length,1)}
  if(process.env.QA_GUIDE_PHASE)await p.evaluate(({corp,fleetId,system,phase})=>localStorage.setItem('hexaverse:command-guide:v1:'+corp,JSON.stringify({version:3,corporationId:corp,fleetId,systemId:system,phase,scanActionId:null,stationId:null,targetId:null,acceptedAt:null,mineActionId:null,resource:null,cargoBefore:0})),{corp,fleetId,system,phase:process.env.QA_GUIDE_PHASE})
  if(process.env.QA_FIRST_LOGIN!=='1')await p.goto(origin+'/systems/'+system);await p.waitForTimeout(3000)
  await auditInputs(p,name,'system-entry');const snapshot=await p.evaluate(()=>({url:location.pathname,title:document.title,text:document.body.innerText.slice(0,6000),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>({label:e.getAttribute('aria-label'),inert:!!e.closest('[inert]'),visibility:getComputedStyle(e).visibility,rect:e.getBoundingClientRect().toJSON()})),expandedTriggers:[...document.querySelectorAll('[data-testid="hud-workspace"] button[aria-expanded="true"]')].map(e=>({label:e.textContent,testid:e.getAttribute('data-testid'),panel:e.closest('[data-panel]')?.getAttribute('data-panel'),panelHidden:e.closest('[data-panel]')?.hasAttribute('hidden')})),inert:[...document.querySelectorAll('[inert]')].map(e=>({tag:e.tagName,id:e.getAttribute('data-testid'),class:e.className?.toString().slice(0,100)})),center:document.elementFromPoint(195,300)?.outerHTML.slice(0,350),shell:document.querySelector('[data-testid="space-view"]')?.getBoundingClientRect().toJSON()}))
@@ -376,7 +378,7 @@ async function run(type,options,name){
   assert.equal(writes.length,0)
  }
  console.log(name,'final errors',JSON.stringify(errors))
- await p.unrouteAll({behavior:'wait'});await c.close()
- }finally{await b.close()}
+ closing=true;await p.unrouteAll({behavior:'wait'});await c.close()
+ }finally{closing=true;await b.close()}
 }
 ;(async()=>{await run(chromium,{},'Chromium');await run(webkit,{executablePath:'/Users/travis/Library/Caches/ms-playwright/webkit-2182/pw_run.sh'},'WebKit')})().catch(e=>{console.error(e);process.exitCode=1})

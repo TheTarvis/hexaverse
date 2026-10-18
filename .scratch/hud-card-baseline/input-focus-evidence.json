@@ -1,0 +1,2651 @@
+{
+  "reference": {
+    "libraryFileId": "libfile_055e093fe28881919bdc0074db64bdf7",
+    "filename": "IMG_1048.png",
+    "screen": "Initial Recovery Signal on /systems/[homeSystem]",
+    "focusedFieldVisible": false
+  },
+  "baselineBuild": "dzvUlXJ5gttS9vxBEcbSW",
+  "fixedBuild": "LZQ850NK0eM1Mfbe64zJo",
+  "physicalIPhoneValidated": false,
+  "audits": {
+    "before": [
+      {
+        "engine": "Chromium",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "wake-autofocus",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "wake-invalid",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 14,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": "true",
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "wake-autofocus",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "wake-invalid",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 14,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": "true",
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      }
+    ],
+    "afterFirstLogin": [
+      {
+        "engine": "Chromium",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "wake-autofocus",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "wake-invalid",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": "true",
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "wake-autofocus",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "wake-invalid",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "wake-name-input",
+            "type": "text",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": "true",
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      }
+    ],
+    "afterObjects": [
+      {
+        "engine": "Chromium",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-sell-kind-select",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-sell-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-sell-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-refuel-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-refuel-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-rest-320",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 320,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 320,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-focus-320",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 320,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 320,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-rest-375",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 375,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 375,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-focus-375",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 375,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 375,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-rest-390",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-focus-390",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-rest-844",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 844,
+          "innerHeight": 390,
+          "scale": 1,
+          "width": 844,
+          "height": 390,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-focus-844",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 844,
+          "innerHeight": 390,
+          "scale": 1,
+          "width": 844,
+          "height": 390,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-rest-1280",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 1280,
+          "innerHeight": 900,
+          "scale": 1,
+          "width": 1280,
+          "height": 900,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "objects-focus-1280",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 1280,
+          "innerHeight": 900,
+          "scale": 1,
+          "width": 1280,
+          "height": 900,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-sell-kind-select",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-sell-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-sell-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-refuel-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-refuel-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "sell-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "sell-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "refuel-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-rest-320",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 320,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 320,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-focus-320",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 320,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 320,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-rest-375",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 375,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 375,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-focus-375",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 375,
+          "innerHeight": 667,
+          "scale": 1,
+          "width": 375,
+          "height": 667,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-rest-390",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-focus-390",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-rest-844",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 844,
+          "innerHeight": 390,
+          "scale": 1,
+          "width": 844,
+          "height": 390,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-focus-844",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 844,
+          "innerHeight": 390,
+          "scale": 1,
+          "width": 844,
+          "height": 390,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-rest-1280",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 1280,
+          "innerHeight": 900,
+          "scale": 1,
+          "width": 1280,
+          "height": 900,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "objects-focus-1280",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 1280,
+          "innerHeight": 900,
+          "scale": 1,
+          "width": 1280,
+          "height": 900,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "system-index-search",
+            "type": "search",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      }
+    ],
+    "afterMining": [
+      {
+        "engine": "Chromium",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-mine-kind-select",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-mine-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "Chromium",
+        "state": "production-mine-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "textSizeAdjust": "100%",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-rest",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "login-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "signup-confirm-focus",
+        "route": "/login",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "login-email",
+            "type": "email",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "login-confirm-password",
+            "type": "password",
+            "font": 16,
+            "lineHeight": "20px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "system-entry",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": []
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-mine-kind-select",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-mine-tons-input",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      },
+      {
+        "engine": "WebKit",
+        "state": "production-mine-tons-input-edited",
+        "route": "/systems/sys_0_1",
+        "meta": "width=device-width, initial-scale=1, viewport-fit=cover",
+        "viewport": {
+          "innerWidth": 390,
+          "innerHeight": 844,
+          "scale": 1,
+          "width": 390,
+          "height": 844,
+          "offsetTop": 0,
+          "offsetLeft": 0
+        },
+        "fields": [
+          {
+            "id": "mine-kind-select",
+            "type": "select-one",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": false,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          },
+          {
+            "id": "mine-tons-input",
+            "type": "number",
+            "font": 16,
+            "lineHeight": "24px",
+            "effectiveScale": 1,
+            "focused": true,
+            "disabled": false,
+            "invalid": null,
+            "ancestors": []
+          }
+        ]
+      }
+    ]
+  }
+}
