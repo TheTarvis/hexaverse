@@ -1,0 +1,45 @@
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+   Using tsconfig file: tsconfig.phone-preview.json
+   Using tsconfig file: tsconfig.phone-preview.json
+   Using tsconfig file: tsconfig.phone-preview.json
+ ✓ Compiled successfully in 7.1s
+   Linting and checking validity of types ...
+
+./components/space/SystemSpaceView.stranding-notice.test.tsx
+398:7  Warning: 'rejectPreview' is assigned a value but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/10) ...
+   Generating static pages (2/10) 
+   Generating static pages (4/10) 
+   Generating static pages (7/10) 
+ ✓ Generating static pages (10/10)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    8.83 kB         623 kB
+├ ○ /_not-found                            124 B         104 kB
+├ ○ /dev/login                           1.58 kB         265 kB
+├ ƒ /dev/system-storyboard                 198 B         441 kB
+├ ƒ /dev/system-storyboard/hud           13.1 kB         454 kB
+├ ○ /login                               4.06 kB         295 kB
+├ ○ /spike/audio                         7.19 kB         125 kB
+├ ○ /spike/intel                          4.9 kB         125 kB
+├ ○ /spike/space-3d                      3.67 kB         124 kB
+├ ○ /spike/stealth                       6.22 kB         127 kB
+└ ƒ /systems/[systemId]                  56.1 kB         699 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/2233-8f30e29c1b99b8c7.js      46.6 kB
+  ├ chunks/c383f733-e74817c66762a473.js  54.2 kB
+  └ other shared chunks (total)          2.64 kB
+
+
+ƒ Middleware                             32.1 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

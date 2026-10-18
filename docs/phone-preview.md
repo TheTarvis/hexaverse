@@ -1179,3 +1179,36 @@ and transport error logs remain empty. The temporary candidate listener is stopp
 record snapshot/config paths and checks. Source implementation:e3bfdcb; local commits
 only, no push. Native physical-iPhone acceptance and full emulator gameplay journeys
 remain unverified.
+
+### Footer and Command fleet cleanup deployed — 2026-10-18 20:34 UTC
+
+Build **u9qNOlafjaKaU_zBlgiqo** now serves the single Galaxy map button, Account/
+Sign out inside existing Arrange HUD settings, and direct Command fleet selection.
+Telemetry is preserved in Command, including resolved dock host and burn target/ETA;
+the map telemetry toggle, fleet dropdown and Account footer panel are removed.
+The production travel-review dropdown is replaced by a link to the same Command
+selector. Source implementation: 568e9d5; local commits only, no push.
+
+The initial cleanup was activated at 20:27 UTC; the final status-preserving build was
+activated at 20:34:39 UTC (frontend 16659/gateway 16660/ngrok 16661). Only frontend snapshot
+paths and their two build pins changed. Exact Google/email protection, gateway/ngrok
+commands, routes, all 57 public assets, frozen 624c4ff card CSS, released iOS fixes and
+2026-10-19T00:00:00Z cutoff remain unchanged. The temporary candidate listener is
+stopped. Config backups and snapshot paths are in the
+[implementation/evidence record](../.scratch/footer-cleanup/README.md).
+
+584 tests / 39 files, TypeScript, scoped lint and production build pass. Final candidate
+and live Chromium/WebKit checks pass 390 portrait/844 landscape/1280 desktop for the
+single footer button, direct selected-fleet state, telemetry, reachable account
+settings, guest/auth, retained state and original chrome. Both engines also pass
+live first-login/guide, sheet isolation, direct icons and 16px input regressions.
+Sign-out wiring is tested with a unit spy; browser QA never activates Sign out, and
+all identity/game API traffic is synthetic. No real user/game writes occurred.
+
+Home/login/system HTML and all 34 initial JS/CSS resources match final build bytes;
+all 7 pins pass. Storybook 200, debug/QA 404, foreign-Origin writes 403, unauthenticated
+galaxy/account APIs 401 and anonymous edge 302 remain correct. Supervision and
+transport error logs are empty. Native physical-iPhone acceptance and full emulator
+gameplay journeys remain unverified. An earlier synthetic HTTPS WebKit blob-resource
+message did not recur in an isolated diagnostic or the final full candidate/live
+sweeps; no blob-error filtering is applied during assertions.
