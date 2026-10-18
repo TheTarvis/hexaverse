@@ -36,31 +36,43 @@ Reproduce synthetic route checks against a running loopback candidate:
 DEPLOYED_QA_ORIGIN=http://127.0.0.1:20218 node .scratch/shared-game-shell/browser.cjs
 ```
 
-Candidate build: ZxLqLPRswDR9eUMPSekHj. Its preserved snapshot path is recorded at
+Validated live build: ZxLqLPRswDR9eUMPSekHj. Its preserved snapshot path is recorded at
 /tmp/hexaverse-shared-shell-root.txt. The candidate server is temporary and can be
 started with that snapshot's phone-preview/frontend.mjs, the verified
 hexaverse-emulator project and port 20218. Do not build into a serving snapshot.
 
-## Preview deployment status
+## Preview deployment status: live
 
-Not deployed. Automatic approval review rejected the existing protected preview's
-launchctl bootout, because it would briefly interrupt a shared service and trusted
-explicit authorization to reload it was not established. No protected preview
-process/config/policy was changed; the live iOS baseline remains LZQ850NK0eM1Mfbe64zJo.
+Travis explicitly approved the brief shared-preview restart at 19:18 UTC on October 18.
+The initial automatic approval rejection was resolved by that approval; the same
+restart call then succeeded. The old supervisor finished stopping at 19:18:52 UTC;
+the replacement started at 19:19:12 UTC, with frontend 11573, gateway 11574 and ngrok 11575.
 
-A prepared, unactivated config is at
-/tmp/hexaverse-weekend-supervision/config-shared-shell-candidate.json. It changes only
-the frontend snapshot path and two build pins. Gateway/ngrok commands, routes,
-Google/exact-email policy, seven-pin validation, Storybook and cutoff
-2026-10-19T00:00:00Z are preserved. Obtain explicit approval for the brief restart
-before activation; do not bypass the rejection. Keep a backup of the current config,
-stop the existing supervisor, wait for its owned groups to exit, activate the
-candidate config and relaunch using the existing phone-preview procedure. Then run
-verify-deployment.py plus browser.cjs through the existing gateway, check anonymous
-edge denial, and inspect supervision/transport logs before claiming deployment.
+Build **ZxLqLPRswDR9eUMPSekHj** now serves at the existing protected
+https://gulf-identity-scrap.ngrok-free.dev/ endpoint. Only the frontend snapshot path
+and its two build pins changed. Gateway/ngrok commands, routes, Google/exact-email
+policy, seven-pin validation, Storybook and cutoff 2026-10-19T00:00:00Z remain unchanged.
+The old config is preserved at
+/tmp/hexaverse-weekend-supervision/config-before-shared-shell.json. The active config
+is the previously prepared config-shared-shell-candidate.json content. Do not build
+into the serving snapshot; prepare a separate snapshot for any further changes.
 
-Read-only post-rejection health checks confirm the old home/login/system HTML and
-33 initial JS/CSS resources match the live iOS build, all seven pins are valid,
-Storybook returns200, debug/QA routes remain404, foreign-Origin writes remain403
-and the anonymous protected edge returns302. Supervision and transport error logs
-remain empty (`live-baseline.log`). The temporary candidate listener was stopped.
+Live HTML for home/login/system and all 34 initial JS/CSS assets match the validated
+build; all seven pins pass. Storybook returns200, debug/QA routes remain404, foreign
+Origin writes remain403, unauthenticated game/account APIs return401 and anonymous
+edge access returns302. Supervision and transport error logs remain empty
+(`live-deployment.log`). Protection and all 57 public assets remain unchanged.
+
+`live-browser.log` records Chromium/WebKit pass at390 portrait,844 landscape and1280
+desktop for guest/auth, renderer readiness, search/Back/focus/state, original chrome,
+shared layout persistence and corporation isolation. `live-onboarding.log` records
+both-engine first-login/guide, inert release, direct icon navigation, original close
+target and mobile input-size checks through the existing gateway. All identity/game
+API traffic is intercepted with synthetic fixtures; no real user or gameplay writes
+were made. Live screenshots use the same synthetic fixtures. Native iPhone and full
+emulator gameplay acceptance remain unverified. The temporary candidate listener is
+stopped; only the approved protected supervisor serves this build.
+
+`live-baseline.log` preserves the earlier read-only evidence that the old iOS build
+remained healthy during the initial approval block. Implementation commit: e3bfdcb;
+initial evidence commit: 8c35b65. No commits have been pushed.

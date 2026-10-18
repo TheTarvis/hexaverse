@@ -1153,20 +1153,29 @@ development services and protected preview remain running. Shared production
 files are ready for the separately authorized shell/Galaxy work; no such refactor
 was attempted in this fix.
 
-### Shared game shell candidate — 2026-10-18, not deployed
+### Shared game shell deployed — 2026-10-18 19:19 UTC
 
-Validated candidate **ZxLqLPRswDR9eUMPSekHj** introduces the shared Galaxy/System
-presentation shell and Galaxy workspace. It preserves all 57 public assets,
-original 624c4ff card CSS, released input/viewport corrections, authentication and
-routes. 438 tests/30 files, types/scoped lint and isolated production build pass;
-Chromium/WebKit synthetic route checks cover guest/auth, search, shared preferences,
-corporation isolation, original chrome and first-login/mobile navigation.
+Build **ZxLqLPRswDR9eUMPSekHj** now serves the shared Galaxy/System shell and
+Galaxy workspace through the existing protected preview. Travis explicitly approved
+the brief restart at 19:18 UTC after the initial automatic-review block. The old
+supervisor finished stopping 19:18:52 UTC; its replacement started 19:19:12 UTC with
+frontend 11573/gateway 11574/ngrok 11575. Only the frontend snapshot path and two build
+pins changed. All 57 public assets, original 624c4ff card CSS, released iOS input/viewport
+fixes, gateway/ngrok commands, routes, exact Google/email policy and
+2026-10-19T00:00:00Z cutoff remain unchanged.
 
-Automatic approval review rejected the supervisor stop needed to activate the
-candidate: a brief interruption to this shared protected preview requires trusted
-explicit authorization to reload it. No live process/config/policy changed. The
-existing iOS build **LZQ850NK0eM1Mfbe64zJo** remains the configured preview.
-[Candidate evidence and handoff](../.scratch/shared-game-shell/README.md) records
-snapshot/config paths, checks and the pending restart. The exact protected endpoint,
-Google identity policy and 2026-10-19T00:00:00Z cutoff remain unchanged. Native
-physical-iPhone acceptance and full emulator gameplay journeys remain unverified.
+438 tests / 30 files, types/scoped lint and isolated production build pass. Live
+Chromium/WebKit checks cover390 portrait,844 landscape and1280 desktop guest/auth,
+renderer readiness, search/details/focus, shared preferences and corporation
+isolation. Both engines also pass first-login/guide isolation, direct mobile icon
+navigation, original close target and 16px input checks with synthetic intercepted
+identity/game APIs. No real user/game writes occurred.
+
+All 34 initial JS/CSS resources match build bytes and all 7 pins pass. Home/login/system
+HTML and Storybook return200; debug/QA remain404, foreign-Origin writes403,
+unauthenticated galaxy/account APIs401 and anonymous protected edge302. Supervision
+and transport error logs remain empty. The temporary candidate listener is stopped.
+[Implementation, screenshots and live evidence](../.scratch/shared-game-shell/README.md)
+record snapshot/config paths and checks. Source implementation:e3bfdcb; local commits
+only, no push. Native physical-iPhone acceptance and full emulator gameplay journeys
+remain unverified.

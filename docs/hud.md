@@ -684,3 +684,12 @@ Galaxy commands retain their original fleet/gate and local-destination boundarie
 The two renderers, canvas allocation, camera implementations and data-settlement
 lifecycles are unchanged. A shared canvas host and persistent renderer are later
 slices, not claims of this extraction.
+
+The shared-shell slice is live on the existing protected preview as build
+ZxLqLPRswDR9eUMPSekHj after Travis's explicit restart approval. 438 tests / 30 files,
+types/scoped lint and production build pass; live Chromium/WebKit synthetic checks
+cover portrait/landscape/desktop guest/auth, original chrome, retained browsing,
+shared layout/corporation isolation and first-login/mobile sheet behavior.
+[Evidence](../.scratch/shared-game-shell/README.md) separates these checks from
+unverified physical-iPhone and full emulator gameplay acceptance. The access policy
+and existing 2026-10-19T00:00:00Z cutoff remain unchanged.
