@@ -52,6 +52,12 @@ function acquire(root: HTMLElement) {
   }
   // Layout ownership must never cancel document input. Native buttons and card
   // scrolling keep their complete touch/click streams; only the map owns gestures.
+  // Focus can change before/without a visualViewport event. Read the settled
+  // active element so a keyboard pan cannot remain after its field loses focus.
+  let released = false
+  const focusChanged = () => queueMicrotask(() => { if (!released) update() })
+  doc.addEventListener('focusin', focusChanged)
+  doc.addEventListener('focusout', focusChanged)
   win.addEventListener('resize', update)
   win.visualViewport?.addEventListener('resize', update)
   win.visualViewport?.addEventListener('scroll', update)
@@ -66,6 +72,8 @@ function acquire(root: HTMLElement) {
   const state = {
     roots, update,
     release: () => {
+      released = true
+      doc.removeEventListener('focusin', focusChanged); doc.removeEventListener('focusout', focusChanged)
       observer.disconnect()
       win.removeEventListener('resize', update); win.visualViewport?.removeEventListener('resize', update); win.visualViewport?.removeEventListener('scroll', update)
       restore(styles)

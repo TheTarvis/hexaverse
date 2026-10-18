@@ -78,3 +78,23 @@ it('keeps the lock when a modal restores body styles, resizes visible bounds and
   media.matches = false; mediaChange?.()
   expect(document.body.style.position).toBe(''); expect(root.style.height).toBe('')
 })
+
+it('separates keyboard pan from browser zoom and clears stale keyboard offsets on blur without a resize', async () => {
+  const { root } = fixture()
+  const input = document.createElement('input'); root.append(input)
+  viewport.height = 400; viewport.offsetTop = 80
+  input.focus(); await Promise.resolve()
+  expect(root.style.top).toBe('80px'); expect(root.style.height).toBe('400px')
+  input.blur(); await Promise.resolve()
+  expect(root.style.top).toBe('0px'); expect(root.style.height).toBe('400px')
+  viewport.height = 700; viewport.offsetTop = 0; viewport.dispatchEvent(new Event('resize'))
+  expect(root.style.height).toBe('700px')
+  viewport.scale = 1.2; viewport.height = 350; viewport.offsetTop = 120
+  input.focus(); await Promise.resolve(); viewport.dispatchEvent(new Event('resize'))
+  expect(root.style.top).toBe('0px'); expect(root.style.height).toBe('700px')
+  input.blur(); await Promise.resolve()
+  expect(root.style.height).toBe('700px')
+  release?.(); release = undefined
+  input.focus(); await Promise.resolve()
+  expect(root.style.top).toBe(''); expect(root.style.height).toBe('')
+})

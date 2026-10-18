@@ -3,3 +3,12 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Safari may magnify a small focused control and retain that zoom across SPA
+   navigation. Apply the readable minimum before focus on every form surface,
+   including login, wake/name, portalled dialogs and HUD cards. The unlayered
+   rule wins over Catalyst's text-sm utility in all control states; desktop
+   typography, browser pinch zoom and the viewport meta remain unchanged. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px), (pointer: coarse) {
+  html :is(input, select, textarea) { font-size: max(16px, 1rem); }
+}

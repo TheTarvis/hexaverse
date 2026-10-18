@@ -14,6 +14,7 @@ if(process.env.QA_HUD_CASE==='mine'){
  interior.features[1].type='rocky';interior.features[1].resources=[{kind:'metals',richness:1}]
 }
 fleet.roster.fuelPricePerTon=2
+if(process.env.QA_INPUT_FORMS==='1')fleet.roster.cargo.metals=5
 if(process.env.QA_OBJECTS_SEARCH==='1')for(let i=1;i<=20;i++)interior.features.push({id:'qa-extra-'+String(i).padStart(2,'0'),name:'QA Survey Site '+String(i).padStart(2,'0'),type:'rocky',space:{X:-60+i*2,Y:0,Z:-30},size:.6,resources:[]})
 const originalChrome=JSON.parse(fs.readFileSync(__dirname+'/../../frontend/components/hud/__fixtures__/original-card-chrome.json','utf8'))
 async function chromeGeometry(card){
@@ -113,6 +114,23 @@ async function checkMobileNavigation(p,name){
  console.log(name,'ORIGINAL CHROME PASS: frozen 624c4ff plaque/close/icon properties and corner geometry, independent Back, invisible 44px target edge tap dismisses')
  console.log(name,'MOBILE NAV PASS: four persistent tabs including Arrange; original 28px transparent close with invisible 44px target outside scrolling, >=16px computed form text, focus/blur/reduced keyboard space, details/back/search retained, callbacks and one sheet owner release; native iPhone focus zoom pending')
 }
+async function auditInputs(p,name,phase){
+ if(process.env.QA_INPUT_FOCUS!=='1')return
+ const data=await p.evaluate(()=>({route:location.pathname,meta:document.querySelector('meta[name="viewport"]')?.content,viewport:{innerWidth,innerHeight,scale:visualViewport?.scale,width:visualViewport?.width,height:visualViewport?.height,offsetTop:visualViewport?.offsetTop,offsetLeft:visualViewport?.offsetLeft},fields:[...document.querySelectorAll('input,textarea,select')].filter(e=>e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden').map(e=>{const style=getComputedStyle(e),rect=e.getBoundingClientRect(),ancestors=[];for(let n=e;n;n=n.parentElement){const s=getComputedStyle(n);if(s.transform!=='none'||s.scale!=='none'||s.zoom!=='1')ancestors.push({tag:n.tagName,id:n.getAttribute('data-testid'),transform:s.transform,scale:s.scale,zoom:s.zoom})}return {id:e.getAttribute('data-testid')||e.getAttribute('aria-label')||e.name,type:e.type,font:parseFloat(style.fontSize),lineHeight:style.lineHeight,textSizeAdjust:style.webkitTextSizeAdjust,effectiveScale:e.offsetWidth?rect.width/e.offsetWidth:1,focused:e===document.activeElement,disabled:e.disabled,invalid:e.getAttribute('aria-invalid'),ancestors}})}))
+ console.log(name,'INPUT AUDIT',phase,JSON.stringify(data))
+ if(process.env.QA_EXPECT_MIN_INPUT==='1')for(const field of data.fields){assert.ok(field.font>=16,'Readable input '+phase+' '+field.id+': '+field.font);assert.ok(field.effectiveScale>=.99,'No reduced input transform '+JSON.stringify(field))}
+ assert.ok(!/user-scalable=no|maximum-scale=1/.test(data.meta),'Accessible browser zoom stays enabled')
+}
+async function checkInputForms(p,name){
+ const mine=process.env.QA_HUD_CASE==='mine'
+ await p.getByRole('button',{name:mine?'Command':'Objects',exact:true}).tap()
+ if(!mine){await p.getByTestId('system-index-search').fill('qa-station');await p.getByTestId('index-qa-station').tap()}
+ const ids=mine?['mine-kind-select','mine-tons-input']:['sell-kind-select','sell-tons-input','refuel-tons-input']
+ for(const id of ids){const field=p.getByTestId(id);await field.waitFor();await field.focus();await auditInputs(p,name,'production-'+id);if(id.endsWith('input')){await field.fill('2');await auditInputs(p,name,'production-'+id+'-edited')}}
+ if(!mine){await p.getByTestId('details-back').tap();await p.getByTestId('system-index-search').fill('')}
+ await p.getByRole('button',{name:mine?'Close Command panel':'Close Objects panel',exact:true}).tap()
+ console.log(name,'PRODUCTION FORM INPUT PASS',ids.join(','),'no command submitted')
+}
 async function checkObjectsSearch(p,c,name){
  assert.equal(await p.getByRole('dialog').count(),0,'Objects must not auto-open a fullscreen panel on entry')
  const expected=interior.features.length+1,owner=p.locator('section[data-panel="objects"]'),search=p.getByTestId('system-index-search'),header=p.getByTestId('system-index-search-header')
@@ -134,7 +152,7 @@ async function checkObjectsSearch(p,c,name){
   await scroll.evaluate(e=>{e.scrollTop=0});await p.waitForTimeout(80)
   if(session){const box=await scroll.boundingBox(),h=await header.boundingBox(),x=box.x+box.width/2,start=box.y+box.height-24,end=Math.max(h.y+h.height+12,box.y+64);await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:0,x,y:start}]});for(let i=1;i<=5;i++)await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:0,x,y:start+(end-start)*i/5}]});await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.waitForTimeout(150);assert.ok(await scroll.evaluate(e=>e.scrollTop)>0,'Trusted touch scroll moves the real object list')}
   // Mobile WebKit does not expose wheel or native swipe automation; sticky bounds and real keyboard scrolling are checked below.
-  await search.fill('QA Survey Site 03');assert.equal(await rows.count(),1);assert.equal(await p.getByTestId('index-qa-extra-03').isVisible(),true)
+  await auditInputs(p,name,'objects-rest-'+size.width);await search.focus();await auditInputs(p,name,'objects-focus-'+size.width);await search.fill('QA Survey Site 03');assert.equal(await rows.count(),1);assert.equal(await p.getByTestId('index-qa-extra-03').isVisible(),true)
   await search.fill('there-is-no-such-object');assert.equal(await rows.count(),0);assert.equal(await owner.getByText('No known objects match. Try a name or type.',{exact:true}).isVisible(),true)
   await search.press('ControlOrMeta+A');await search.press('Backspace');assert.equal(await rows.count(),expected)
   await scroll.evaluate(e=>{e.scrollTop=0});await rows.first().focus();await rows.first().press('PageDown');await p.waitForTimeout(150);assert.ok(await scroll.evaluate(e=>e.scrollTop)>0,'Keyboard scroll reaches the actual list')
@@ -167,7 +185,7 @@ async function checkHudBaseline(p,name){
  await open('Command');const command=await assertFrame('command')
  if(process.env.QA_HUD_CASE==='mine'){
   assert.equal(await command.getByTestId('mine-section').isVisible(),true);assert.equal(await command.getByTestId('stationkeep-control').isVisible(),true)
-  await command.getByTestId('mine-tons-input').fill('3')
+  await command.getByTestId('mine-tons-input').fill('3');await auditInputs(p,name,'command-mine-focus')
   for(const id of ['mine-kind-select','mine-tons-input','mine-button','stationkeep-control']){const box=await command.getByTestId(id).boundingBox();assert.ok(box&&box.height>=44,'Phone action target: '+id);if(id.endsWith('input')||id.endsWith('select'))assert.ok(await command.getByTestId(id).evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=16,'Readable phone field: '+id)}
  }else assert.equal(await command.getByTestId('refuel-section').count(),0,'Station services belong to the station details')
  await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-command-'+(process.env.QA_HUD_CASE||'station')+'.png'})
@@ -179,7 +197,7 @@ async function checkHudBaseline(p,name){
  await p.getByTestId('details-back').tap();assert.equal(await search.inputValue(),'qa-planet')
  if(process.env.QA_HUD_CASE!=='mine'){
   await search.fill('qa-station');await p.getByTestId('index-qa-station').tap();await assertFrame('objects')
-  assert.equal(await p.getByTestId('refuel-section').isVisible(),true);await p.getByTestId('refuel-tons-input').fill('2')
+  assert.equal(await p.getByTestId('refuel-section').isVisible(),true);await p.getByTestId('refuel-tons-input').fill('2');await auditInputs(p,name,'station-refuel-focus')
   await p.getByTestId('refuel-button').scrollIntoViewIfNeeded()
   await p.screenshot({path:out+'/'+name.toLowerCase()+'-hud-station-services.png'})
   await p.getByTestId('details-back').tap();await p.getByTestId('index-qa-station').tap();assert.equal(await p.getByTestId('refuel-tons-input').inputValue(),'2')
@@ -308,23 +326,23 @@ async function run(type,options,name){
  else if(path==='/v1/fleets')data={fleets:[fleet],worldTime:1000,scale:1}
  else if(path.endsWith('/survey'))data={range:100,durationMs:1000,worldTime:1000,scale:1,sensorBusy:false,inTransit:false,survey:null,targets:[]}
  else if(path.endsWith('/scan-targets'))data={fleetId,systemId:system,worldTime:1000,targets:[]}
- else if(path==='/v1/market/board')data={worldTime:1000,refreshCadenceMs:30000,venues:[]}
+ else if(path==='/v1/market/board')data={worldTime:1000,refreshCadenceMs:30000,venues:process.env.QA_INPUT_FORMS==='1'?[{venue:'qa-only',systemId:system,quotes:[{kind:'metals',entries:[{source:'floor',unitPrice:2,unlimited:true}]}]}]:[]}
  else if(path==='/v1/actions')data={actions:[]}
  else if(path==='/v1/sightings')data={sightings:[],nextCursor:null}
  else if(path.includes('/channels/'))return route.fulfill({status:200,contentType:'text/event-stream',body:': fixture\n\n'})
  else{status=404;data={error:'QA fixture missing'}}
  return route.fulfill({status,json:data})})
- await p.goto(origin+'/login');await p.getByTestId('login-email').fill('isolated@example.invalid');await p.getByTestId('login-password').fill('synthetic-not-a-credential');await p.getByTestId('login-submit').tap()
+ await p.goto(origin+'/login');await p.getByTestId('login-email').waitFor();await auditInputs(p,name,'login-rest');await p.getByTestId('login-email').focus();await auditInputs(p,name,'login-focus');if(process.env.QA_INPUT_FOCUS==='1'){await p.getByRole('button',{name:'Sign up',exact:true}).click();await p.getByTestId('login-confirm-password').focus();await auditInputs(p,name,'signup-confirm-focus');await p.getByRole('button',{name:'Sign in',exact:true}).click()}await p.getByTestId('login-email').fill('isolated@example.invalid');await p.getByTestId('login-password').fill('synthetic-not-a-credential');await p.getByTestId('login-submit').tap()
  await p.waitForFunction(()=>!document.querySelector('[data-testid="login-submit"]'),{timeout:15000}).catch(()=>{})
- if(process.env.QA_FIRST_LOGIN==='1'){await p.goto(origin+'/systems/'+system);await p.getByTestId('wake-name-input').fill('Isolated QA');await p.getByTestId('wake-submit').tap();await p.waitForURL('**/systems/'+system);await p.getByTestId('begin-guide').waitFor();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'wake');await p.getByTestId('begin-guide').tap();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'objects');assert.equal(fixtureWrites.length,1)}
+ if(process.env.QA_FIRST_LOGIN==='1'){await p.goto(origin+'/systems/'+system);await p.getByTestId('wake-name-input').waitFor();await auditInputs(p,name,'wake-autofocus');await p.getByTestId('wake-name-input').fill('W'.repeat(41));await auditInputs(p,name,'wake-invalid');await p.getByTestId('wake-name-input').fill('Isolated QA');await p.getByTestId('wake-submit').tap();await p.waitForURL('**/systems/'+system);await p.getByTestId('begin-guide').waitFor();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'wake');await p.getByTestId('begin-guide').tap();assert.equal(await p.getByTestId('recovery-transmission').getAttribute('data-phase'),'objects');assert.equal(fixtureWrites.length,1)}
  if(process.env.QA_GUIDE_PHASE)await p.evaluate(({corp,fleetId,system,phase})=>localStorage.setItem('hexaverse:command-guide:v1:'+corp,JSON.stringify({version:3,corporationId:corp,fleetId,systemId:system,phase,scanActionId:null,stationId:null,targetId:null,acceptedAt:null,mineActionId:null,resource:null,cargoBefore:0})),{corp,fleetId,system,phase:process.env.QA_GUIDE_PHASE})
  if(process.env.QA_FIRST_LOGIN!=='1')await p.goto(origin+'/systems/'+system);await p.waitForTimeout(3000)
- const snapshot=await p.evaluate(()=>({url:location.pathname,title:document.title,text:document.body.innerText.slice(0,6000),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>({label:e.getAttribute('aria-label'),inert:!!e.closest('[inert]'),visibility:getComputedStyle(e).visibility,rect:e.getBoundingClientRect().toJSON()})),expandedTriggers:[...document.querySelectorAll('[data-testid="hud-workspace"] button[aria-expanded="true"]')].map(e=>({label:e.textContent,testid:e.getAttribute('data-testid'),panel:e.closest('[data-panel]')?.getAttribute('data-panel'),panelHidden:e.closest('[data-panel]')?.hasAttribute('hidden')})),inert:[...document.querySelectorAll('[inert]')].map(e=>({tag:e.tagName,id:e.getAttribute('data-testid'),class:e.className?.toString().slice(0,100)})),center:document.elementFromPoint(195,300)?.outerHTML.slice(0,350),shell:document.querySelector('[data-testid="space-view"]')?.getBoundingClientRect().toJSON()}))
+ await auditInputs(p,name,'system-entry');const snapshot=await p.evaluate(()=>({url:location.pathname,title:document.title,text:document.body.innerText.slice(0,6000),dialogs:[...document.querySelectorAll('[role="dialog"]')].map(e=>({label:e.getAttribute('aria-label'),inert:!!e.closest('[inert]'),visibility:getComputedStyle(e).visibility,rect:e.getBoundingClientRect().toJSON()})),expandedTriggers:[...document.querySelectorAll('[data-testid="hud-workspace"] button[aria-expanded="true"]')].map(e=>({label:e.textContent,testid:e.getAttribute('data-testid'),panel:e.closest('[data-panel]')?.getAttribute('data-panel'),panelHidden:e.closest('[data-panel]')?.hasAttribute('hidden')})),inert:[...document.querySelectorAll('[inert]')].map(e=>({tag:e.tagName,id:e.getAttribute('data-testid'),class:e.className?.toString().slice(0,100)})),center:document.elementFromPoint(195,300)?.outerHTML.slice(0,350),shell:document.querySelector('[data-testid="space-view"]')?.getBoundingClientRect().toJSON()}))
  console.log(name,JSON.stringify({snapshot,errors,bad,requests,writes,fixtureWrites},null,2));
  if(process.env.QA_EXPECT_INTERACTIVE==='1'&&snapshot.dialogs.some(d=>d.label==='Recovery transmission')){
   const frame=await p.locator('[aria-label="Current objective"]').evaluate(e=>({height:e.getBoundingClientRect().height,decoration:parseFloat(getComputedStyle(e,'::before').height)}));assert.ok(frame.decoration<=frame.height+1,'Objective frame must not paint over recovery: '+JSON.stringify(frame))
  }
- await p.screenshot({path:out+'/'+name.toLowerCase()+'.png'})
+ await p.screenshot({path:out+'/'+name.toLowerCase()+(process.env.QA_FIRST_LOGIN==='1'?'-wake-input-fix':'')+'.png'})
  if(process.env.QA_EXPECT_INTERACTIVE==='1'){
   assert.equal(errors.length,0,'No browser runtime/resource errors expected under configured HTTPS origin')
   if(process.env.QA_GUIDE_PHASE||process.env.QA_FIRST_LOGIN==='1'){const dialog=p.getByRole('dialog',{name:'Recovery transmission',exact:true});assert.equal(await dialog.isVisible(),true);assert.ok(snapshot.dialogs.some(item=>item.label==='Recovery transmission'&&item.visibility==='visible'))}
@@ -347,6 +365,7 @@ async function run(type,options,name){
   await p.getByRole('button',{name:'Console',exact:true}).tap();assert.equal(await p.getByRole('dialog',{name:'Console panel',exact:true}).isVisible(),true)
   await p.getByRole('button',{name:'Close Console panel',exact:true}).tap();assert.equal(await p.getByRole('dialog').count(),0)
   const region=p.getByTestId('space-canvas-region'),camera=JSON.parse(await region.getAttribute('data-camera'));await region.focus();await region.press('+');assert.ok(JSON.parse(await region.getAttribute('data-camera')).distance<camera.distance)
+  if(process.env.QA_INPUT_FORMS==='1')await checkInputForms(p,name)
   if(process.env.QA_OBJECTS_SEARCH==='1')await checkObjectsSearch(p,c,name)
   if(process.env.QA_MOBILE_NAV==='1')await checkMobileNavigation(p,name)
   if(process.env.QA_HUD_BASELINE==='1')await checkHudBaseline(p,name)

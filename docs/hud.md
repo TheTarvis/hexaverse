@@ -633,3 +633,28 @@ browsing state. Escape backs out of details first, then reaches the workspace.
 Original shared header/close styling, direct icon strip, safe areas, 16px phone
 fields and accessible zoom remain unchanged. HUD/Objects Search demonstrates the
 same component with enough rows to exercise real internal scrolling.
+
+## Input focus and keyboard viewport — 2026-10-18
+
+An actual iPhone screenshot (IMG_1048) shows enlarged/clipped Recovery Signal copy
+on the initial system guide after naming a corporation. That screen has no input;
+the screenshot cannot prove the exact preceding focus event or viewport scale.
+Live-build inspection identified a concrete gap: the login email/password and
+autofocused wake/name fields were14px in rest/focus/invalid states, outside the
+HUD-card-only16px rule. Ancestor transforms/zoom did not reduce them. Retained
+Safari focus zoom across the SPA transition is consistent with the report; this
+causal inference still needs physical-device confirmation.
+
+The shared global mobile/short-landscape/coarse-pointer form rule now enforces
+max(16px,1rem) before focus for input/select/textarea, including portalled fields
+and every state. Desktop fine-pointer typography remains unchanged; the original
+card/header/close/navigation CSS is unchanged. No scale transform, zoom reset,
+maximum-scale/user-scalable restriction or document touch cancellation is added.
+
+Keyboard resizing is separate from magnification: at visualViewport.scale≈1 the
+system follows the available height and an editing viewport's top offset. Focus
+handoffs/blur now re-read the settled active element even without a resize event,
+clearing stale keyboard pan. At browser scale≠1 the game retains its layout and
+lets the browser own accessible zoom. Focus changes never force scale back to1.
+A page already magnified before deployment may retain its browser zoom; resetting
+that existing view remains a user action, not an automatic accessibility override.

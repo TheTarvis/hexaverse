@@ -245,3 +245,34 @@ accepted snapshot. [Phone](objects-sticky-search-phone.png) and
 Full emulator-backed journeys were updated for retired selectors and type checked,
 but were not executed in this task. Local Storybook375 renders the actual30-row
 story; its play exercise restores the complete list after typing and clearing.
+
+## Actual iPhone input-focus report — 2026-10-18
+
+Inspected Library libfile_055e093fe28881919bdc0074db64bdf7 / IMG_1048.png locally.
+It shows /systems/[homeSystem] Recovery Signal, initial wake guide, enlarged text
+clipped on the right after input interaction; no field is visible. The exact field
+is not provable from the image. The immediately preceding Corporation name field
+uses autofocus; login fields can also initiate the problem.
+
+Served baseline dzvUlXJ5gttS9vxBEcbSW audit in Chromium/WebKit: login email/password
+and wake-name/rest/focus/invalid all14px, effective scale1 and no reducing ancestor
+transform/CSS zoom. Meta is width=device-width,initial-scale=1,viewport-fit=cover.
+The previous16px claim covered only HudCardShell descendants, omitting login/wake.
+Root cause fixed: shared mobile/coarse-pointer native form sizing before focus,
+max(16px,1rem), without changing card chrome, forcing browser zoom or blocking touch.
+An independent keyboard-offset gap is fixed by settled-focus updates in the
+system viewport owner; scale≠1 still preserves accessible browser zoom.
+
+430tests/28files, types/scoped lint, production and Storybook builds pass.
+Candidate LZQ850NK0eM1Mfbe64zJo renders login/signup-confirm/wake-invalid at16px;
+real Objects, mine/sell/refuel inputs remain16px with effective scale1. Both-engine
+shared-control checks cover17 native control variants/states and a portalled
+naming field at320/390/844 widths, while fine-pointer desktop remains14px. First
+login, camera, sticky Objects and guide/inert checks pass with errors[] and no
+live writes. Unit coverage separates keyboard pan/resize/blur from browser zoom
+and verifies teardown. Original card/navigation CSS and all57 public assets match.
+
+Installed WebKit does not reproduce physical iPhone automatic focus magnification
+or its software keyboard. Those remain device acceptance checks, not inferred
+from visualViewport.scale1 in these runs. Browser control of the user's local
+Chrome remains unavailable. Private reference screenshot was not published.
