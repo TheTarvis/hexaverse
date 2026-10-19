@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import * as THREE from 'three'
 import { MeshStandardNodeMaterial } from 'three/webgpu'
+import { Line2 } from 'three/examples/jsm/lines/webgpu/Line2.js'
 import SpaceWorld, { BODY_DRAW_SCALE } from './SpaceWorld'
 import { defaultCamera, type SpaceCamera } from '../space-camera'
 import { viewBasisOf } from '../space-projection'
@@ -387,4 +388,38 @@ it('never reveals feature art for an anonymous contact carrying incidental body 
   const mesh = bodies()[0]!
   expect(mesh.name).not.toMatch(/^feature:/)
   expect(mesh.children.some(child => child.name === 'assembly')).toBe(false)
+})
+
+
+it('updates orbit width and brightness on selection, including shared gate paths', async () => {
+  const h = await mount([mark('first', 'rocky'), mark('second', 'rocky')])
+  const elements = { parentId: 'star', radius: 30, periodMs: 10000, phase: 0, inclination: 0, node: 0 }
+  h.scene.orbitRings = ['first', 'second'].map(bodyId => ({ bodyId, parentId: 'star', bodyType: 'gate', elements, parentPosition: { x: 3, y: 0, z: 5 } }))
+  const appearance = { brightness: 0.03, thickness: 0.5, selectedBrightness: 0.7, selectedThickness: 2 }
+  h.rerender(<SpaceWorld canvas={h.canvas} frameRef={h.frameRef} extent={100} orbitAppearance={appearance} />)
+  await h.step()
+  const paths = () => {
+    const found: Line2[] = []
+    world().traverse(object => { if (object instanceof Line2) found.push(object) })
+    return found
+  }
+  expect(paths()).toHaveLength(1)
+  const line = paths()[0]!
+  expect(line.material.opacity).toBe(0.03)
+  expect(line.material.linewidth).toBe(0.5)
+  expect(line.position.toArray()).toEqual([3, 0, 5])
+  h.scene.marks[1]!.selected = true
+  await h.step()
+  expect(paths()[0]).toBe(line)
+  expect(line.material.opacity).toBe(0.7)
+  expect(line.material.linewidth).toBe(2)
+  h.scene.marks[1]!.selected = false
+  await h.step()
+  expect(line.material.opacity).toBe(0.03)
+  expect(line.material.linewidth).toBe(0.5)
+  const release = vi.spyOn(line.geometry, 'dispose')
+  h.scene.orbitRings = []
+  await h.step()
+  expect(paths()).toHaveLength(0)
+  expect(release).toHaveBeenCalledOnce()
 })

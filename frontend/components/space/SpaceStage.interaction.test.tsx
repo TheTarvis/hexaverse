@@ -610,3 +610,16 @@ it('keeps long annotations inside the viewport near its right edge', async () =>
   expect(Number(coords![2])).toBeGreaterThanOrEqual(8)
   expect(Number(coords![2]) + 26).toBeLessThanOrEqual(H - 8)
 })
+
+
+it('can hide ordinary labels while keeping the selected label and body hit targets', async () => {
+  await stage({
+    selection: { bodyId: 'feat-body-0' },
+    labelAppearance: { visible: false, opacity: 0.2, selectedVisible: true, selectedOpacity: 0.8 },
+  })
+  expect(screen.queryByTestId('space-annotation-feat-body-1')).not.toBeInTheDocument()
+  expect(screen.getByTestId('space-annotation-feat-body-0')).toHaveStyle({ opacity: '0.8' })
+  expect(screen.getByTestId('body-hit-feat-body-1')).toHaveAccessibleName('feat-body-1')
+  fireEvent.keyDown(screen.getByTestId('body-hit-feat-body-1'), { key: 'Enter' })
+  expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-1' })
+})

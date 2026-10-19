@@ -43,6 +43,7 @@ import { unprojectToViewPlane, type DrawVec3, type DrawViewBasis } from '@/lib/s
 import { SpaceCanvas } from './SpaceCanvas'
 import { projectMarks, viewBasisOf } from './space-projection'
 import { placeAnnotations } from './space-annotations'
+import type { OrbitAppearance, LabelAppearance } from './space-appearance'
 import {
   advanceDrag,
   atOrbitLimit,
@@ -84,6 +85,8 @@ const NO_BASIS_SCREEN = { x: NaN, y: NaN, depth: 0, onScreen: false } as const
 
 export interface SpaceStageProps {
   /** Shared scene treatment; Storybook can compare alternate grid modes. */
+  orbitAppearance?: OrbitAppearance
+  labelAppearance?: LabelAppearance
   gridMode?: SpaceGridMode
   gridSettings?: Partial<HexSkySettings>
   systemId: string
@@ -154,6 +157,8 @@ function selectionAttr(selection: SpaceSelection | null): string {
 }
 
 export function SpaceStage({
+  orbitAppearance,
+  labelAppearance,
   gridMode,
   gridSettings,
   systemId,
@@ -497,10 +502,11 @@ export function SpaceStage({
         onPendingChange={onPendingChange}
         claimFocus={focusInsideRef.current}
         renderWorld={(canvas, bindings) => (
-          <SpaceWorld canvas={canvas} {...bindings} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} gridMode={gridMode} gridSettings={gridSettings} />
+          <SpaceWorld orbitAppearance={orbitAppearance} canvas={canvas} {...bindings} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} gridMode={gridMode} gridSettings={gridSettings} />
         )}
       >
         {ready => <SpaceLayers
+          labelAppearance={labelAppearance}
           available={ready}
           scene={scene}
           camera={camera}
@@ -542,6 +548,7 @@ export function SpaceStage({
 }
 
 interface SpaceLayersProps {
+  labelAppearance?: LabelAppearance
   available: boolean
   scene: SceneModel
   camera: SpaceCamera
@@ -577,6 +584,7 @@ interface SpaceLayersProps {
 }
 
 function SpaceLayers({
+  labelAppearance,
   available,
   scene,
   camera,
@@ -702,6 +710,7 @@ function SpaceLayers({
           const selected = mark.selected || selection?.bodyId === mark.id || actingFleetId === mark.id
           const hovered = hoveredBodyId === mark.id || focusedMarkId === mark.id || hoveredFleetId === mark.id
           const detailed = selected || hovered
+          if (labelAppearance && !(selected ? labelAppearance.selectedVisible : labelAppearance.visible)) return null
           return (
             <div
               key={mark.id}
@@ -710,7 +719,7 @@ function SpaceLayers({
               data-priority={selected ? 2 : hovered ? 1 : 0}
               className={'absolute left-0 top-0 max-w-40 rounded border px-2 py-1 hud-type-caption leading-4 shadow-sm ' +
                 (selected ? 'border-cyan-300/70 bg-slate-950/90 text-cyan-100' : detailed ? 'border-white/30 bg-slate-950/90 text-white' : 'border-white/10 bg-slate-950/65 text-slate-300')}
-              style={{ pointerEvents: 'none', visibility: 'hidden' }}
+              style={{ pointerEvents: 'none', visibility: 'hidden', opacity: labelAppearance ? (selected ? labelAppearance.selectedOpacity : labelAppearance.opacity) : 1 }}
             >
               <div className="truncate">{mark.name || mark.id}</div>
               {detailed && (mark.bodyType || mark.starClass) && <div className="text-slate-400">{[mark.bodyType, mark.starClass].filter(Boolean).join(' · ').replaceAll('_', ' ')}</div>}

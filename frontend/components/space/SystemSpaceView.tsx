@@ -80,6 +80,7 @@ import { FleetActionsPanel } from './FleetActionsPanel'
 import { ScanControl } from './ScanControl'
 import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
 import { SpaceStage } from './SpaceStage'
+import { SYSTEM_ORBIT_APPEARANCE, SYSTEM_LABEL_APPEARANCE } from './space-appearance'
 import { buildSceneModel } from './space-scene'
 import { selectionKey, selectionWireRequest, toggleSelection, type SpaceSelection } from './space-selection'
 import type { SceneFrameInputs, SpaceFrameSource } from './space-transform-loop'
@@ -1110,6 +1111,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               </div>
             )}
             <SpaceStage
+              orbitAppearance={SYSTEM_ORBIT_APPEARANCE}
+              labelAppearance={SYSTEM_LABEL_APPEARANCE}
               gridMode="surround"
               systemId={systemId}
               scene={scene}

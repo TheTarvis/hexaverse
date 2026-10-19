@@ -48,6 +48,16 @@ Exact colors and material values should be calibrated from accepted production
 previews. The concept image establishes visual relationships, not physical
 material measurements. Preserve this reference until a replacement is accepted.
 
+## System orbits and labels
+
+Accepted for the live game, 2026-10-19: use the quiet treatment reviewed in
+[Orbit Appearance / Selected Body](http://localhost:20203/?path=/story/graphics-orbit-appearance--selected-body).
+Ordinary orbits use opacity 0.035 and width 0.5px; the selected body's path
+uses cyan, opacity 0.7 and width 1.5px. Hide ordinary name labels and reveal
+the selected object's label at full opacity. Hidden labels retain body picking.
+The game and Storybook share the accepted values in `space-appearance.ts`;
+Storybook keeps independent controls for further comparison.
+
 ## Galaxy canvas background
 
 In-app adoption approved, 2026-10-19: Travis requested that the game canvases

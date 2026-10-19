@@ -31,6 +31,10 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { Line2NodeMaterial } from 'three/webgpu'
+import { Line2 } from 'three/examples/jsm/lines/webgpu/Line2.js'
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
+import type { OrbitAppearance } from '../space-appearance'
 import {
   bezierPointAt,
   drawOrbitPosition,
@@ -51,6 +55,7 @@ import type { SpaceRendererBindings } from '../SpaceCanvas'
 import { createStarModel, stellarTint, type StarModel } from './star-art'
 
 export interface SpaceWorldProps extends Partial<SpaceRendererBindings> {
+  orbitAppearance?: OrbitAppearance
   gridMode?: SpaceGridMode
   gridSettings?: Partial<HexSkySettings>
   canvas: HTMLCanvasElement
@@ -223,6 +228,7 @@ function ringKeyOf(ring: { parentId: string; elements: DrawOrbitElements }): str
 }
 
 export function SpaceWorld({
+  orbitAppearance,
   canvas,
   frameRef,
   extent,
@@ -234,6 +240,8 @@ export function SpaceWorld({
   const bindings = useRef({ createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame })
   bindings.current = { createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame }
   const actingRef = useRef<string | null>(actingFleetId)
+  const orbitAppearanceRef = useRef(orbitAppearance)
+  orbitAppearanceRef.current = orbitAppearance
   const gridSettingsRef = useRef(gridSettings)
   gridSettingsRef.current = gridSettings
   actingRef.current = actingFleetId
@@ -332,7 +340,7 @@ export function SpaceWorld({
     const lines: THREE.Line[] = []
     /** Decorative streaks rebuilt every frame: the path ahead, drift headings. */
     const streaks: THREE.Line[] = []
-    const rings = new Map<string, THREE.Line>()
+    const rings = new Map<string, THREE.Line | Line2>()
     const belts = new Map<string, { mesh: THREE.InstancedMesh; variant: string }>()
     let frameId = 0
     let announced = false
@@ -670,13 +678,30 @@ export function SpaceWorld({
     // one), sampled once and moved to the parent's frame every frame.
     const syncRings = () => {
       const live = new Set<string>()
-      for (const ring of liveScene.orbitRings) {
+      const appearance = orbitAppearanceRef.current
+      const orbitRings = appearance ? [...liveScene.orbitRings, ...liveScene.beltFields.map(field => ({
+        bodyId: field.bodyId, parentId: field.elements.parentId, bodyType: 'belt', elements: field.elements, parentPosition: field.ringCenter,
+      }))] : liveScene.orbitRings
+      const selectedIds = new Set(liveScene.marks.filter(mark => mark.selected).map(mark => mark.id))
+      const selectedKeys = new Set(orbitRings.filter(ring => selectedIds.has(ring.bodyId)).map(ringKeyOf))
+      for (const ring of orbitRings) {
         const key = ringKeyOf(ring)
         live.add(key)
         let line = rings.get(key)
+        if (line && (line instanceof Line2) !== Boolean(appearance)) {
+          decor.remove(line)
+          line.geometry.dispose()
+          ;(line.material as THREE.Material).dispose()
+          rings.delete(key)
+          line = undefined
+        }
         if (!line) {
           const dim = ring.bodyType === 'moon' || ring.bodyType === 'station' || ring.bodyType === 'gate'
-          line = new THREE.Line(
+          line = appearance ? new Line2(
+            new LineGeometry().setPositions(orbitSamples(ring.elements, ORBIT_RING_SAMPLES).flatMap(point => point.toArray())),
+            new Line2NodeMaterial({ color: 0x9fbdd4, transparent: true, depthWrite: false, worldUnits: false, alphaToCoverage: false,
+              stencilWrite: true, stencilRef: 0, stencilFunc: THREE.EqualStencilFunc }),
+          ) : new THREE.Line(
             new THREE.BufferGeometry().setFromPoints(orbitSamples(ring.elements, ORBIT_RING_SAMPLES)),
             new THREE.LineBasicMaterial({
               color: dim ? 0x405068 : 0x4b6076,
@@ -688,6 +713,13 @@ export function SpaceWorld({
           )
           rings.set(key, line)
           decor.add(line)
+        }
+        if (appearance && line instanceof Line2) {
+          const selected = selectedKeys.has(key)
+          line.material.opacity = THREE.MathUtils.clamp(selected ? appearance.selectedBrightness : appearance.brightness, 0, 1)
+          line.material.linewidth = Math.max(0, selected ? appearance.selectedThickness : appearance.thickness)
+          line.material.color.setHex(selected ? 0x67e8f9 : 0x9fbdd4)
+          line.visible = line.material.opacity > 0 && line.material.linewidth > 0
         }
         line.position.set(ring.parentPosition.x, ring.parentPosition.y, ring.parentPosition.z)
       }
