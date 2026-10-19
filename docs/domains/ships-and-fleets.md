@@ -57,8 +57,8 @@ membership or command model. Combat capabilities follow [combat scoping](combat.
 
 [Travel](travel.md), [sensors](sensors-and-stealth.md), [economy](economy.md),
 [combat](combat.md), [identity](discovery-and-identity.md).
-Historical sources: [mine/composition decisions](../specs/0010-mine.md),
-[fleet roster](../specs/0011-fleet-roster.md),
+Historical sources: [mine/composition decisions](../history/2026-rebuild/specs/0010-mine.md),
+[fleet roster](../history/2026-rebuild/specs/0011-fleet-roster.md),
 [continuous-space fleet decision](../plans/continous_space/decisions.md).
 
 Historical #0010's “additional hulls are unmanned drones” is not a newly settled

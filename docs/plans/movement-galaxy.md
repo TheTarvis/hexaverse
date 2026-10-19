@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Movement (galaxy tier) — Lane Travel (strategic, inter-system)
 
 > **Living doc, high-level only.** Scratchpad for **how a unit crosses the galaxy**

@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Continuous-space pivot — decisions log
 
 Running record of the open questions in `README.md` as they get settled, so

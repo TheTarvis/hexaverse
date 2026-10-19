@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Propellant & Delta-V — Scoping
 
 > **Status: scoping (2026-08-24).** Movement stops being free. Today a burn

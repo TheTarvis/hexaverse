@@ -1,7 +1,0 @@
-# 0007 — historical spec redirect
-
-Current owner: [hud](../hud.md).
-
-[Archived full spec](../history/2026-rebuild/specs/0007-hex-board-view.md) preserves historical decisions
-and scenarios. Its status/checklists describe an earlier rebuild, not active work.
-See the [file-by-file audit](../history/2026-rebuild/specs/README.md).

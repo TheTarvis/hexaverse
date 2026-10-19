@@ -55,6 +55,14 @@ Older FTL-technology/relay-corridor ideas require reconfirmation before becoming
 
 ## Open questions
 
+Galaxy art session, 2026-10-18: Travis requested visual support for long routes
+spanning multiple systems and agreed to distinguish proposed routes from active
+routes, with completed legs subdued. The visual encoding is recorded in
+[art direction](../art-direction.md); concept review is pending. A route is an
+ordered journey along a sequence of lanes. Route selection, planning, commitment
+and execution behavior remain unresolved. This does not
+restore historical multi-hop checklists or establish a shipped route planner.
+
 How should players select far-out and non-planar holding positions? Are additional
 parking policies desired beyond current physics? Future escort/formation and
 combat evasion behavior need separate scope. Arrival exposure rules belong to
@@ -64,7 +72,7 @@ sensors; they do not follow automatically from the jump implementation.
 
 [Ships/fleets](ships-and-fleets.md), [actions/time](actions-and-time.md),
 [economy](economy.md), [stations](stations.md), [sensors](sensors-and-stealth.md).
-Historical lineage: [board movement](../specs/0004-movement-board.md),
-[lane movement](../specs/0008-movement-galaxy.md),
+Historical lineage: [board movement](../history/2026-rebuild/specs/0004-movement-board.md),
+[lane movement](../history/2026-rebuild/specs/0008-movement-galaxy.md),
 [continuous-space decisions](../plans/continous_space/decisions.md).
 Those records retain provenance, not authority for retired hex/ring mechanics.

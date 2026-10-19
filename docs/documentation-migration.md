@@ -24,7 +24,7 @@ marketing files. **Scratch: 50 Markdown files / 3,156 lines**, grouped in five
 work areas. Counts include working-tree documents, not just committed files;
 images and source code are excluded.
 
-[Specs](specs/README.md) and [plans](plans/README.md) already label their contents
+[Specs](history/2026-rebuild/specs/README.md) and [plans](plans/README.md) already label their contents
 historical. Their individual pages nevertheless contain accepted/implemented
 badges, unresolved checkboxes and later amendments. Discovery by filename alone
 can mistake those old claims for current requirements. The combined
@@ -95,7 +95,7 @@ history with a clear pointer. It does not mean copying all historical rules.
 
 ## #0003 audit: preserve provenance, retire misleading authority
 
-[System interior spec](specs/0003-system-interior.md) is dated July 7 and marked
+[System interior spec](history/2026-rebuild/specs/0003-system-interior.md) is dated July 7 and marked
 accepted. It mixes durable domain ideas with retired representation and unresolved
 implementation claims:
 
@@ -111,11 +111,11 @@ implementation claims:
 Inbound reference audit, excluding the spec itself: **24 files / 99 matching lines**
 for `#0003`, `specs/0003` or `0003-system-interior` across docs/scratch/Go/TS sources
 (excluding dependency/build trees). Of those, 19 are docs and five are Go files.
-Only three docs name the exact filename: [spec index](specs/README.md),
+Only three docs name the exact filename: [spec index](history/2026-rebuild/specs/README.md),
 [spawn plan](plans/spawn.md), [hex-board plan](plans/hex-board.md); many references
 are plain-text spec numbers, not clickable links. High-density dependencies include
-[board movement](specs/0004-movement-board.md) (21 matching lines),
-[build order](plans/build-order.md) (11), and [scan/fog](specs/0006-scan-and-fog.md) (8).
+[board movement](history/2026-rebuild/specs/0004-movement-board.md) (21 matching lines),
+[build order](plans/build-order.md) (11), and [scan/fog](history/2026-rebuild/specs/0006-scan-and-fog.md) (8).
 Go references in system model/params and galaxy model/seed/skeleton preserve decision
 provenance. Keep the numbered path or an explicit redirect; review incoming numeric
 references as well as Markdown links before any archival move.
@@ -195,3 +195,36 @@ ships owners before archival. Old scenario citations remain traceable. Genuine
 future decisions and the scheduler audience discrepancy are explicit in the audit;
 none authorizes a gameplay/security change. Full source records preserve unresolved
 history, avoiding blind deletion or promotion of old proposals into accepted rules.
+
+## Placement and vocabulary cleanup — 2026-10-19
+
+The [placement rules](README.md#where-to-write) now distinguish shared vocabulary,
+gameplay owners, reusable agent instructions and per-effort scratch artifacts.
+The root glossary follows the imported glossary format with topic groups;
+implementation details were removed while existing terms and domain links were
+preserved. Hexaverse continues to use one glossary; domain topics alone do not
+require a glossary map.
+
+Corrected the object-art playbook's instruction to save artifacts beside itself.
+Galaxy concept rounds, prompts, runtime review and screenshots moved together
+from `docs/agents/` to `.scratch/galaxy-canvas/`; canonical art/HUD and renderer
+reference links now target that location. The active object-coverage inventory
+moved from `docs/plans/` to `.scratch/hud-components/`, matching its existing
+scratch-spec references. Accepted art direction remains in its canonical owner.
+No active work or evidence was deleted.
+
+Remaining historical plan files now open with an authority notice, including
+when reached directly. The vision draft's obsolete authority and hex-grid summary
+were corrected; its historical rollout remains labeled history. Numbered spec
+redirects and full archives remain intact. This is document placement and
+navigation cleanup, not a fresh audit of every gameplay implementation claim.
+
+## Specs directory archived — 2026-10-19
+
+At Travis’s request, removed `docs/specs/` from the active documentation tree.
+Its thirteen navigation/redirect files now live in
+[archived redirects](history/2026-rebuild/spec-redirects/README.md); full source
+records remain in [historical specs](history/2026-rebuild/specs/README.md).
+Rebased their links and updated incoming documentation links. Earlier statements
+that the original paths remain refer to the October 16 migration state.
+New feature specs continue to use `.scratch/<effort>/spec.md`.

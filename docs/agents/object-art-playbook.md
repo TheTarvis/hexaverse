@@ -3,7 +3,7 @@
 Work through one object category at a time. Create quick concept images,
 iterate with Travis, and settle the design before producing a mesh or runtime
 effect. Start with lane gates; reuse this process for the remaining categories
-in the [visual inventory](object-visual-inventory.md).
+in the [visual inventory](../../.scratch/hud-components/object-visual-inventory.md).
 
 ## 1. Establish the brief
 
@@ -125,7 +125,8 @@ proceeding. Update the inventory only for the stage actually accepted.
 
 ## Save each round
 
-Keep artifacts beside this playbook using the existing naming convention:
+Save each effort under `.scratch/<effort>/`, with its design record, images,
+prompts and review evidence together. Use the existing naming convention:
 
 ```text
 lane-gate-options-01.png
@@ -144,7 +145,7 @@ Distinguish concept accepted, production approved, asset generated and
 runtime/HUD accepted.
 
 Open each saved comparison or refinement image in the project's JetBrains IDE
-for review, following the [foundation process](spec.md). If that capability is
+for review, following the [foundation process](../../.scratch/hud-components/spec.md). If that capability is
 unavailable, provide the image directly and report the limitation.
 
 ## Delegation
@@ -158,7 +159,8 @@ authorize extra paid generations.
 ## Start or resume a session
 
 ```text
-Follow .scratch/hud-components/object-art-playbook.md for <category>.
+Follow docs/agents/object-art-playbook.md for <category>.
+Save this effort under .scratch/<effort>/.
 Read its existing design record and references, if any.
 Resume at the first unresolved stage. Ask the design questions needed for
 the next image, then create that round after I answer.

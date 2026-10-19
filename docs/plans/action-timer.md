@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Action / Timer System — the async spine
 
 > **Living doc, high-level only.** Scratchpad for **how real-time actions are

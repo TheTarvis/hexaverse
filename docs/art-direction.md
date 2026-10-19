@@ -48,6 +48,68 @@ Exact colors and material values should be calibrated from accepted production
 previews. The concept image establishes visual relationships, not physical
 material measurements. Preserve this reference until a replacement is accepted.
 
+## Galaxy canvas background
+
+In-app adoption approved, 2026-10-19: Travis requested that the game canvases
+match the reviewed appearance. Galaxy and System now select the shared
+surrounding sky and **Dark seams** at distance 16, brightness 0, thickness 0.5px.
+Galaxy also uses the reviewed Stellar spheres and fine silver-blue lanes.
+The lattice is promoted from its prototype module to shared production code.
+Storybook keeps the adjustment/comparison controls; the live views use the
+shared accepted preset. This supersedes the review-only/ground-default status
+in earlier round records. Route fixture data remains exclusive to Storybook.
+
+Updated direction, 2026-10-19: Travis requested the same surrounding background
+for Galaxy and System after the galaxy's dust plane and distant stars read as
+flat. Both now use the shared system-style sky sphere and spherical distant-star
+shell. This supersedes the galaxy-only dust plane in runtime review; earlier
+concept images remain historical references. Travis then proposed an enclosing
+hex lattice, liked the first view and requested it feel farther away. The
+surrounding lattice is available as a Storybook prototype alongside ground/off
+variants. Both scenes expose distance, brightness and line-thickness controls;
+Galaxy also offers them directly on canvas. Exact settings and final lattice
+appearance remain under review. These remain decorative, not world cells.
+
+Preferred treatment, 2026-10-19: Travis liked black borders at 0.5px because
+they make space itself read as hexagonal cells. Preserve this as explicit
+**Dark seams** in the shared Storybook sky. His shown values (distance 16,
+brightness 0, thickness 0.5px) are the review preset. In this treatment zero
+brightness means black ink, not an invisible grid; Luminous lines remains a
+separate comparison option. This does not establish navigable world cells.
+
+Accepted concept, 2026-10-18: [Galactic Dust refinement 02](../.scratch/galaxy-canvas/galaxy-canvas-refinement-02.png).
+Preserve its sweeping dark teal/amber dust band, dark voids, distant starfield
+and faint system-style hex plane during star/lane art refinement. The plane is
+decorative and does not define territory or movement cells. Travis accepted
+the background as shown; further dimming of the hex grid is not a settled change.
+Star/lane direction selected, 2026-10-18: A, Stellar, from
+[comparison 03](../.scratch/galaxy-canvas/galaxy-stars-lanes-options-03.png): dimensional radiant
+stellar cores and fine luminous lane filaments. Long multi-system route display
+must fit this direction. Route styling agreed for visual review: quiet silver-blue
+ordinary lanes; stronger route overlays with sparse directional chevrons and
+a distinct destination marker. Proposed routes are dashed; active routes are
+continuous with completed legs subdued. Exact appearance and zoom density await
+concept review. Cyan route color was rejected after review because it blends
+with the blue scenery, regardless of dashes or arrows. Coral was rejected as too
+light. On 2026-10-19 Travis selected emerald from
+[comparison 06](../.scratch/galaxy-canvas/galaxy-route-colors-06.png) as the default route color.
+Routes always have a dark outline and heavier stroke than ordinary lanes, with
+dashes, direction markers and a distinct destination shape; color is never the
+only distinguishing cue. Proposed/active state styling remains as above.
+The accepted Map palette setting offers previewable alternatives. High-contrast
+Amber and High-contrast Ivory are initial candidates, not validated accessible
+palettes. Compare them in Storybook, including color-vision simulations, before
+accepting alternatives. Simulations supplement visual/readability review.
+These are visual states, not an implemented route-execution model.
+An opt-in runtime pass is available in the existing
+[Galaxy Map / Overview](http://127.0.0.1:20203/?path=/story/graphics-galaxy-map--overview):
+procedural dust, shared hex plane, spectral Stellar spheres and outlined routes
+with palette/state/zoom/vision controls. This is a first runtime interpretation,
+not final visual acceptance or a change to the live game's default appearance.
+See [runtime review 07](../.scratch/galaxy-canvas/galaxy-runtime-review-07.md) for implementation,
+checks and the headless native-WebGPU screenshot limitation. Animation remains open.
+See the [design record](../.scratch/galaxy-canvas/galaxy-canvas-design.md) for feedback and rounds.
+
 ## Reuse and updates
 
 During concept work, reference the profile ID, revision and accepted image in

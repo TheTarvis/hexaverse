@@ -19,6 +19,6 @@ preserved in the owning pages; no new sensing/combat implementation is authorize
 
 This path remains a redirect for existing links. [Documentation](README.md)
 explains authority; [migration map](documentation-migration.md) records source
-coverage. Historical [scan/fog](specs/0006-scan-and-fog.md),
+coverage. Historical [scan/fog](history/2026-rebuild/specs/0006-scan-and-fog.md),
 [sensors brainstorm](plans/sensors-and-stealth.md) and
 [continuous-space decisions](plans/continous_space/decisions.md) remain in place.

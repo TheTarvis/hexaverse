@@ -347,6 +347,7 @@ export function GalaxyView() {
         </div>}
       >
         <GalaxyGraph galaxy={galaxy} selectedId={selectedId}
+          artStyle="stellar" gridMode="surround"
           onSelect={(node) => setSelectedId(node?.id ?? null)}
           fleetSystemIds={fleetSystemIds} homeSystemId={homeSystemId}
           onReady={handleGraphReady} onController={handleController} onRendererState={handleRendererState}

@@ -1,12 +1,10 @@
 # Hexaverse — Vision & Product Overview
 
-> **Status: DRAFT (2026-07-06).** First pass at the *what and why*, distilled
-> from `docs/plans/BRAINSTORM.md` — the current direction, which **supersedes**
-> the earlier single-hex-map colonization/territory framing (archived in git
-> history). This doc is the trunk: the north star and pillars that specs in
-> `docs/specs/` hang off, and the source of truth for the "Purpose" /
-> "Domain quick-reference" holes in `CLAUDE.md`. `?` marks a still-open
-> decision; **TODO(travis)** marks a blank only you can fill. Edit freely.
+> **Product vision draft, 2026-07-06; authority clarified 2026-10-19.**
+> This preserves the game's broader aspirations. For settled rules, current
+> implementation and open questions, start with [domain owners](README.md).
+> Historical build order, feature deferrals and renderer choices below are not
+> an active backlog. New work follows [document placement](README.md#where-to-write).
 
 ## What it is
 
@@ -23,11 +21,11 @@ It's played across a **two-tier map**:
 
 - **Galactic view — a node graph.** Star systems are nodes, lanes/routes are
   edges. This is the strategic layer: navigate the galaxy under fog of war.
-- **Solar-system view — a hex grid.** Click a system → drill into its hex
-  board. This is the tactical layer, where you actually *do things* per tile:
-  scan, mine, research, fight, move.
+- **Solar-system view — continuous 3D space.** Enter a system to inspect
+  bodies and command fleets. [World](domains/world.md) and
+  [travel](domains/travel.md) own the current model.
 
-> Mental model: **graph = navigate, hex grid = act.** Zoom out to travel, zoom
+> Mental model: **galaxy = navigate, system = act.** Zoom out to travel, zoom
 > in to work.
 
 This repo is the **2026-07-01 rebuild** on the Volt platform skeleton
@@ -150,13 +148,14 @@ restarts from a drifted backup (`docs/plans/spawn.md`).
 - **AI bots as living-world flavor** — populate the world, chat, small trades
   (a natural fit for this repo's `claude-agent`); they **don't** drive prices.
 
-## Goals of the rebuild
+## Historical rebuild goals
 
 - **Prove out Volt** (auth, SSE, Pub/Sub, Firestore, the layered
   backend/frontend conventions) on a real game.
 - **Realtime on SSE + Pub/Sub**, not raw WebSockets.
 - **Ship a playable vertical slice** (below) before layering economy and bots.
-- **Stay spec-first** — intent documented before code (`docs/specs/README.md`).
+- **Document intent before code** — the original numbered-spec process is retired;
+  current work uses [local specs and tickets](agents/issue-tracker.md).
 
 ## First vertical slice — what "playable" means first
 
@@ -203,8 +202,8 @@ persist is enough to validate the spine.*
 
 ## Related docs
 
-- `docs/plans/BRAINSTORM.md` — the living scratchpad (more detail than here).
-- `docs/plans/intel-market.md` — the knowledge economy, fully scoped.
-- `docs/specs/` — feature specs; the spec-first build order starts here.
+- [Historical brainstorm](plans/BRAINSTORM.md) — the original product exploration.
+- [Economy](domains/economy.md) — current intent and unresolved intelligence-market design.
+- [Historical specs](history/2026-rebuild/specs/README.md) — compatibility paths into rebuild history.
 - Archived original design: `git show bf9c637:client/docs/Gameplay.mdc`.
 - UI reference: `docs/plans/canvas/` (the WebGraph galaxy view).

@@ -9,14 +9,68 @@ An account is the authenticated user; a corporation is the player entity owning
 fleets, credits and knowledge. Discovery/ownership, naming entitlement and knowing
 an object's identity are different concepts. Naming protection is not a combat
 shield. [Sensors](sensors-and-stealth.md) owns observation/identification, not this
-page's claim and naming rights.
+page's control and naming rights.
+
+### Control and succession direction — 2026-10-19
+
+Travis revised the earlier discovery/naming design during domain review: current
+control of a celestial body grants naming authority. Initial analysis of an
+untouched body establishes initial control; this does not guarantee permanent
+control after the explorer leaves. Building a station around that body can
+establish a later corporation's control and allow it to rename the body. Preserve
+first-discovery attribution and the history of names and control changes. This
+supersedes the earlier intent that exploration claims provide only display/naming
+rights and that the first confirmed name is permanent. These are accepted design
+directions, not implemented transfer or renaming mechanics.
+
+Control may transfer by agreement, including purchase or another negotiated
+exchange, as well as by military means. Neither the military mechanism nor
+contract execution rules are settled. Bribery and subterfuge are longer-term
+possibilities, not accepted mechanics.
+
+Home stations belong to their spawning corporations; this is actual station
+ownership, rather than honorary naming credit over NPC property. Station services
+and starting protection require separate rules.
+
+Control can extend across a system without infrastructure at every body.
+Station ownership is distinct from system control: a corporation may allow
+another corporation to build a station while retaining recognized control of
+the system. Taxation is a longer-term possibility, outside the present scope.
+Competing claims without agreement can leave a body or system **contested**;
+multiple station owners alone need not imply a dispute.
+
+A control dispute ends by agreement or when only one claimant retains an
+established territorial foothold: competing footholds can be captured or
+eliminated. Merely bringing a larger fleet through does not transfer control;
+a defeated claimant retaining ships elsewhere does not keep the territory
+contested indefinitely. What qualifies as a foothold and how capture works
+remain unresolved. While control is contested, preserve the existing public
+name and freeze renaming. A later uncontested controller may rename the place
+without erasing discovery or naming history.
+
+The reach of infrastructure-backed claims and their relationship to
+individual-body control remain unresolved. No percentage-based control formula
+has been accepted.
+
+The exact meaning and scope of control, qualifying infrastructure, contested
+control and station capture remain unresolved. The existing claim model does not
+settle them. “Analysis” here describes the player's exploration intent; whether
+the existing Survey command remains distinct from Analyze is still a question.
+
+An account survives the end of its corporation. Voluntary **dissolution** should
+let a player end a corporation and start over, including after an undesirable
+spawn or becoming stranded. It must not permit two living corporations for one
+account. Confirmation, effective timing, any undo period, asset disposition and
+successor inheritance remain undecided. Account-level corporation history and
+statistics are future possibilities outside this review's immediate scope.
 
 ## Current implementation and gaps
 
 - [Account](../../backend/account/model.go) links Firebase identity/profile;
   [Corporation](../../backend/corporations/model.go) owns player state.
   [ResolveCorporation](../../backend/middlewares/corporation.go) resolves the
-  living corporation and can continue corpless. Old account scaffold organization/
+  account-linked corporation and can continue corpless. It does not currently
+  filter a dead linked corporation or establish a restart flow. Old account scaffold organization/
   membership prose is not the current model.
 - [Spawn](../../backend/corporations/service.go) reuses an existing corporation,
   validates names, atomically anchors account/corporation/home reservation, then
@@ -36,7 +90,8 @@ page's claim and naming rights.
 - [Home/name transactions](../../backend/discovery/dao.go) reserve home star/station
   rights, arrival and station name. Home star ownership alone does not grant naming
   entitlement without survey. Name confirmation requires ownership/entitlement;
-  first confirmed name is permanent, identical retry succeeds. Names are unique
+  first confirmed name is permanent in current code, identical retry succeeds.
+  That lock predates the revised control-based naming direction above. Names are unique
   within a system, star names also galaxy-wide; [validation](../../backend/discovery/validation.go)
   normalizes and rejects invalid/reserved/offensive forms.
 - Corporation death requires zero fleets, but current gameplay has no fleet
@@ -45,9 +100,10 @@ page's claim and naming rights.
 
 ## Open questions
 
-How should future sovereignty, station construction and combat interact with
-claims/home rights? Which knowledge products can players trade? Confirm those
-contracts separately. Active discovery/naming scratch work is implementation
+Define what establishes and transfers control, its scope across stars, planets,
+moons and stations, and how contested control works. Implement corporation ownership of home stations consistently across station
+records and discovery projections; define its services and protection separately. Determine how dissolution ends control without erasing history.
+Which knowledge products can players trade? Confirm that contract separately. Active discovery/naming scratch work is implementation
 tracking; durable decisions belong here once verified, not in a second rulebook.
 
 Historical deferred intent: [backup/restore lore](../lore.md) and #0009 envision
@@ -60,4 +116,4 @@ this is not permission to erase an existing corporation.
 
 [World](world.md), [stations](stations.md), [ships/fleets](ships-and-fleets.md),
 [sensors](sensors-and-stealth.md), [economy](economy.md), [actions](actions-and-time.md).
-Historical sources: [spawn spec](../specs/0009-spawn.md), [spawn plan](../plans/spawn.md).
+Historical sources: [spawn spec](../history/2026-rebuild/specs/0009-spawn.md), [spawn plan](../plans/spawn.md).

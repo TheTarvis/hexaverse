@@ -62,7 +62,7 @@ not player HUD settings.
 
 [Travel](travel.md), [economy](economy.md), [sensors](sensors-and-stealth.md),
 [discovery](discovery-and-identity.md), [combat](combat.md).
-Historical provenance: [action spec](../specs/0005-action-timer.md),
+Historical provenance: [action spec](../history/2026-rebuild/specs/0005-action-timer.md),
 [action plan](../plans/action-timer.md). Code/tests decide implemented behavior.
 
 Historical deferred ideas: queues/chaining, notification delivery (email-first

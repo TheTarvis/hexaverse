@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Fog of War — Brainstorm
 
 > **Living doc, high-level only.** Scratchpad to think through per-player

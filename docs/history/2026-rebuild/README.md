@@ -16,8 +16,8 @@ archived payload differs only by notice/link rebasing, verified during cleanup.
 | [docs/plans/build-order.md](../../plans/build-order.md) | [Snapshot](plans/build-order.md) | 407 | `01c1778ebc8de5d2e2bd01e93239e8b57510bcfe62c685e19b40978810f9c5d1` |
 | [docs/plans/continous_space/chain.md](../../plans/continous_space/chain.md) | [Snapshot](plans/continous_space/chain.md) | 957 | `71732754cad5807f3838715093dcd393a9339eec4d9d90f1d4b09db2b0db2f3f` |
 | [docs/plans/system-hud/chain.md](../../plans/system-hud/chain.md) | [Snapshot](plans/system-hud/chain.md) | 1417 | `d930181dc6c5a0c20d0469cdfd4dfd2921b86037fde32cb0829a6605f62e0ce4` |
-| [docs/specs/BACKLOG.md](../../specs/BACKLOG.md) | [Snapshot](specs/BACKLOG.md) | 121 | `f240cfcba934d646245487aa6ef819d286b815882f6ee63955c4012c251de31b` |
-| [docs/specs/0003-system-interior.md](../../specs/0003-system-interior.md) | [Snapshot](specs/0003-system-interior.md) | 326 | `d96318398f6caf528d4e7bea2b7bd5c4092abeeea7f0c328e914385a20dae1e9` |
+| [docs/specs/BACKLOG.md](spec-redirects/BACKLOG.md) | [Snapshot](specs/BACKLOG.md) | 121 | `f240cfcba934d646245487aa6ef819d286b815882f6ee63955c4012c251de31b` |
+| [docs/specs/0003-system-interior.md](spec-redirects/0003-system-interior.md) | [Snapshot](specs/0003-system-interior.md) | 326 | `d96318398f6caf528d4e7bea2b7bd5c4092abeeea7f0c328e914385a20dae1e9` |
 
 Removed outright: `docs/specs/TEMPLATE.md` (84 lines), the retired numbered-spec
 workflow scaffold; it contains no unique gameplay decisions and is recoverable
@@ -38,3 +38,12 @@ cleanup: ten additional full specs and the original index archived, all thirteen
 remaining paths classified and retained as redirects/navigation. Earlier #0003
 and BACKLOG snapshots remain unchanged. No historical spec metadata remains active
 in docs/specs; no scratch or asset cleanup was performed.
+
+## Spec path retirement — 2026-10-19
+
+The former `docs/specs/` folder is now archived as
+[spec-redirects](spec-redirects/README.md). The thirteen redirect/navigation files
+are preserved there with relative links rebased; the full historical specs remain
+in [specs](specs/README.md). Repository documentation links were updated; there
+is no active `docs/specs/` directory. Earlier descriptions of retained source
+paths above record the October 16 migration state.

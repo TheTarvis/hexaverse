@@ -53,5 +53,5 @@ roadmaps are not all current mechanics or new task scope.
 
 [Stations](stations.md), [travel](travel.md), [ships/fleets](ships-and-fleets.md),
 [sensors](sensors-and-stealth.md), [actions/time](actions-and-time.md).
-Historical provenance: [mine spec](../specs/0010-mine.md),
+Historical provenance: [mine spec](../history/2026-rebuild/specs/0010-mine.md),
 [goods plan](../plans/goods-market.md), [intel plan](../plans/market.md).

@@ -1,6 +1,6 @@
 > Historical snapshot, archived 2026-10-16. Retired workflow and old status claims
 > are provenance, not current instructions. Original relative plain-text paths
-> are interpreted from [docs/specs/0003-system-interior.md](../../../specs/0003-system-interior.md). Current domains live in
+> are interpreted from [docs/specs/0003-system-interior.md](../spec-redirects/0003-system-interior.md). Current domains live in
 > [canonical documentation](../../../README.md).
 
 ---

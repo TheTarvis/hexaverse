@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Camera & Input Controls — Brainstorm (galaxy tier)
 
 > **Living doc, high-level only.** How you move the **camera** and give **input** on

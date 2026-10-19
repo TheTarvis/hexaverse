@@ -51,6 +51,21 @@ Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
   foundation. [Art direction](art-direction.md) governs object assets; decorative
   illumination carries no gameplay meaning.
 
+## Map palette setting
+
+Accepted direction, 2026-10-19: offer a **Map palette** setting with previewable
+alternatives. Default Emerald is selected; High-contrast Amber and High-contrast
+Ivory are initial candidates pending Storybook comparison and color-vision
+simulation. Route outlines, heavier strokes, dash patterns, direction markers
+and destination shapes remain available in every palette. Color alone must not
+carry route/state meaning. [Art direction](art-direction.md) owns visual choices;
+the [canvas design record](../.scratch/galaxy-canvas/galaxy-canvas-design.md) tracks review.
+Map palette is implemented as a synchronized on-canvas/Controls selector in
+[Galaxy Map / Overview](http://127.0.0.1:20203/?path=/story/graphics-galaxy-map--overview)
+for art review, including route-state, progress, zoom and vision-preview controls.
+Gameplay settings placement and persistence remain unimplemented; exact palette
+values and alternative palettes still require visual acceptance.
+
 ## Shared typography
 
 Game surfaces and `HUD/Typography` stories share

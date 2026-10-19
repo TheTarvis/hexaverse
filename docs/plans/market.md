@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Intel Market — Focused Scoping
 
 > **Status: scoping (2026-07-05).** Deep-dive on Hexaverse 2.0's signature

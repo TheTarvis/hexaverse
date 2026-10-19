@@ -8,6 +8,9 @@ import type { RendererCandidateFactory } from '@/components/render-guard/rendere
 import { REGION_PALETTE } from './region-palette'
 import { glowTexture } from './glow-texture'
 import { MapCameraRig as CameraRig } from '@/components/map/map-camera-rig'
+import { createStellarEnvironment, createStellarNode, disposeStellarArt } from './stellar-map-art'
+import { paintMapRoute, resolveRoute, type MapPalette, type MapRoute } from './map-route-overlay'
+import { updateSpaceSky, type SpaceGridMode, type HexSkySettings } from '@/components/graphics/space-sky'
 
 export interface GalaxyGraphController {
   recenter: () => void
@@ -28,6 +31,12 @@ interface GalaxyGraphProps {
   rendererFactory?: RendererCandidateFactory
   fleetSystemIds?: string[]
   homeSystemId?: string | null
+  /** The live view selects Stellar; the original remains available for comparison. */
+  artStyle?: 'current' | 'stellar'
+  route?: MapRoute
+  mapPalette?: MapPalette
+  gridMode?: SpaceGridMode
+  gridSettings?: Partial<HexSkySettings>
 }
 
 function disposeGroup(group: THREE.Object3D) {
@@ -45,6 +54,7 @@ function disposeGroup(group: THREE.Object3D) {
 export function GalaxyGraph(props: GalaxyGraphProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLDivElement>(null)
+  const routeCanvasRef = useRef<HTMLCanvasElement>(null)
   const latest = useRef(props)
   latest.current = props
   const rebuildRef = useRef<(() => void) | null>(null)
@@ -55,6 +65,12 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
     scene.background = new THREE.Color(0x05070d)
     const content = new THREE.Group()
     scene.add(content)
+    let environment: THREE.Group | null = null
+    let environmentSource: Galaxy | null = null
+    let environmentGrid: SpaceGridMode | undefined
+    let routeSource: MapRoute | undefined
+    let routeGalaxy: Galaxy | null = null
+    let routeLegs: ReturnType<typeof resolveRoute> = []
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100000)
     let canvas: HTMLCanvasElement | null = null
     let rig: CameraRig | null = null
@@ -72,36 +88,38 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       const dim = 1
       const sel = selected ? 1.5 : 1
 
-      const group = new THREE.Group()
+      const group = props.artStyle === 'stellar' ? createStellarNode(node, selected) : new THREE.Group()
 
-      const halo = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: glowTexture(),
-          color: new THREE.Color(style.color),
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          transparent: true,
-          opacity: 0.32 * dim * (selected ? 1.4 : 1),
-        }),
-      )
-      const hs = (5 + style.size * 8) * sel
-      halo.scale.set(hs, hs, 1)
+      if (props.artStyle !== 'stellar') {
+        const halo = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: glowTexture(),
+            color: new THREE.Color(style.color),
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            transparent: true,
+            opacity: 0.32 * dim * (selected ? 1.4 : 1),
+          }),
+        )
+        const hs = (5 + style.size * 8) * sel
+        halo.scale.set(hs, hs, 1)
 
-      const core = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: glowTexture(),
-          color: new THREE.Color(style.color).lerp(new THREE.Color('#ffffff'), 0.5),
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          transparent: true,
-          opacity: 0.95 * dim,
-        }),
-      )
-      const cs = (2.2 + style.size * 3) * sel
-      core.scale.set(cs, cs, 1)
+        const core = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: glowTexture(),
+            color: new THREE.Color(style.color).lerp(new THREE.Color('#ffffff'), 0.5),
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            transparent: true,
+            opacity: 0.95 * dim,
+          }),
+        )
+        const cs = (2.2 + style.size * 3) * sel
+        core.scale.set(cs, cs, 1)
 
-      group.add(halo)
-      group.add(core)
+        group.add(halo)
+        group.add(core)
+      }
 
       // Own-fleet presence marker — a bright cyan pip lifted above the star on
       // +Z so it reads as "a hull is on station here" from the oblique disk view
@@ -128,12 +146,19 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       disposeGroup(content)
       proxies.length = 0
       const galaxy = latest.current.galaxy
+      if (props.artStyle === 'stellar' && (environmentSource !== galaxy || environmentGrid !== latest.current.gridMode)) {
+        if (environment) { scene.remove(environment); disposeStellarArt(environment) }
+        environment = createStellarEnvironment(galaxy, latest.current.gridMode)
+        environmentSource = galaxy
+        environmentGrid = latest.current.gridMode
+        scene.add(environment)
+      }
       const nodes = new Map(galaxy.nodes.map(node => [node.id, node]))
       for (const node of galaxy.nodes) {
         const group = makeNode(node)
         group.position.set(node.x, node.y, node.z)
         content.add(group)
-        const proxy = new THREE.Mesh(new THREE.SphereGeometry(4), new THREE.MeshBasicMaterial({ visible: false }))
+        const proxy = new THREE.Mesh(new THREE.SphereGeometry(props.artStyle === 'stellar' ? 7 : 4), new THREE.MeshBasicMaterial({ visible: false }))
         proxy.position.copy(group.position)
         proxy.userData.nodeId = node.id
         content.add(proxy)
@@ -146,22 +171,24 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
         const start = new THREE.Vector3(a.x, a.y, a.z), end = new THREE.Vector3(b.x, b.y, b.z)
         const direction = end.clone().sub(start)
         // Cylinders preserve the original world-space lane width on both backends.
-        const width = lane.bridge ? 0.25 : 0.5
+        const width = props.artStyle === 'stellar' ? 0.65 : lane.bridge ? 0.25 : 0.5
         const mesh = new THREE.Mesh(new THREE.CylinderGeometry(width / 2, width / 2, direction.length(), 6), new THREE.MeshBasicMaterial({
-          color: lane.bridge || !seam ? 0x96b9e6 : 0xf472b6,
-          transparent: true, opacity: lane.bridge ? 0.16 : seam ? 0.5 : 0.42, depthWrite: false,
+          color: props.artStyle === 'stellar' ? 0x9aafc4 : lane.bridge || !seam ? 0x96b9e6 : 0xf472b6,
+          transparent: true, opacity: props.artStyle === 'stellar' ? 0.58 : lane.bridge ? 0.16 : seam ? 0.5 : 0.42, depthWrite: false,
         }))
         mesh.position.copy(start.add(end).multiplyScalar(0.5))
         mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
         content.add(mesh)
       }
-      const span = Math.max(galaxy.bounds.x[1] - galaxy.bounds.x[0], galaxy.bounds.y[1] - galaxy.bounds.y[0])
-      const grid = new THREE.GridHelper(span * 1.4, 26, 0x33415e, 0x1b2440)
-      grid.rotation.x = Math.PI / 2
-      grid.renderOrder = -1
-      const materials = Array.isArray(grid.material) ? grid.material : [grid.material]
-      materials.forEach(material => { material.transparent = true; material.opacity = 0.5; material.depthWrite = false })
-      content.add(grid)
+      if (props.artStyle !== 'stellar') {
+        const span = Math.max(galaxy.bounds.x[1] - galaxy.bounds.x[0], galaxy.bounds.y[1] - galaxy.bounds.y[0])
+        const grid = new THREE.GridHelper(span * 1.4, 26, 0x33415e, 0x1b2440)
+        grid.rotation.x = Math.PI / 2
+        grid.renderOrder = -1
+        const materials = Array.isArray(grid.material) ? grid.material : [grid.material]
+        materials.forEach(material => { material.transparent = true; material.opacity = 0.5; material.depthWrite = false })
+        content.add(grid)
+      }
       scene.updateMatrixWorld(true)
     }
     rebuild()
@@ -187,7 +214,23 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       const state = owner?.snapshot()
       if ((state?.phase === 'unavailable' || state?.phase === 'interrupted') && !state.retrying) return
       if (drawable()) {
-        void owner?.update(() => { rig?.update() }).then(() => owner?.present(scene, camera))
+        void owner?.update(() => {
+          rig?.update()
+          const sky = environment?.getObjectByName('space-sky') as THREE.Group | undefined
+          if (sky) {
+            const bounds = latest.current.galaxy.bounds
+            updateSpaceSky(sky, camera, Math.max(bounds.x[1] - bounds.x[0], bounds.y[1] - bounds.y[0], 100), latest.current.gridSettings)
+          }
+          if (routeCanvasRef.current) {
+            const { galaxy, route } = latest.current
+            if (routeSource !== route || routeGalaxy !== galaxy) {
+              routeSource = route; routeGalaxy = galaxy
+              routeLegs = route ? resolveRoute(galaxy, route) : []
+            }
+            routeCanvasRef.current.hidden = owner?.snapshot().phase !== 'ready'
+            paintMapRoute(routeCanvasRef.current, camera, routeLegs, route, latest.current.mapPalette ?? 'emerald', wrap.clientWidth, wrap.clientHeight)
+          }
+        }).then(() => owner?.present(scene, camera))
       }
       schedule()
     }
@@ -259,6 +302,7 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       },
       onState: state => {
         latest.current.onRendererState?.(state)
+        if (routeCanvasRef.current && state.phase !== 'ready') routeCanvasRef.current.hidden = true
         if (state.phase === 'ready' && !firstReady) { firstReady = true; latest.current.onReady?.(controller) }
         if ((state.phase === 'unavailable' || state.phase === 'interrupted') && !state.retrying) { cancelAnimationFrame(raf); raf = 0 }
         else schedule()
@@ -285,16 +329,15 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       observer.disconnect(); intersection.disconnect()
       document.removeEventListener('visibilitychange', visibility)
       detach(); rig?.dispose(); owner?.dispose(); canvas?.remove(); disposeGroup(content)
+      if (environment) disposeStellarArt(environment)
       rebuildRef.current = null
       latest.current.onController?.(null)
     }
-  }, [props.rendererFactory])
-  useEffect(() => { rebuildRef.current?.() }, [props.galaxy, props.selectedId, props.fleetSystemIds])
+  }, [props.rendererFactory, props.artStyle])
+  useEffect(() => { rebuildRef.current?.() }, [props.galaxy, props.selectedId, props.fleetSystemIds, props.gridMode])
   return <div ref={wrapRef} data-testid="galaxy-graph" className="absolute inset-0">
+    {(props.artStyle === 'stellar' || props.route) && <canvas ref={routeCanvasRef} data-testid="galaxy-route-overlay" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />}
     <div ref={labelRef} hidden className="pointer-events-none absolute rounded bg-zinc-800 px-2 py-1 hud-type-caption text-white" />
-    <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 hud-type-value tracking-wider text-white/35">
-      drag to orbit · two-finger swipe to pan · pinch to zoom · double-click to focus · ⌖ recenter
-    </div>
   </div>
 }
 export default GalaxyGraph

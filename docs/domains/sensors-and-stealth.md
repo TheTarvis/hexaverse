@@ -75,7 +75,7 @@ controls show only served information and preserve these privacy boundaries.
 
 [Ships/fleets](ships-and-fleets.md), [travel](travel.md), [combat](combat.md),
 [economy](economy.md), [discovery](discovery-and-identity.md), [HUD](../hud.md).
-Historical lineage: [scan/fog spec](../specs/0006-scan-and-fog.md),
+Historical lineage: [scan/fog spec](../history/2026-rebuild/specs/0006-scan-and-fog.md),
 [fog plan](../plans/fog-of-war.md), [sensors brainstorm](../plans/sensors-and-stealth.md),
 [continuous-space disclosure decisions](../plans/continous_space/decisions.md).
 Older hex-era or speculative through-body sensing laws are not current rules.

@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Continuous Space — the full-rewrite direction
 
 **Status (2026-08-26): direction decided, PoC being tweaked before lock-in.**

@@ -1,5 +1,5 @@
 > Historical numbered-spec snapshot, archived 2026-10-16. Original source:
-> [docs/specs/0004-movement-board.md](../../../specs/0004-movement-board.md). Old status/scenarios are provenance,
+> [docs/specs/0004-movement-board.md](../spec-redirects/0004-movement-board.md). Old status/scenarios are provenance,
 > not current instructions or live implementation work. Current owners are in
 > [canonical documentation](../../../README.md).
 > Plain-text relative paths retain the original source context.

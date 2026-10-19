@@ -1110,6 +1110,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               </div>
             )}
             <SpaceStage
+              gridMode="surround"
               systemId={systemId}
               scene={scene}
               extent={extent}

@@ -43,13 +43,16 @@ import type { SpaceFrame } from '../space-transform-loop'
 import { createSpacecraftModel, loadSpacecraftAsset, type SpacecraftKind } from './spacecraft-art'
 import { advanceFeatureModel, createFeatureModel, featureArtKind } from './feature-art'
 import { advanceLaneGatePortal, createLaneGateModel, loadLaneGateAsset } from './lane-gate-art'
-import { advancePlanetClouds, createPlanetModel, planetKind, createHexGrid, createBackdropMaterial } from './scene-art'
+import { advancePlanetClouds, createPlanetModel, planetKind, createHexGrid } from './scene-art'
+import { createSpaceSky, updateSpaceSky, type SpaceGridMode, type HexSkySettings } from '@/components/graphics/space-sky'
 
 import { createRendererOwner } from '@/components/render-guard/renderer-owner'
 import type { SpaceRendererBindings } from '../SpaceCanvas'
 import { createStarModel, stellarTint, type StarModel } from './star-art'
 
 export interface SpaceWorldProps extends Partial<SpaceRendererBindings> {
+  gridMode?: SpaceGridMode
+  gridSettings?: Partial<HexSkySettings>
   canvas: HTMLCanvasElement
   /**
    * The transform loop's published frame (openspec change
@@ -143,7 +146,6 @@ const FACETED_TYPES = new Set(['station', 'gate'])
 /** Marks drawn as a hollow wireframe — previews and records, not things. */
 const WIRE_KINDS = new Set<SceneMark['kind']>(['ghost', 'sighting', 'point-selection'])
 
-const STARFIELD_COUNT = 1400
 const ORBIT_RING_SAMPLES = 128
 const BELT_RADIAL_JITTER = 0.05
 const BELT_NORMAL_JITTER = 0.012
@@ -225,11 +227,15 @@ export function SpaceWorld({
   frameRef,
   extent,
   actingFleetId = null,
+  gridMode = 'ground',
+  gridSettings,
   onFirstFrame, createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory,
 }: SpaceWorldProps) {
   const bindings = useRef({ createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame })
   bindings.current = { createCanvas, onCanvas, onRendererState, onRendererOwner, rendererFactory, onFirstFrame }
   const actingRef = useRef<string | null>(actingFleetId)
+  const gridSettingsRef = useRef(gridSettings)
+  gridSettingsRef.current = gridSettings
   actingRef.current = actingFleetId
 
   useEffect(() => {
@@ -253,41 +259,12 @@ export function SpaceWorld({
     const decor = new THREE.Group()
     world.add(decor)
 
-    const backdrop = new THREE.Mesh(sphere, createBackdropMaterial())
-    backdrop.scale.setScalar(extent * 40)
-    backdrop.renderOrder = -1000
-    decor.add(backdrop)
-
-    // Starfield — a far shell of unattenuated points, seeded so it is the
-    // same sky every mount.
-    {
-      const rand = seeded(0x5eed)
-      const positions = new Float32Array(STARFIELD_COUNT * 3)
-      for (let i = 0; i < STARFIELD_COUNT; i++) {
-        const u = rand() * 2 - 1
-        const phi = rand() * Math.PI * 2
-        const r = extent * (12 + rand() * 8)
-        const s = Math.sqrt(1 - u * u)
-        positions.set([r * s * Math.cos(phi), r * u, r * s * Math.sin(phi)], i * 3)
-      }
-      const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-      decor.add(
-        new THREE.Points(
-          geometry,
-          new THREE.PointsMaterial({
-            color: 0x9aa3c0,
-            size: 1.6,
-            sizeAttenuation: false,
-            transparent: true,
-            opacity: 0.75,
-          }),
-        ),
-      )
-    }
+    const sky = createSpaceSky(extent, { hexLattice: gridMode === 'surround' })
+    decor.add(sky)
 
     // One decorative XZ plane; picking continues to use continuous space.
     const grid = createHexGrid(extent)
+    grid.visible = gridMode === 'ground'
     const gridMaterial = grid.material as THREE.LineBasicMaterial
     // Bodies straddle XZ, so depth alone lets the plane cut across their
     // lower hemispheres. Their opaque silhouettes mask decorative lines.
@@ -810,7 +787,7 @@ export function SpaceWorld({
       const target = published.camera.target
       view.lookAt(target.x, target.y, target.z)
       // Follow the published camera only; no extra clock, allocations or state.
-      backdrop.position.copy(view.position)
+      updateSpaceSky(sky, view, extent, gridSettingsRef.current)
       const distance = Math.hypot(basis.eye.x - target.x, basis.eye.y - target.y, basis.eye.z - target.z)
       const elevation = Math.abs(basis.eye.y - target.y) / Math.max(distance, 0.001)
       const distanceFade = 1 / (1 + (distance / Math.max(extent, 0.001)) ** 2)
@@ -873,7 +850,7 @@ export function SpaceWorld({
     // `frameRef` is a stable ref object (`{ readonly current: SpaceFrame |
     // null }`) for the whole mount — it belongs in no dependency array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvas, extent])
+  }, [canvas, extent, gridMode])
 
   return null
 }

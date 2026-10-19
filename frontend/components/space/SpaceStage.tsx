@@ -60,6 +60,7 @@ import {
 } from './space-camera'
 import { resolvePick, type PickMark, type SpaceSelection } from './space-selection'
 import type { SceneMark, SceneModel } from './space-scene'
+import type { SpaceGridMode, HexSkySettings } from '@/components/graphics/space-sky'
 import {
   applyHitTransform,
   createHitTargetRegistry,
@@ -82,6 +83,9 @@ const SpaceWorld = dynamic(() => import('./webgl/SpaceWorld').then((m) => m.Spac
 const NO_BASIS_SCREEN = { x: NaN, y: NaN, depth: 0, onScreen: false } as const
 
 export interface SpaceStageProps {
+  /** Shared scene treatment; Storybook can compare alternate grid modes. */
+  gridMode?: SpaceGridMode
+  gridSettings?: Partial<HexSkySettings>
   systemId: string
   scene: SceneModel
   /** The interior's served continuous extent — every camera figure scales off it. */
@@ -150,6 +154,8 @@ function selectionAttr(selection: SpaceSelection | null): string {
 }
 
 export function SpaceStage({
+  gridMode,
+  gridSettings,
   systemId,
   scene,
   extent,
@@ -491,7 +497,7 @@ export function SpaceStage({
         onPendingChange={onPendingChange}
         claimFocus={focusInsideRef.current}
         renderWorld={(canvas, bindings) => (
-          <SpaceWorld canvas={canvas} {...bindings} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} />
+          <SpaceWorld canvas={canvas} {...bindings} frameRef={frameRef} extent={extent} actingFleetId={actingFleetId} gridMode={gridMode} gridSettings={gridSettings} />
         )}
       >
         {ready => <SpaceLayers

@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Hex Board — Solar-System Interior
 
 > **Living doc, high-level only.** Scratchpad for the **tactical tier**: the

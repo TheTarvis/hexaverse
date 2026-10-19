@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Visualization spikes for the fog/stealth/intel model
 
 Companion to `README.md`'s "Fog, stealth & intel" section (2026-08-26).

@@ -28,6 +28,29 @@ domain documentation structure. Documentation does not authorize unscoped gamepl
 is a separately permission-dependent access proposal. [Migration map](documentation-migration.md)
 records source coverage and retained historical paths.
 
+## Where to write
+
+| Content | Home |
+| --- | --- |
+| Shared game vocabulary | Root `GLOSSARY.md`: concise definitions, grouped by topic |
+| Gameplay rules, settled intent, implementation gaps and open questions | Existing owner in `docs/domains/` |
+| Shared interaction and visual direction | `docs/hud.md` and `docs/art-direction.md` |
+| Reusable agent playbooks and workflow configuration | `docs/agents/` |
+| Local specs, tickets, wayfinding maps, research, prototypes, design rounds, prompts and review evidence | `.scratch/<effort>/`; follow [tracker conventions](agents/issue-tracker.md) |
+| Consequential decisions with a real trade-off that are costly to reverse | `docs/adr/`, created when the first qualifying decision is recorded |
+| Retained historical records | `docs/history/`; numbered specs are archived under `docs/history/2026-rebuild/specs/`; `docs/plans/` records are historical |
+
+Hexaverse uses one shared game vocabulary. Combat, economy and stations are
+related gameplay domains, not separate language contexts. Keep one root glossary;
+use `GLOSSARY-MAP.md` only if separate contexts with their own vocabularies emerge.
+A glossary defines what a term means; the linked domain page explains the rules.
+
+Before creating a durable document, update its existing owner when one exists.
+Promote accepted decisions from scratch into that owner and link supporting
+evidence. Reusable instructions belong in agents; each execution's artifacts
+belong in scratch. New specs and plans use the local tracker, rather than adding
+to the historical numbered-spec series or starting another gameplay authority.
+
 ## Authority and upkeep
 
 Each domain separates **settled intent**, **current implementation/gaps** and
@@ -38,13 +61,13 @@ Update a resolved question where it lives; keep glossary definitions concise.
 Use [ADRs](agents/domain.md) sparingly for consequential, hard-to-reverse trade-offs.
 
 [Archived rebuild records](history/2026-rebuild/README.md),
-[specs](specs/README.md) and [plans](plans/README.md) preserve history;
+[specs](history/2026-rebuild/specs/README.md) and [plans](plans/README.md) preserve history;
 older hex/ring mechanics, retired workflow commands and unchecked milestones do
 not become current requirements. [Defects](defects/) retain evidence; marketing
 and agent operational guidance keep their own roles. Imported skills remain unchanged.
 
-Scratch is ephemeral work in progress, never authoritative game rules. Its
-[project checklist](../.scratch/weekend-visual-batch/status.md) tracks current work,
-checks and blockers. Preserve accepted decisions in these canonical records and
-preserve referenced assets/evidence before pruning a scratch area; prune only
-once its implementation is finished. No scratch cleanup is part of this migration.
+Scratch is ephemeral work in progress. Track each effort in its own directory;
+[tracker conventions](agents/issue-tracker.md) define specs, tickets and maps.
+Preserve accepted decisions in canonical owners and preserve referenced evidence
+before pruning completed work. Existing scratch evidence remains available until
+its references have been deliberately preserved or replaced.

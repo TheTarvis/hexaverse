@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Goods Market & Credits — Scoping
 
 > **Status: scoping (2026-07-30).** The physical-economy arc: currency + the

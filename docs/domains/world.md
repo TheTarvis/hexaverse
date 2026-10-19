@@ -73,8 +73,8 @@ checkboxes. New visual categories preserve current server disclosure.
 [Discovery](discovery-and-identity.md), [sensors](sensors-and-stealth.md),
 [travel](travel.md), [economy](economy.md), [stations](stations.md),
 [art direction](../art-direction.md). Provenance:
-[galaxy spec](../specs/0001-galaxy-generation.md),
-[interior spec](../specs/0003-system-interior.md),
+[galaxy spec](../history/2026-rebuild/specs/0001-galaxy-generation.md),
+[interior spec](../history/2026-rebuild/specs/0003-system-interior.md),
 [continuous-space decisions](../plans/continous_space/decisions.md).
 The [migration audit](../documentation-migration.md) explains #0003's surviving
 ideas and stale claims; its numbered path remains for historical/code references.

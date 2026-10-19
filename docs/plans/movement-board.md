@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Movement (board tier) — Coast & Thrust (tactical, in-system)
 
 > **Living doc, high-level only.** Scratchpad for **how a unit moves inside a
@@ -218,7 +222,7 @@ rendezvous.
 
 ## Next step
 
-**Graduated → [#0004 In-system movement (coast & thrust)](../specs/0004-movement-board.md)
+**Graduated → [#0004 In-system movement (coast & thrust)](../history/2026-rebuild/specs/0004-movement-board.md)
 — `accepted` 2026-07-07.** All four opening questions locked there (fleet is the
 mover; bearing-aligned graph↔board handoff; uniform burn cost; the ephemeris-vs-
 activity invariant with cadence/audience delegated). This plan stays the living design

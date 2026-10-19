@@ -1,51 +1,26 @@
-# Domain Docs
+# Domain documentation
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+Hexaverse uses one shared game vocabulary in root [GLOSSARY.md](../../GLOSSARY.md).
+Before exploring or changing a gameplay domain, read that glossary and the owning
+page linked from [docs/README.md](../README.md). Domain pages distinguish settled
+intent, current implementation/gaps and proposals; code/tests establish implemented
+behavior. Use the glossary's terms consistently in prose, issues, code and tests.
+Surface conflicts with accepted intent or decisions rather than silently overriding.
 
-## Before exploring, read these
+## Updating the model
 
-- **`GLOSSARY.md`** at the repo root, or
-- **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+Record resolved terminology in `GLOSSARY.md` using the imported
+[glossary format](../../harness/skills/domain-modeling/GLOSSARY-FORMAT.md).
+Keep definitions free of APIs, storage types and implementation decisions.
+Record gameplay rules in their existing domain owner; link across domains instead
+of copying rules. Follow [document placement](../README.md#where-to-write) for
+scratch work and durable guidance.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+Create `docs/adr/` lazily for decisions that are costly to reverse, surprising
+without context and involve a real trade-off. Read relevant ADRs when present;
+flag conflicts explicitly. Use the imported
+[ADR format](../../harness/skills/domain-modeling/ADR-FORMAT.md).
 
-## File structure
-
-Single-context repo (most repos):
-
-```
-/
-├── GLOSSARY.md
-├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
-└── src/
-```
-
-Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
-
-```
-/
-├── GLOSSARY-MAP.md
-├── docs/adr/                          ← system-wide decisions
-└── src/
-    ├── ordering/
-    │   ├── GLOSSARY.md
-    │   └── docs/adr/                  ← context-specific decisions
-    └── billing/
-        ├── GLOSSARY.md
-        └── docs/adr/
-```
-
-## Use the glossary's vocabulary
-
-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
-
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
-
-## Flag ADR conflicts
-
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
-
-> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
+The domain pages are topics within the same language. A root `GLOSSARY-MAP.md`
+would be appropriate only if separate language contexts emerge, each with its
+own glossary; it is not an additional index of the existing domain pages.

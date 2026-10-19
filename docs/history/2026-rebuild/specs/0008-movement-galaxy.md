@@ -1,5 +1,5 @@
 > Historical numbered-spec snapshot, archived 2026-10-16. Original source:
-> [docs/specs/0008-movement-galaxy.md](../../../specs/0008-movement-galaxy.md). Old status/scenarios are provenance,
+> [docs/specs/0008-movement-galaxy.md](../spec-redirects/0008-movement-galaxy.md). Old status/scenarios are provenance,
 > not current instructions or live implementation work. Current owners are in
 > [canonical documentation](../../../README.md).
 > Plain-text relative paths retain the original source context.

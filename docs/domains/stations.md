@@ -5,8 +5,12 @@ record, 2026-10-16; [documentation guide](../README.md) explains authority.
 
 ## Settled intent
 
-The starter loop includes an NPC trading station in each spawn/respawn home
-system so mining, hauling, docking and selling can begin locally. Stations are
+The starter loop includes a trading station in each spawn/respawn home system
+so mining, hauling, docking and selling can begin locally. On 2026-10-19, Travis
+confirmed that the home station belongs to the spawning corporation, superseding
+the earlier NPC-ownership intent. Trading-service behavior and starting protection
+remain separate decisions. [Discovery and identity](discovery-and-identity.md) owns
+the developing control and transfer model. Stations are
 structures with ownership, distinct from mineable resource hosts. Player-built
 stations and network infrastructure are future ambitions, not shipped services.
 Sources: [goods-market decisions](../plans/goods-market.md),
@@ -24,7 +28,9 @@ Sources: [goods-market decisions](../plans/goods-market.md),
 - Requester reads use [GetVisible](../../backend/stations/service.go), gated by
   graph knowledge; hidden existence returns not-found. This differs from the
   internal ungated structural read. Discovery records can overlay name/owner;
-  provisioning itself creates an NPC station.
+  provisioning itself currently creates an NPC station. This conflicts with the
+  accepted corporation-owned home-station direction; the ownership overlay alone
+  does not implement that direction consistently.
 - Station demand and docked sales exist; their rules belong to
   [economy](economy.md). Fuel service and docking semantics are linked there and
   in [travel](travel.md). Model fields for ownership are not a construction game.

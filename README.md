@@ -21,6 +21,7 @@ port lane. The shared `spinup` skill restarts dev services in GoLand Run tabs.
 ## Project guidance
 
 - [`CLAUDE.md`](CLAUDE.md): project conventions and development.
+- [`docs/README.md`](docs/README.md): canonical domain owners and document placement.
 - [`GLOSSARY.md`](GLOSSARY.md): game domain vocabulary.
 - [`docs/game-architecture.md`](docs/game-architecture.md): cross-domain reference.
 - [`backend/CLAUDE.md`](backend/CLAUDE.md) and

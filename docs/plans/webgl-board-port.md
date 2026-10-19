@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # WebGL Board Port — Implementation Plan
 
 > **Status: planned (2026-08-11).** Promote `frontend/app/spike/webgl-board/`

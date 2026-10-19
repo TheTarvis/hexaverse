@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Spawn & identity — a mind wakes in a hull
 
 > **Living doc, high-level only.** Scratchpad for **who the player *is*, how a

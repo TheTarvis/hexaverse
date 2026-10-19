@@ -1,3 +1,7 @@
+> **Historical record.** Current intent and open questions live in the
+> [canonical domain documentation](../README.md). Status labels, checklists and
+> workflow instructions below describe the earlier design, not current authority.
+
 # Board Visual Language — Scoping
 
 > **Status: concept (2026-08-11).** Out of scope for the WebGL renderer port
