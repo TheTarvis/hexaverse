@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ssoHelperAllowed, idpSignInAllowed } from './sso-policy.mjs'
 import { createTransportLog, transportPath, transportRecord } from './transport-diagnostics.mjs'
 import { attachLiveHmr, injectLiveConfig } from './live-frontend.mjs'
+import { createLiveStorybook } from './live-storybook.mjs'
 
 const ID = '[A-Za-z0-9_-]{1,180}'
 const api = (pattern) => new RegExp(`^/v1/${pattern}$`)
@@ -131,7 +132,7 @@ async function serveStorybook(request, response, directory, expired) {
 
 /** All upstream hosts are fixed loopback; only their numeric ports are configurable. */
 export function createPreviewGateway({ previewOrigin, frontendPort = 20205, backendPort = 20201, authPort = 20211,
-  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now, onTransportError, liveProject } = {}) {
+  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now, onTransportError, liveProject, liveStorybookPort } = {}) {
   let trusted
   try { trusted = new URL(previewOrigin) } catch { throw new Error('Explicit previewOrigin is required') }
   // Local QA is an explicit alternative, never an additional allowed origin on
@@ -154,7 +155,9 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
   if (onTransportError !== undefined && typeof onTransportError !== 'function') throw new Error('Invalid diagnostics callback')
   const expired = () => now() >= deadline
   if (liveProject !== undefined && (typeof liveProject !== 'string' || !/^[a-z][a-z0-9-]{2,62}$/.test(liveProject))) throw new Error('Invalid live emulator project')
-  const ports = { frontend: port(frontendPort), backend: port(backendPort), auth: port(authPort) }
+  const ports = { frontend: port(frontendPort), backend: port(backendPort), auth: port(authPort), ...(liveStorybookPort ? { storybook: port(liveStorybookPort) } : {}) }
+  if (liveStorybookPort && !liveProject) throw new Error('Live Storybook requires explicit live preview mode')
+  const liveStorybook = liveStorybookPort ? createLiveStorybook({ port: ports.storybook, origin: trusted.origin, expired }) : null
   if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 1_048_576) throw new Error('Invalid request body limit')
   const server = http.createServer(async (request, response) => {
     // Check wall time on every request as well as using a timer: a delayed
@@ -169,7 +172,8 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     // Turbopack encodes @ in dependency chunk names. Normalize that one safe
     // character only in live mode; retain the existing traversal restrictions.
     const target = liveProject ? request.url.replace(/%40/ig, '@') : request.url
-    const route = previewRoute(request.method, target)
+    const storybookTarget = liveStorybook && target.startsWith('/storybook/')
+    const route = storybookTarget ? liveStorybook.route(request.method, target) : previewRoute(request.method, target)
     if (!route || request.headers['x-http-method-override'] || request.headers['x-method-override']) return reject(response, 404)
     if (route.service === 'auth' && ssoHelperPaths.has(route.path.split('?', 1)[0]) && !ssoHelperAllowed(route.path, trusted.origin)) return reject(response, 400)
     let receivedBytes = 0, upstreamFailed = false, downstreamAborted = false, responseStatus
@@ -182,7 +186,10 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     const declaredLength = Number(request.headers['content-length'] ?? 0)
     if (!Number.isSafeInteger(declaredLength) || declaredLength < 0 || declaredLength > maxBodyBytes) return reject(response, 413)
     if ((request.method === 'GET' || request.method === 'HEAD') && (declaredLength || request.headers['transfer-encoding'])) return reject(response, 404)
-    if (route.service === 'storybook') return serveStorybook(request, response, storybookDirectory, expired)
+    if (route.service === 'storybook' && !liveStorybook) return serveStorybook(request, response, storybookDirectory, expired)
+    if (liveStorybook && target === '/storybook') {
+      response.writeHead(308, { location: '/storybook/', 'cache-control': 'no-store' }); response.end(); return
+    }
 
     // Browser request bodies are small JSON/form payloads. Bound them before
     // forwarding so a partial oversized mutation never reaches an upstream.
@@ -218,16 +225,16 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     for (const key of spoofHeaders) delete headers[key]
     for (const key of Object.keys(headers)) if (/^x-(?:middleware|invoke|nextjs)-/.test(key)) delete headers[key]
     headers.host = `localhost:${ports[route.service]}`
-    if (liveProject && route.service === 'frontend') {
+    if (liveProject && (route.service === 'frontend' || route.service === 'storybook')) {
       headers['accept-encoding'] = 'identity'
-      if (headers.origin) headers.origin = `http://localhost:${ports.frontend}`
+      if (headers.origin) headers.origin = `http://localhost:${ports[route.service]}`
     }
     if (route.service === 'backend' && headers.origin) headers.origin = 'http://localhost:20200'
     headers['content-length'] = size
     const upstream = http.request({ hostname: '127.0.0.1', port: ports[route.service], method: request.method, path: route.path, headers }, incoming => {
       if (expired()) { incoming.destroy(); reject(response, 410); return }
       responseStatus = incoming.statusCode ?? 502
-      if (liveProject && route.service === 'frontend' && incoming.headers['content-type']?.includes('text/html') && request.method === 'GET') {
+      if (request.method === 'GET' && (liveProject && route.service === 'frontend' && incoming.headers['content-type']?.includes('text/html') || liveStorybook && route.service === 'storybook' && /(?:javascript|text\/css|text\/html|application\/json)/.test(incoming.headers['content-type'] ?? ''))) {
         const parts = []
         let bytes = 0
         incoming.on('data', part => {
@@ -238,7 +245,9 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
         incoming.on('error', () => response.destroy())
         incoming.on('end', () => {
           if (expired()) return reject(response, 410)
-          const html = injectLiveConfig(Buffer.concat(parts).toString('utf8'), trusted.origin, liveProject)
+          let html
+          try { html = route.service === 'storybook' ? liveStorybook.transform(Buffer.concat(parts), route.path, incoming.headers['content-type']) : injectLiveConfig(Buffer.concat(parts).toString('utf8'), trusted.origin, liveProject) }
+          catch { report('upstream_http_error', 'STORYBOOK_TRANSFORM', 502); return reject(response, 502) }
           const outgoing = headersWithoutHop(incoming.headers)
           delete outgoing['content-length']; delete outgoing['content-encoding']; delete outgoing.etag
           response.writeHead(incoming.statusCode ?? 502, { ...outgoing, 'cache-control': 'no-store' })
@@ -277,9 +286,9 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
   })
   server.requestTimeout = 30_000
   server.headersTimeout = 15_000
-  const closeHmr = liveProject ? attachLiveHmr(server, { origin: trusted.origin, frontendPort: ports.frontend, expired }) : () => {}
+  const closeHmr = liveProject ? attachLiveHmr(server, { origin: trusted.origin, frontendPort: ports.frontend, expired, otherUpgrade: liveStorybook?.upgrade }) : () => {}
   const closeConnections = server.closeAllConnections.bind(server)
-  server.closeAllConnections = () => { closeHmr(); closeConnections() }
+  server.closeAllConnections = () => { closeHmr(); liveStorybook?.close(); closeConnections() }
   let expiryTimer
   if (Number.isFinite(deadline)) {
     server.on('listening', () => {
@@ -298,14 +307,14 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port', '--error-log', '--live-project'])
+  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port', '--error-log', '--live-project', '--live-storybook-port'])
   const args = {}
   for (let i = 2; i < process.argv.length; i += 2) {
     if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error('Use --origin and --until UTC-ISO-deadline for HTTPS; optional numeric port flags')
     args[process.argv[i]] = ['--origin', '--until', '--error-log', '--live-project'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
   }
   const errorLog = args['--error-log'] ? createTransportLog({ filePath: args['--error-log'], expiresAt: args['--until'] }) : undefined
-  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'], onTransportError: errorLog, liveProject: args['--live-project'] })
+  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'], onTransportError: errorLog, liveProject: args['--live-project'], liveStorybookPort: args['--live-storybook-port'] })
   gateway.once('close', () => errorLog?.close())
   gateway.on('error', () => { console.error('Preview gateway could not listen'); process.exitCode = 1 })
   gateway.listen(args['--port'] ?? 20204, '127.0.0.1', () => {

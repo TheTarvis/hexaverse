@@ -1,5 +1,40 @@
 # Authenticated phone preview
 
+## One-week live app and Storybook preview — 2026-10-19
+
+Travis requested restoration for one week and live Storybook on20203. The explicit
+new deadline is **2026-10-26T11:53:17Z** (October26 at7:53a.m. Eastern), superseding
+the earlier cutoff and static-Storybook records below. The same ngrok URL, Google identity allowlist,
+credentials and game API/Auth restrictions apply. Only the loopback gateway and
+ngrok belong to the supervisor; the separately managed dev servers on20200/20203
+remain running after preview expiry. Automatic shutdown at the prior04:00 cutoff
+was observed: cleanup completed04:00:00.530UTC, launchd exit0, public ngrok404.
+
+Live Storybook uses explicit `--live-storybook-port 20203` beneath `/storybook/`.
+Its manager, iframe, index, modules and update sockets retain that prefix. The
+relay admits modules referenced by trusted Storybook output and fixed public
+asset directories, rather than forwarding arbitrary Vite/filesystem routes.
+Environment files, unreferenced files, raw-file queries, editor/debug endpoints
+and writes are rejected. JavaScript URL literals are parsed before rewriting;
+regular-expression literals are preserved. Storybook's server channel permits
+only sanitized read-only follower initialization; test runners, editor commands
+and unrelated RPC are not exposed. Vite invalidation is limited to known modules.
+
+Live stories expose their browser source modules and client-side diagnostics to
+the already authorized reviewer. This is inherent in the requested development
+preview; it does not grant arbitrary filesystem or server-control access. Both
+Storybook update channels require the configured outer Origin, retain upstream
+tokens, and close at the same independent gateway deadline as app HMR/SSE.
+Existing Next frontend HMR continues through its separate exact endpoint.
+
+Isolated browser validation rendered the original card story, discovered a
+disposable new story in the manager, rendered its iframe, and observed an actual
+source change through HMR. The temporary story was removed. Physical iPhone and
+an authenticated public browser session remain separate device acceptance.
+The app's gateway-only login guidance is applied after initial hydration so a
+fresh dev-server page matches its server-rendered markup; a hydration regression
+test and fresh mobile-browser check cover that handoff.
+
 ## Live development preview — 2026-10-19
 
 Travis approved switching the existing protected endpoint to the separately

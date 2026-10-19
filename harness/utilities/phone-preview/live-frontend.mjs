@@ -22,12 +22,13 @@ export function liveClientMessage(data) {
   return null
 }
 
-export function attachLiveHmr(server, { origin, frontendPort, expired }) {
+export function attachLiveHmr(server, { origin, frontendPort, expired, otherUpgrade }) {
   const relay = new WebSocket.Server({ noServer: true, maxPayload: 65536, perMessageDeflate: false })
   const connections = new Set()
   const close = () => { for (const socket of connections) socket.terminate(); connections.clear() }
   server.on('close', close)
   server.on('upgrade', (request, socket, head) => {
+    if (otherUpgrade && request.url.startsWith('/storybook/')) return otherUpgrade(request, socket, head)
     const reject = status => socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`)
     if (expired()) return reject('410 Gone')
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress) ||

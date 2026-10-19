@@ -64,7 +64,10 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = sanitizeRedirect(searchParams.get('redirect'))
-  const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true' || !!livePhonePreviewConfig()
+  const [phonePreview, setPhonePreview] = useState(process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true')
+  useEffect(() => {
+    if (livePhonePreviewConfig()) setPhonePreview(true)
+  }, [])
   // Preview uses the same email and simulated Google flows against the emulator.
   const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
 

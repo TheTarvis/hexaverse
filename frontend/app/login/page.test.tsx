@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
+import { hydrateRoot } from 'react-dom/client'
 import LoginPage from './page'
 
 const mockPush = vi.fn()
@@ -407,6 +409,29 @@ describe('LoginPage', () => {
     render(<LoginPage />)
 
     expect(screen.queryByTestId('login-error')).not.toBeInTheDocument()
+  })
+
+  it('hydrates ordinary server markup before applying a gateway-only live profile', async () => {
+    mockAccountContext()
+    const container = document.createElement('div')
+    container.innerHTML = renderToString(<LoginPage />)
+    expect(container.textContent).toContain('Welcome back.')
+    document.body.append(container)
+    const profile = document.createElement('script')
+    profile.id = 'hexaverse-phone-preview'
+    profile.type = 'application/json'
+    profile.textContent = JSON.stringify({ origin: window.location.origin, projectId: 'hexaverse-emulator' })
+    document.head.append(profile)
+    const errors: unknown[] = []
+    let root: ReturnType<typeof hydrateRoot> | undefined
+    try {
+      await act(async () => { root = hydrateRoot(container, <LoginPage />, { onRecoverableError: error => errors.push(error) }) })
+      expect(container.textContent).toContain('Use a test-only email and password for this preview.')
+      expect(errors).toEqual([])
+    } finally {
+      await act(async () => root?.unmount())
+      container.remove(); profile.remove()
+    }
   })
 
   it('phone preview offers email sign-in/signup and explains its simulated Google option', async () => {
