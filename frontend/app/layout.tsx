@@ -4,6 +4,7 @@ import { Providers } from '@/components/providers'
 import { LayoutWrapper } from '@/components/layout-wrapper'
 import { Toaster } from 'sonner'
 import './globals.css'
+import '@/components/hud/hud-type.css'
 
 const inter = Inter({
   subsets: ['latin'],

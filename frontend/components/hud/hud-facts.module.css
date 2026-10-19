@@ -1,8 +1,4 @@
 .facts {
-  --hud-label-font-size: 11px;
-  --hud-body-font-size: 13px;
-  --hud-value-font-size: 15px;
-
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 72px), 1fr));
   gap: 8px;
@@ -22,6 +18,6 @@
   overflow-wrap: anywhere;
 }
 
-.details { color: #dce8f0; font-size: var(--hud-body-font-size, 14px); line-height: 1.55; }
+.details { color: var(--hud-type-body); font: var(--hud-body-font); }
 .rows { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .rows .fact { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr); gap: 12px; align-items: baseline; }

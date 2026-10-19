@@ -172,7 +172,7 @@ export function ScanControl({
   if (!fleet) {
     return (
       <aside data-testid="scan-control" className="flex flex-col gap-3 py-4">
-        <p className="text-sm text-zinc-400">No fleet selected.</p>
+        <p className="hud-type-body text-zinc-400">No fleet selected.</p>
       </aside>
     )
   }
@@ -196,7 +196,7 @@ export function ScanControl({
       </HudLivePortal>
 
       {runningScan.isError ? (
-        <div className="mt-2 text-sm text-zinc-400">
+        <div className="mt-2 hud-type-body text-zinc-400">
           <p>This sweep&apos;s state could not be read.</p>
           <Button type="button" plain onClick={() => void runningScan.refetch()}>
             Retry
@@ -204,14 +204,14 @@ export function ScanControl({
         </div>
       ) : running ? (
         <div className="mt-2 flex flex-col gap-2">
-          <p className="text-sm text-zinc-400">
+          <p className="hud-type-body text-zinc-400">
             This fleet is detectable for the remainder of the sweep.
           </p>
           <div className="flex items-center justify-between">
             {settling ? (
               // F4: the settling state renders NO figure — a plain span with
               // the mandated override copy and no data-raw/data-unit pair.
-              <span data-testid="scan-countdown" className="font-mono text-[11px] text-sky-400">
+              <span data-testid="scan-countdown" className="hud-type-value text-sky-400">
                 Settling…
               </span>
             ) : (
@@ -220,13 +220,13 @@ export function ScanControl({
                 unit="world-ms-span-left"
                 text={formatByUnit(runningEta! - worldTime, scale, 'world-ms-span-left')}
                 data-testid="scan-countdown"
-                className="font-mono text-[11px] text-sky-400"
+                className="hud-type-value text-sky-400"
               />
             )}
             <button
               type="button"
               data-testid="scan-cancel"
-              className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+              className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
               onClick={commitCancel}
             >
               Cancel
@@ -239,18 +239,18 @@ export function ScanControl({
         // copy, never a commit control, never the target list — only that
         // the commit was accepted and its window is still being confirmed.
         // The countdown itself appears once `running` above goes true.
-        <p data-testid="scan-commit-pending" className="mt-2 text-sm text-zinc-400">
+        <p data-testid="scan-commit-pending" className="mt-2 hud-type-body text-zinc-400">
           Sweep committed — confirming its window…
         </p>
       ) : scanTargets.isError ? (
-        <div className="mt-2 text-sm text-zinc-400">
+        <div className="mt-2 hud-type-body text-zinc-400">
           <p>The available scan targets could not be read.</p>
           <Button type="button" plain onClick={() => void scanTargets.refetch()}>
             Retry
           </Button>
         </div>
       ) : scanTargets.isLoading ? (
-        <p data-testid="scan-targets-loading" className="mt-2 text-sm text-zinc-400">
+        <p data-testid="scan-targets-loading" className="mt-2 hud-type-body text-zinc-400">
           Reading scan targets…
         </p>
       ) : targets.length === 0 && scanTargets.isFetching ? (
@@ -261,7 +261,7 @@ export function ScanControl({
         // status inbox read can land first and flip "already sweeping" to
         // false while this read is still catching up over the stale empty
         // page.
-        <p data-testid="scan-targets-rereading" className="mt-2 text-sm text-zinc-400">
+        <p data-testid="scan-targets-rereading" className="mt-2 hud-type-body text-zinc-400">
           Re-reading targets…
         </p>
       ) : targets.length === 0 && earlySettleHandoff ? null : targets.length === 0 ? (
@@ -279,7 +279,7 @@ export function ScanControl({
         // communicating the outcome; once the player dismisses it (or it
         // was never the report this window explains), an empty set again
         // reads as "no host is in range" on its own authority.
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 hud-type-body text-zinc-400">
           {inTransit
             ? 'This fleet is in lane transit and cannot sweep right now.'
             : 'No host is in range to sweep.'}
@@ -287,14 +287,14 @@ export function ScanControl({
       ) : (
         <div className="mt-2 flex flex-col gap-2">
           {staleNotice && (
-            <p className="text-[11px] text-amber-500">
+            <p className="hud-type-caption text-amber-500">
               That sweep is no longer possible against that host. The target list has been refreshed.
             </p>
           )}
           <select
             data-testid="scan-target-select"
             aria-label="Scan target"
-            className="rounded-md border border-zinc-700/60 bg-transparent px-1 py-0.5 font-mono text-[11px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="rounded-md border border-zinc-700/60 bg-transparent px-1 py-0.5 hud-type-value focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
             value={activeHostId ?? ''}
             onChange={(e) => setSelectedHostId(e.target.value)}
           >
@@ -308,7 +308,7 @@ export function ScanControl({
               </option>
             ))}
           </select>
-          <p className="text-sm text-zinc-400">
+          <p className="hud-type-body text-zinc-400">
             Committing this sweep makes the fleet detectable for its whole duration.
             {fleet.attachedTo &&
               ' It also breaks this fleet’s masking at the attached host for that time.'}
@@ -316,7 +316,7 @@ export function ScanControl({
           <button
             type="button"
             data-testid="scan-commit-button"
-            className="rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
             disabled={!activeHostId}
             onClick={commit}
           >
@@ -326,7 +326,7 @@ export function ScanControl({
       )}
 
       {settledScan.isError ? (
-        <div className="mt-2 text-sm text-zinc-400">
+        <div className="mt-2 hud-type-body text-zinc-400">
           <p>This sweep&apos;s outcome could not be read.</p>
           <Button type="button" plain onClick={() => void settledScan.refetch()}>
             Retry
@@ -335,7 +335,7 @@ export function ScanControl({
       ) : settledScan.data ? (
         <div
           data-testid="scan-report"
-          className="mt-2 flex flex-col gap-1 border-t border-white/15 pt-2 text-[11px] text-zinc-300"
+          className="mt-2 flex flex-col gap-1 border-t border-white/15 pt-2 hud-type-caption text-zinc-300"
         >
           <p>
             {settledScan.data.reasonCode
@@ -345,7 +345,7 @@ export function ScanControl({
           {!settledScan.data.reasonCode && onOpenLog && (
             <button
               type="button"
-              className="self-start font-mono text-[10px] uppercase text-sky-400 underline"
+              className="self-start hud-type-label text-sky-400 underline"
               onClick={onOpenLog}
             >
               Open the sighting log
@@ -354,7 +354,7 @@ export function ScanControl({
           <button
             type="button"
             data-testid="scan-report-dismiss"
-            className="self-start rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            className="self-start rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
             onClick={dismissReport}
           >
             Dismiss

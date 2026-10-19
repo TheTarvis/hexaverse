@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode, ComponentPropsWithRef } from 'react'
 import { CONSOLE_DOCK_LANE_COLUMN } from '@/lib/console-dock-layout'
 import styles from './game-hud.module.css'
+import { HudHeading as ContentHeading, HudText } from './HudTypography'
 
 type Props = HTMLAttributes<HTMLElement>
 
@@ -30,8 +31,8 @@ export function HudHeading({ eyebrow, title, detail, className = '', ...props }:
   detail?: ReactNode
 }) {
   return <header {...props} className={`${styles.heading} ${className}`}>
-    {eyebrow && <p>{eyebrow}</p>}
-    <h1>{title}</h1>
-    {detail && <p>{detail}</p>}
+    {eyebrow && <HudText variant="label">{eyebrow}</HudText>}
+    <ContentHeading level={1} size="compact">{title}</ContentHeading>
+    {detail && <HudText variant="secondary">{detail}</HudText>}
   </header>
 }

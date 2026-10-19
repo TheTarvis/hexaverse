@@ -968,7 +968,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
 {stationFailed && (
           <div
             data-testid="station-unavailable"
-            className="flex flex-col gap-3 text-sm"
+            className="flex flex-col gap-3 hud-type-body"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               The station read failed, so trading here is unavailable. Retry the read to sell or
@@ -977,7 +977,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             <button
               type="button"
               data-testid="station-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={() => void stationRead.refetch()}
             >
               Retry
@@ -990,7 +990,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {boardFailed && !stationFailed && (
           <div
             data-testid="market-board-unavailable"
-            className="flex flex-col gap-3 text-sm"
+            className="flex flex-col gap-3 hud-type-body"
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               The price board could not be read, so selling is unavailable. Refuelling still works.
@@ -998,7 +998,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             <button
               type="button"
               data-testid="market-board-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={() => void boardRead.refetch()}
             >
               Retry
@@ -1086,13 +1086,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             data-testid="space-interior-error"
             className="flex w-full max-w-md flex-col items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800/50 dark:bg-white/[0.12]"
           >
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="hud-type-body text-zinc-600 dark:text-zinc-400">
               The system could not be read. {interior.error?.message ?? ''}
             </p>
             <button
               type="button"
               data-testid="space-interior-retry"
-              className="rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              className="rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={() => void interior.refetch()}
             >
               Retry
@@ -1104,7 +1104,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             {showLoading && (
               <div
                 data-testid="space-loading"
-                className="absolute inset-0 z-10 grid place-items-center bg-zinc-900/60 text-sm text-zinc-300"
+                className="absolute inset-0 z-10 grid place-items-center bg-zinc-900/60 hud-type-body text-zinc-300"
               >
                 Charting the system…
               </div>
@@ -1138,14 +1138,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {ghostFeed.isError && (
           <div
             data-testid="sightings-unavailable"
-            className={`absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-[11px] dark:border-zinc-800/50 dark:bg-white/[0.12]`}
+            className={`absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 hud-type-caption dark:border-zinc-800/50 dark:bg-white/[0.12]`}
           >
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
             </p>
             <button
               type="button"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={ghostFeed.refetch}
             >
               Retry
@@ -1261,13 +1261,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         {fleets.isError && (
           <div
             data-testid="space-fleets-error"
-            className="flex flex-col gap-3 text-sm"
+            className="flex flex-col gap-3 hud-type-body"
           >
             <p className="text-zinc-600 dark:text-zinc-400">Your fleets could not be read.</p>
             <button
               type="button"
               data-testid="space-fleets-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[11px] uppercase text-zinc-300"
+              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={() => void fleets.refetch()}
             >
               Retry

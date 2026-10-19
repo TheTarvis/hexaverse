@@ -291,8 +291,8 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
   }, [props.rendererFactory])
   useEffect(() => { rebuildRef.current?.() }, [props.galaxy, props.selectedId, props.fleetSystemIds])
   return <div ref={wrapRef} data-testid="galaxy-graph" className="absolute inset-0">
-    <div ref={labelRef} hidden className="pointer-events-none absolute rounded bg-zinc-800 px-2 py-1 text-xs text-white" />
-    <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] tracking-wider text-white/35">
+    <div ref={labelRef} hidden className="pointer-events-none absolute rounded bg-zinc-800 px-2 py-1 hud-type-caption text-white" />
+    <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 hud-type-value tracking-wider text-white/35">
       drag to orbit · two-finger swipe to pan · pinch to zoom · double-click to focus · ⌖ recenter
     </div>
   </div>

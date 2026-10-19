@@ -181,7 +181,7 @@ export function VitalsStripFleetCell({
 
   return (
     <div className="flex items-center gap-1.5">
-      <span data-testid="vitals-fleet-id" className="font-mono text-[11px] text-zinc-900 dark:text-white">
+      <span data-testid="vitals-fleet-id" className="hud-type-value text-zinc-900 dark:text-white">
         {acting ? acting.id : ABSENT_FIGURE}
       </span>
       <div className="relative">
@@ -192,7 +192,7 @@ export function VitalsStripFleetCell({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={chevronLabel}
-          className="rounded border border-zinc-300 px-1 py-0.5 font-mono text-[10px] text-zinc-600 hover:bg-zinc-200 dark:border-white/[0.12] dark:text-zinc-400 dark:hover:bg-white/[0.14]"
+          className="rounded border border-zinc-300 px-1 py-0.5 hud-type-value text-zinc-600 hover:bg-zinc-200 dark:border-white/[0.12] dark:text-zinc-400 dark:hover:bg-white/[0.14]"
           onClick={() => { if (open) setOpen(false); else openMenu() }}
           onKeyDown={onChevronKeyDown}
         >
@@ -214,7 +214,7 @@ export function VitalsStripFleetCell({
                   itemRefs.current[index] = el
                 }}
                 data-testid={`vitals-fleet-menu-item-${fleet.id}`}
-                className="break-words px-2 py-1 text-left font-mono text-[11px] text-zinc-900 hover:bg-white/10"
+                className="break-words px-2 py-1 text-left hud-type-value text-zinc-900 hover:bg-white/10"
                 onClick={() => choose(fleet)}
                 onKeyDown={(event) => onItemKeyDown(event, index, fleet)}
               >
@@ -223,7 +223,7 @@ export function VitalsStripFleetCell({
             ))}
             {inspectable && <button type="button" role="menuitem" data-testid="vitals-fleet-inspect"
               ref={element => { itemRefs.current[entries.length] = element }}
-              className="break-words border-t border-zinc-200 px-2 py-1 text-left font-mono text-[11px] text-zinc-900 hover:bg-white/10 dark:border-white/[0.12] dark:text-white"
+              className="break-words border-t border-zinc-200 px-2 py-1 text-left hud-type-value text-zinc-900 hover:bg-white/10 dark:border-white/[0.12] dark:text-white"
               onClick={inspect} onKeyDown={event => onItemKeyDown(event, entries.length)}>
               Inspect current fleet {inspectable.id}
             </button>}

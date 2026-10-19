@@ -395,7 +395,7 @@ export function FleetActionsPanel({
               onChange={(e) => setMineTons(clampTons(e.target.value, freeHold))}
             />
           </div>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 hud-type-body text-zinc-400">
             About{' '}
             <Figure
               raw={minePreviewMs}
@@ -418,7 +418,7 @@ export function FleetActionsPanel({
         </HudSection>
       )}
       {interiorFailed && (
-        <div data-testid="mine-unavailable" className="border-t border-white/15 pt-4 text-sm text-zinc-400">
+        <div data-testid="mine-unavailable" className="border-t border-white/15 pt-4 hud-type-body text-zinc-400">
           The system read failed, so this body&apos;s resources are unavailable. Retry the read to
           mine here.
         </div>
@@ -430,12 +430,12 @@ export function FleetActionsPanel({
             unit="world-ms-span-left"
             text={formatByUnit(mineEta.eta - worldTime, scale, 'world-ms-span-left')}
             data-testid="mine-countdown"
-            className="font-mono text-[11px] text-sky-400"
+            className="hud-type-value text-sky-400"
           />
           <button
             type="button"
             data-testid="mine-cancel"
-            className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-zinc-300"
+            className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300"
             onClick={() =>
               cancelAction.mutate(
                 { actionId: mineEta.id, fleetId: fleet.id },
@@ -456,7 +456,7 @@ export function FleetActionsPanel({
             <Badge color="cyan">DOCKED</Badge>
           </div>
           {priceChange !== null && (
-            <p data-testid="sell-price-changed" className="mt-1 text-[11px] text-amber-500">
+            <p data-testid="sell-price-changed" className="mt-1 hud-type-caption text-amber-500">
               The price moved while you were deciding — you expected{' '}
               <Figure
                 raw={priceChange.expectedTotal}
@@ -496,7 +496,7 @@ export function FleetActionsPanel({
               onChange={(e) => setSellTons(clampTons(e.target.value, sellHeld))}
             />
           </div>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 hud-type-body text-zinc-400">
             <Figure
               raw={sellPreview.totalProceeds}
               unit="credits"
@@ -532,7 +532,7 @@ export function FleetActionsPanel({
             value={String(refuelTons)}
             onChange={(e) => setRefuelTons(clampTons(e.target.value, freeHold))}
           />
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 hud-type-body text-zinc-400">
             <Figure
               raw={refuelTons * fuelPrice}
               unit="credits"
@@ -570,7 +570,7 @@ export function FleetActionsPanel({
             // Rendered on BOTH park modes the field is served for: the live
             // drain while holding, and what holding WOULD cost before it is
             // taken.
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 hud-type-body text-zinc-400">
               {parkMode === 'stationkeep' ? 'Drain' : 'Holding costs'}{' '}
               <Figure
                 raw={upkeepRate}

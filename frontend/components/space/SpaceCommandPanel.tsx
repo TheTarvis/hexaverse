@@ -110,7 +110,7 @@ interface CommitFigures {
   previewedDeltaV?: number
 }
 
-const LABEL = 'font-mono text-[11px] font-medium tracking-wide text-zinc-400 uppercase'
+const LABEL = 'hud-type-label text-zinc-400 uppercase'
 
 function differs(a: number | undefined, b: number | undefined): boolean {
   if (typeof a !== 'number' || typeof b !== 'number') return true
@@ -234,31 +234,31 @@ export function SpaceCommandPanel({
       <span className={LABEL}>Course</span>
 
       {!selection && canvasAvailable && (
-        <p data-testid="selection-prompt" className="mt-1 text-[11px] text-zinc-500">
+        <p data-testid="selection-prompt" className="mt-1 hud-type-caption text-zinc-500">
           Select a body, lane gate, or point in space to plot a burn.
         </p>
       )}
       {!canvasAvailable && (
-        <p data-testid="canvas-required-notice" className="mt-1 text-[11px] text-zinc-500">
+        <p data-testid="canvas-required-notice" className="mt-1 hud-type-caption text-zinc-500">
           Plotting a course needs the system view, which is unavailable. The commands below still
           work.
         </p>
       )}
 
       {selection && (
-        <div data-testid="selection-facts" className="mt-1 text-[11px] text-zinc-400">
+        <div data-testid="selection-facts" className="mt-1 hud-type-caption text-zinc-400">
           {selection.bodyId ? `Target ${selection.bodyId}` : 'Target: a point in space'}
         </div>
       )}
       {showGateFacts && (
-        <div data-testid="gate-facts" className="mt-1 text-[11px] text-cyan-300">
+        <div data-testid="gate-facts" className="mt-1 hud-type-caption text-cyan-300">
           Lane gate to {gateFacts.destSystemId}
         </div>
       )}
 
       {/* ------------------------------------------------ the quote */}
       {preview && (
-        <dl className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-zinc-400">
+        <dl className="mt-2 grid grid-cols-2 gap-1 hud-type-caption text-zinc-400">
           <dt>Arrival</dt>
           <dd>
             <Figure
@@ -306,24 +306,24 @@ export function SpaceCommandPanel({
         <p
           data-testid="preview-affordable"
           data-affordable={preview.affordable ? 'true' : 'false'}
-          className="mt-1 text-[11px]"
+          className="mt-1 hud-type-caption"
         >
           {preview.affordable ? 'Affordable' : 'Not affordable with the fuel aboard'}
         </p>
       )}
       {preview?.strandingWarning && (
-        <p data-testid="preview-stranding" className="mt-1 text-[11px] text-amber-400">
+        <p data-testid="preview-stranding" className="mt-1 hud-type-caption text-amber-400">
           This burn would leave the fleet unable to reach a station.
         </p>
       )}
 
       {noQuote && (
-        <p data-testid="preview-no-quote" className="mt-1 text-[11px] text-zinc-500">
+        <p data-testid="preview-no-quote" className="mt-1 hud-type-caption text-zinc-500">
           No quote — the preview could not be solved.
         </p>
       )}
       {stale && (
-        <p data-testid="preview-stale" className="mt-1 text-[11px] text-amber-400">
+        <p data-testid="preview-stale" className="mt-1 hud-type-caption text-amber-400">
           These figures are out of date.
         </p>
       )}
@@ -331,7 +331,7 @@ export function SpaceCommandPanel({
         <button
           type="button"
           data-testid="preview-retry"
-          className="mt-1 rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-zinc-300"
+          className="mt-1 rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300"
           onClick={retry}
         >
           Retry quote
@@ -340,7 +340,7 @@ export function SpaceCommandPanel({
       {burnAvailable && !currentQuote && (
         // Committable WITHOUT a quote — a transient preview failure must not
         // make the core verb unreachable — but labelled for what it is.
-        <p data-testid="burn-uncapped-label" className="mt-1 text-[11px] text-zinc-500">
+        <p data-testid="burn-uncapped-label" className="mt-1 hud-type-caption text-zinc-500">
           Uncapped: this burn will be committed with no fuel ceiling.
         </p>
       )}
@@ -349,7 +349,7 @@ export function SpaceCommandPanel({
         <p
           id={statementId}
           data-testid="selection-committed-statement"
-          className="mt-1 text-[11px] text-zinc-500"
+          className="mt-1 hud-type-caption text-zinc-500"
         >
           {SELECTION_COMMITTED_STATEMENT_COPY}
         </p>
@@ -368,13 +368,13 @@ export function SpaceCommandPanel({
       </Button>
 
       {commitStrandingNotice && (
-        <p data-testid="commit-stranding-notice" className="mt-2 text-[11px] text-amber-400">
+        <p data-testid="commit-stranding-notice" className="mt-2 hud-type-caption text-amber-400">
           {COMMIT_STRANDING_NOTICE_COPY}
         </p>
       )}
 
       {driftNotice && (
-        <p data-testid="commit-drift-notice" className="mt-2 text-[11px] text-amber-400">
+        <p data-testid="commit-drift-notice" className="mt-2 hud-type-caption text-amber-400">
           Committed at delta-v{' '}
           <Figure
             raw={commit.deltaV}

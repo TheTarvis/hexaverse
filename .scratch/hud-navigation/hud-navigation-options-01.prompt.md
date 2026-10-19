@@ -9,7 +9,7 @@ Input references:
 - Full HUD: /private/var/folders/_y/pntj1rzd6sl4v3nj3nvs97xm0000gn/T/pasted-image-.png
 - Rejected toolbar: /private/var/folders/_y/pntj1rzd6sl4v3nj3nvs97xm0000gn/T/pasted-image-2.png
 
-Saved output: docs/agents/hud-navigation-options-01.png.
+Saved output: .scratch/hud-navigation/hud-navigation-options-01.png.
 
 Original output: /Users/travis/.codex/generated_images/01a15169-ec0d-7da2-9abf-3fd8fb4793f6/exec-63c0c3f4-93d4-4059-a9b7-4db263d62cb8.png
 

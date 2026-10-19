@@ -1,5 +1,5 @@
 /* Shared game art direction: galaxy and local-space HUDs use the same materials. */
-.theme { --command-ink: #dce6f0; --command-muted: #a1b3c6; --command-signal: #76e3ef; color: var(--command-ink); }
+.theme { font: var(--hud-body-font); --command-ink: #dce6f0; --command-muted: #a1b3c6; --command-signal: #76e3ef; color: var(--command-ink); }
 .root { position: relative; height: 100dvh; width: 100%; overflow: hidden; background: #05060a; }
 .panel { pointer-events: auto; min-width: 0; border: 0; border-left: 1px solid #76e3ef40; border-radius: 0; background: linear-gradient(90deg, #08121de8, #08121dba); box-shadow: none; backdrop-filter: blur(8px); }
 .inset { border: 1px solid #76e3ef20; background: #030a1299; border-radius: 2px; backdrop-filter: none; }
@@ -10,17 +10,15 @@
 .left { left: 16px; }
 .right { right: 16px; }
 .heading { min-width: 0; text-shadow: 0 2px 12px #000; }
-.heading p { color: var(--command-muted); font: 10px/1.6 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
-.heading h1 { margin: 8px 0; font-size: 28px; font-weight: 300; letter-spacing: .03em; overflow-wrap: anywhere; }
+.heading p { margin: 0; }
+.heading h1 { margin: 8px 0; }
 .panel button { border-radius: 3px; }
 .panel input, .panel select { min-width: 0; color: var(--command-ink); background: #08121d; }
 .panel option { background: #08121d; }
 .theme :global(.text-zinc-900) { color: var(--command-ink); }
 .theme :global(.text-zinc-500), .theme :global(.text-zinc-600) { color: var(--command-muted); }
 @media (max-width: 760px) {
-  .heading h1 { font-size: 22px; }
   .paired { width: calc(50vw - 24px); }
-  .paired .heading h1 { font-size: 18px; }
 }
 
 .root [data-testid='vitals-strip'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }

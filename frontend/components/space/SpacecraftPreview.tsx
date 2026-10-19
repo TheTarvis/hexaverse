@@ -67,9 +67,9 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
         surface="preview" alpha stencil={false} maxResolution={384} maxFramesPerSecond={30} rendererFactory={rendererFactory}
         style={{ background: 'transparent' }} />
     </div>
-    <p role="status" aria-live="polite" className="text-xs text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : ''}</p>
+    <p role="status" aria-live="polite" className="hud-type-caption text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : ''}</p>
     <div className="flex items-center justify-between gap-2">
-      <p id={instructions} className="text-xs text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
+      <p id={instructions} className="hud-type-caption text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
       <Button plain style={{ color: 'var(--command-ink)' }} data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</Button>
     </div>
   </div>

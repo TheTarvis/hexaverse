@@ -51,6 +51,19 @@ Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
   foundation. [Art direction](art-direction.md) governs object assets; decorative
   illumination carries no gameplay meaning.
 
+## Shared typography
+
+Game surfaces and `HUD/Typography` stories share
+`frontend/components/hud/hud-type.css`. Change font families, role font shorthands,
+tracking and role colors there. Michroma identities use the compact role in lists
+and narrow cards; section labels use cyan uppercase monospace, body/context use
+sans, and figures use tabular monospace. Use `HudHeading`, `HudText` and `HudValue`
+for content, or `hud-type-*` classes for inline names, controls and formatted
+`Figure` elements. Component CSS owns layout and references these tokens rather
+than defining private fonts or sizes. Preserve the shared 16px phone input minimum
+for Safari focus behavior. Admin/account forms outside the game keep Catalyst's
+application typography.
+
 ## Acceptance checks
 
 These define the target, not a claim that review has passed:
@@ -861,3 +874,21 @@ not dismiss. Tab/Shift-Tab, visible close, Escape, modal isolation, handoff and
 focus restoration remain; interactive controls keep their focus-visible outlines.
 See [fresh-entry evidence](../.scratch/first-desktop/README.md) for real flow
 fixtures, stylesheet-order checks and device/browser limits.
+
+
+## Accepted navigation frame
+
+Map and open-phone-panel navigation reuse the existing headerless `HudCardShell`.
+The four-control toolbar uses a 292×68px frame, 12px corner cuts, shared outline
+icons, separators and top/bottom accents for the selected control. Ordinary cards
+retain their 20px cuts. Preserve accessible labels, 44px targets, focus restoration
+and one visible navigation during phone-page handoffs.
+
+Shared highlights use screen-space distance from two opposed centers moving at
+77 pixels per second along the actual chamfered perimeter. Larger cards take longer
+to complete a lap. Keep the existing pause, reduced-motion and static fallback
+behavior. These are accepted implementation choices; final physical-phone visual
+acceptance remains separate.
+
+[Design exploration and implementation evidence](../.scratch/hud-navigation/hud-navigation-design.md),
+including the concept comparison and generation prompt, live in `.scratch/`.

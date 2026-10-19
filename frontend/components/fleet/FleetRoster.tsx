@@ -54,7 +54,7 @@ const TONE_DOT: Record<StatusTone, string> = {
 }
 
 const CMD_BUTTON =
-  'rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-zinc-300 hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700/60 disabled:hover:text-zinc-300'
+  'rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700/60 disabled:hover:text-zinc-300'
 
 /**
  * Who renders the fleet verbs on this mounting view. `'roster'` — the view
@@ -155,10 +155,10 @@ export function FleetRoster({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-between gap-2 px-4 py-3 text-left"
       >
-        <span className="text-sm font-medium text-white">
+        <span className="hud-type-body font-medium text-white">
           Command fleet <span className="text-zinc-400">· {own.length} available</span>
         </span>
-        <span className="font-mono text-xs text-zinc-400">{open ? '▾' : '▸'}</span>
+        <span className="hud-type-value text-zinc-400">{open ? '▾' : '▸'}</span>
       </button>
 
       {open && (
@@ -188,17 +188,17 @@ export function FleetRoster({
                   title={f.id}
                   className={`flex min-h-16 w-full flex-col gap-1 rounded p-3 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
                 >
-                  <span className="flex flex-wrap items-center justify-between gap-2 text-sm text-white"><strong>{fleetLabel(f)}</strong>{active && <span className="text-xs text-cyan-200">Selected command fleet</span>}</span>
+                  <span className="flex flex-wrap items-center justify-between gap-2 hud-type-body text-white"><span className="hud-type-compact">{fleetLabel(f)}</span>{active && <span className="hud-type-caption text-cyan-200">Selected command fleet</span>}</span>
                   <span className="flex items-center gap-2">
                     <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[status.tone]}`} />
-                    <span className="truncate text-sm text-white">{status.where}</span>
+                    <span className="truncate hud-type-body text-white">{status.where}</span>
                     {here && (
-                      <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                      <span className="ml-auto hud-type-label text-zinc-500">
                         here
                       </span>
                     )}
                   </span>
-                  <span className="flex items-center gap-2 pl-3.5 text-xs text-zinc-400">
+                  <span className="flex items-center gap-2 pl-3.5 hud-type-caption text-zinc-400">
                     <span className="truncate">{status.activity}</span>
                     {status.remainingMs !== undefined && (
                       <Figure
@@ -206,7 +206,7 @@ export function FleetRoster({
                         unit="world-ms-span-left"
                         text={formatByUnit(status.remainingMs, scale, 'world-ms-span-left')}
                         data-testid={`fleet-row-eta-${f.id}`}
-                        className="ml-auto font-mono text-zinc-500"
+                        className="ml-auto hud-type-value text-zinc-500"
                       />
                     )}
                   </span>
@@ -217,7 +217,7 @@ export function FleetRoster({
                       this row derives/computes neither. An unserved roster
                       reads as the absent form, never a lying `0t fuel`
                       (RULING 13). */}
-                  <span className="flex items-center gap-2 pl-3.5 font-mono text-[10px] text-zinc-500">
+                  <span className="flex items-center gap-2 pl-3.5 hud-type-value text-zinc-500">
                     <span>
                       <Figure
                         raw={f.roster?.cargo?.fuel}

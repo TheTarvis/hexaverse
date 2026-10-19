@@ -1,7 +1,7 @@
 .page { position: fixed; inset: 0; z-index: 80; width: 100%; height: var(--system-viewport-height, 100dvh); top: var(--system-viewport-top, 0px); bottom: auto; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(12px, env(safe-area-inset-left)); background: #08121d; color: #d5e7f1; }
 .page .panel { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; max-height: none; padding: 0; overflow: hidden; }
 .page header { flex-shrink: 0; min-height: 56px; border-bottom: 1px solid #435d70; }
-.page header h3 { min-width: 0; font-size: 13px; }
+.page header h3 { min-width: 0; font: var(--hud-secondary-font); }
 .page header button { flex-shrink: 0; min-width: 44px; min-height: 44px; }
 .page .body { flex: 1; min-height: 0; overflow: auto; padding-block: 12px; }
 

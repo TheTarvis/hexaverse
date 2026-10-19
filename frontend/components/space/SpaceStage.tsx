@@ -702,7 +702,7 @@ function SpaceLayers({
               ref={annotationRegistry.refFor(mark.id)}
               data-testid={`space-annotation-${mark.id}`}
               data-priority={selected ? 2 : hovered ? 1 : 0}
-              className={'absolute left-0 top-0 max-w-40 rounded border px-2 py-1 text-[10px] leading-4 shadow-sm ' +
+              className={'absolute left-0 top-0 max-w-40 rounded border px-2 py-1 hud-type-caption leading-4 shadow-sm ' +
                 (selected ? 'border-cyan-300/70 bg-slate-950/90 text-cyan-100' : detailed ? 'border-white/30 bg-slate-950/90 text-white' : 'border-white/10 bg-slate-950/65 text-slate-300')}
               style={{ pointerEvents: 'none', visibility: 'hidden' }}
             >
@@ -737,7 +737,7 @@ function SpaceLayers({
         return (
           <div
             data-testid="contact-facts"
-            className="absolute left-1/2 top-4 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+            className="absolute left-1/2 top-4 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 hud-type-caption text-zinc-200"
           >
             <div>Bearing {heading.toFixed(0)}°</div>
             <div>Speed {speed.toFixed(2)}</div>
@@ -784,7 +784,7 @@ function SpaceLayers({
         return (
           <div
             data-testid="sighting-facts"
-            className="absolute left-1/2 top-16 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+            className="absolute left-1/2 top-16 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 hud-type-caption text-zinc-200"
           >
             <div>
               Observed at{' '}
@@ -860,7 +860,7 @@ function SpaceLayers({
             data-testid={`offscreen-${mark.id}`}
             aria-label={`Bring ${mark.name || mark.id} into view`}
             className={
-              'pointer-events-auto absolute left-4 rounded-full border border-white/20 bg-black/60 px-2 py-1 text-[10px] text-zinc-200' +
+              'pointer-events-auto absolute left-4 rounded-full border border-white/20 bg-black/60 px-2 py-1 hud-type-caption text-zinc-200' +
               ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
             }
             style={{ top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px` }}
@@ -969,15 +969,15 @@ function FleetFacts({
   return (
     <div
       data-testid="fleet-facts"
-      className="absolute left-1/2 top-28 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 text-xs text-zinc-200"
+      className="absolute left-1/2 top-28 -translate-x-1/2 rounded-md bg-black/70 px-3 py-2 hud-type-caption text-zinc-200"
     >
-      <div className="font-mono text-[11px] text-emerald-300">
+      <div className="hud-type-value text-emerald-300">
         {mark.id}
         {acting ? ' · commanding' : ''}
       </div>
       <div>{activity}</div>
       {detail && <div className="text-zinc-400">{detail}</div>}
-      {!acting && <div className="text-[10px] text-zinc-500">Click to command this fleet</div>}
+      {!acting && <div className="hud-type-caption text-zinc-500">Click to command this fleet</div>}
     </div>
   )
 }

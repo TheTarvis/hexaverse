@@ -45,7 +45,7 @@ export function GalaxyObjectBrowser({ nodes, selectedId, onSelect, children }: {
       </div>
       <div className={styles.rows}>
         {matches.map(node => <Button plain key={node.id} ref={element => { if (element) rows.current.set(node.id, element); else rows.current.delete(node.id) }} aria-controls={detailsId} aria-expanded={details && selectedId === node.id} data-testid={`galaxy-object-${node.id}`} onClick={() => { focusDetails.current = true; setBrowsing(false); onSelect(node.id) }}>
-          <span><strong>{node.name}</strong><small>{REGION_PALETTE[node.region].label} · Class {node.skeleton.starClass}{node.catalogueRef ? ` · ${node.catalogueRef}` : ''}</small></span><span aria-hidden="true">›</span>
+          <span><span className={`hud-type-compact ${styles.name}`}>{node.name}</span><small>{REGION_PALETTE[node.region].label} · Class {node.skeleton.starClass}{node.catalogueRef ? ` · ${node.catalogueRef}` : ''}</small></span><span aria-hidden="true">›</span>
         </Button>)}
         {!matches.length && <HudText role="status">No known systems match. Try a name, region, or star class.</HudText>}
       </div>

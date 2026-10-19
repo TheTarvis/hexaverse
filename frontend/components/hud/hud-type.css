@@ -1,0 +1,56 @@
+/* Single source for game typography, shared by production and Storybook.
+   Use HudHeading/HudText/HudValue in prose; hud-type-* classes on inline
+   names, controls and formatted figures. Component styles own geometry only. */
+@font-face {
+  font-family: 'HUD Michroma';
+  src: url('./fonts/Michroma-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --hud-font-identity: 'HUD Michroma', ui-sans-serif, system-ui, sans-serif;
+  --hud-font-body: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --hud-font-data: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --hud-identity-font: 400 24px/1.45 var(--hud-font-identity);
+  --hud-compact-font: 400 16px/1.5 var(--hud-font-identity);
+  --hud-label-font: 500 12px/1.5 var(--hud-font-data);
+  --hud-body-font: 400 14px/1.55 var(--hud-font-body);
+  --hud-secondary-font: 400 13px/1.5 var(--hud-font-body);
+  --hud-caption-font: 400 11px/1.6 var(--hud-font-body);
+  --hud-value-font: 400 17px/1.5 var(--hud-font-data);
+  --hud-chrome-font: 500 11px/20px var(--hud-font-data);
+  --hud-identity-tracking: -0.025em;
+  --hud-compact-tracking: -0.01em;
+  --hud-label-tracking: 0.13em;
+  --hud-type-primary: #e7f3fa;
+  --hud-type-body: #dce8f0;
+  --hud-type-secondary: #a0b7c7;
+  --hud-type-label: #91d9ec;
+}
+
+.hud-type-identity, .hud-type-compact {
+  font: var(--hud-identity-font);
+  letter-spacing: var(--hud-identity-tracking);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.hud-type-compact {
+  font: var(--hud-compact-font);
+  letter-spacing: var(--hud-compact-tracking);
+}
+.hud-type-label, .hud-type-chrome {
+  font: var(--hud-label-font);
+  letter-spacing: var(--hud-label-tracking);
+  text-transform: uppercase;
+}
+.hud-type-chrome { font: var(--hud-chrome-font); }
+.hud-type-body { font: var(--hud-body-font); letter-spacing: normal; }
+.hud-type-secondary { font: var(--hud-secondary-font); letter-spacing: normal; }
+.hud-type-caption { font: var(--hud-caption-font); letter-spacing: normal; }
+.hud-type-value {
+  font: var(--hud-value-font);
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}

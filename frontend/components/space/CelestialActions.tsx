@@ -37,7 +37,7 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
   }, [running, options.isSuccess])
   const target = options.data?.targets.find(target => target.bodyId === body.id)
   const history = body.discovery
-  return <div className="space-y-3 text-sm" data-testid="celestial-actions">
+  return <div className="space-y-3 hud-type-body" data-testid="celestial-actions">
     <HudHeading variant="section" level={3}>Discovery record</HudHeading>
     <HudFacts layout="rows" items={[
       { label: 'Owner', value: body.ownerCorpId ?? 'Unclaimed' },

@@ -34,7 +34,7 @@ import { GalaxyObjectBrowser } from './GalaxyObjectBrowser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Heading, Subheading } from '@/components/catalyst/heading'
+import { HudHeading } from '@/components/hud/HudTypography'
 import { Button } from '@/components/catalyst/button'
 import { Text } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
@@ -69,7 +69,7 @@ function GraphFallback({ label }: { label: string }) {
   return (
     <div
       data-testid="graph-loading"
-      className="absolute inset-0 grid place-items-center text-sm text-white/50"
+      className="absolute inset-0 grid place-items-center hud-type-body text-white/50"
     >
       {label}
     </div>
@@ -326,7 +326,7 @@ export function GalaxyView() {
         className="grid place-items-center px-6"
       >
         <HudCardShell className="p-4">
-          <Subheading className="!text-white">Couldn’t load the galaxy</Subheading>
+          <HudHeading size="compact" level={2}>Couldn’t load the galaxy</HudHeading>
           <Text className="mt-1 !text-zinc-400">
             {error?.message ?? 'The galaxy read failed. Try again shortly.'}
           </Text>
@@ -442,7 +442,7 @@ function Inspector({
         data-testid="inspector"
         className="flex flex-col p-4"
       >
-        <p className="text-sm text-zinc-400">
+        <p className="hud-type-body text-zinc-400">
           {available
             ? 'Select a system to inspect its star, bodies, and lanes.'
             : hasOwnFleet
@@ -459,49 +459,49 @@ function Inspector({
       className="flex flex-col gap-3 p-4"
     >
       <div>
-        <Heading level={2} data-testid="inspector-name" className="!text-base !text-white">
+        <HudHeading size="compact" level={2} data-testid="inspector-name">
           {node.name}
-        </Heading>
-        {node.catalogueRef && <p className="text-xs text-zinc-600 dark:text-zinc-400">{node.catalogueRef}</p>}
-        {node.discovery?.firstArrival && <p className="text-xs">First arrival: {node.discovery.firstArrival.corporationId}</p>}
-        {node.discovery?.ownerCorpId && <p className="text-xs">Owner: {node.discovery.ownerCorpId}</p>}
+        </HudHeading>
+        {node.catalogueRef && <p className="hud-type-caption text-zinc-600 dark:text-zinc-400">{node.catalogueRef}</p>}
+        {node.discovery?.firstArrival && <p className="hud-type-caption">First arrival: {node.discovery.firstArrival.corporationId}</p>}
+        {node.discovery?.ownerCorpId && <p className="hud-type-caption">Owner: {node.discovery.ownerCorpId}</p>}
         <p
           data-testid="inspector-region"
-          className="mt-1 flex items-center gap-2 text-sm text-zinc-300"
+          className="mt-1 flex items-center gap-2 hud-type-body text-zinc-300"
         >
           <RegionDot region={node.region} />
           {REGION_PALETTE[node.region].label}
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-2 text-sm">
+      <dl className="grid grid-cols-2 gap-2 hud-type-body">
         <HudCardShell className="min-w-0 px-3 py-2">
-          <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Lanes</dt>
-          <dd className="font-mono text-white">{connections}</dd>
+          <dt className="hud-type-label text-zinc-400">Lanes</dt>
+          <dd className="hud-type-value text-white">{connections}</dd>
         </HudCardShell>
         <HudCardShell className="min-w-0 px-3 py-2">
-          <dt className="text-[11px] tracking-wide text-zinc-400 uppercase">Star</dt>
-          <dd className="font-mono text-white">Class {node.skeleton.starClass}</dd>
+          <dt className="hud-type-label text-zinc-400">Star</dt>
+          <dd className="hud-type-value text-white">Class {node.skeleton.starClass}</dd>
         </HudCardShell>
       </dl>
 
       {/* Major-body skeleton — the free astronomical layer, ALWAYS shown
           (spec Decision #7); never gated by `discovered`. */}
       <div>
-        <p className="mb-1.5 text-xs font-medium tracking-wide text-zinc-400 uppercase">
+        <p className="mb-1.5 hud-type-label text-zinc-400">
           Major bodies
         </p>
         {node.skeleton.bodies.length === 0 ? (
-          <p className="text-sm text-zinc-500">No major bodies.</p>
+          <p className="hud-type-body text-zinc-500">No major bodies.</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {node.skeleton.bodies.map((b, i) => (
               <li
                 key={i}
-                className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
+                className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 hud-type-body"
               >
                 <span className="capitalize">{b.type.replace('_', ' ')}</span>
-                <span className="font-mono text-xs text-zinc-400">ring {b.ring}</span>
+                <span className="hud-type-value text-zinc-400">ring {b.ring}</span>
               </li>
             ))}
           </ul>
@@ -514,7 +514,7 @@ function Inspector({
           visible" and "no station here" look identical, by design. */}
       {stationQuotes && stationQuotes.length > 0 && (
         <div data-testid="inspector-station">
-          <p className="mb-1.5 text-xs font-medium tracking-wide text-zinc-400 uppercase">
+          <p className="mb-1.5 hud-type-label text-zinc-400">
             Trading station
           </p>
           <ul className="flex flex-col gap-1">
@@ -527,20 +527,20 @@ function Inspector({
                 <li
                   key={q.kind}
                   data-testid={`inspector-quote-${q.kind}`}
-                  className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-1 px-2.5 py-1.5 hud-type-body"
                 >
                   <span className="flex items-center gap-1.5">
                     {/* Request vs floor carried by a glyph and a word, never by
                         colour alone. */}
-                    <span aria-hidden="true" className="text-xs">
+                    <span aria-hidden="true" className="hud-type-caption">
                       {top.source === 'request' ? '★' : '·'}
                     </span>
                     <span className="capitalize">{q.kind}</span>
-                    <span className="font-mono text-[10px] text-zinc-500 uppercase">
+                    <span className="hud-type-label text-zinc-500">
                       {top.source === 'request' ? 'request' : 'floor'}
                     </span>
                   </span>
-                  <span className="font-mono text-xs text-zinc-300 tabular-nums">
+                  <span className="hud-type-value text-zinc-300 tabular-nums">
                     {top.unitPrice} cr/t
                   </span>
                 </li>
@@ -551,7 +551,7 @@ function Inspector({
       )}
 
       {node.tier === 'starVisible' && (
-        <p className="text-xs text-zinc-500 italic">
+        <p className="hud-type-caption text-zinc-500 italic">
           Uncharted — survey or travel to chart subspace routes and reveal its worth.
         </p>
       )}

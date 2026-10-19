@@ -73,7 +73,7 @@ function Row({
         type="button"
         data-testid={`sighting-row-${record.id}`}
         data-highlighted={highlighted ? 'true' : 'false'}
-        className="w-full rounded-md border border-zinc-700/60 px-2 py-1 text-left font-mono text-[11px] text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        className="w-full rounded-md border border-zinc-700/60 px-2 py-1 text-left hud-type-value text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
         onClick={onSelect}
       >
         <div className="flex items-center justify-between">
@@ -165,7 +165,7 @@ export function SightingLog({
         <button
           type="button"
           aria-label="Refresh sighting log"
-          className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 font-mono text-[10px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+          className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
           onClick={() => void pile.refetch()}
         >
           Refresh
@@ -173,16 +173,16 @@ export function SightingLog({
       </div>
 
       {pile.isError ? (
-        <div data-testid="sighting-log-error" className="text-sm text-zinc-400">
+        <div data-testid="sighting-log-error" className="hud-type-body text-zinc-400">
           <p>The sighting pile could not be read.</p>
           <Button type="button" plain onClick={() => void pile.refetch()}>
             Retry
           </Button>
         </div>
       ) : pile.isLoading ? (
-        <p className="text-sm text-zinc-400">Reading the pile…</p>
+        <p className="hud-type-body text-zinc-400">Reading the pile…</p>
       ) : records.length === 0 ? (
-        <p data-testid="sighting-log-empty" className="text-sm text-zinc-400">
+        <p data-testid="sighting-log-empty" className="hud-type-body text-zinc-400">
           No sightings yet. Run a focused scan to file one.
         </p>
       ) : (
@@ -205,7 +205,7 @@ export function SightingLog({
         <button
           type="button"
           data-testid="sighting-log-load-more"
-          className="self-start rounded-md border border-zinc-700/60 px-2 py-1 font-mono text-[10px] uppercase text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+          className="self-start rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
           onClick={() => void pile.fetchNextPage()}
         >
           Load more

@@ -61,7 +61,7 @@ export interface VitalsStripProps {
   burnCost?: GaugeCost
 }
 
-const LABEL = 'font-mono text-[10px] font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400'
+const LABEL = 'hud-type-label text-zinc-500 uppercase dark:text-zinc-400'
 
 function sortedCargoEntries(roster: FleetRoster | undefined): [string, number][] | undefined {
   if (!roster) return undefined
@@ -100,9 +100,9 @@ function FuelCell({
         unit="tons"
         text={formatByUnit(fuelTons ?? NaN, scale, 'tons')}
         data-testid="vitals-fuel-tons"
-        className="font-mono text-[11px] text-zinc-900 dark:text-white"
+        className="hud-type-value text-zinc-900 dark:text-white"
       />
-      <span className="flex items-center gap-1 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+      <span className="flex items-center gap-1 hud-type-value text-zinc-500 dark:text-zinc-400">
         <Figure
           raw={rangeVal}
           unit="range"
@@ -112,7 +112,7 @@ function FuelCell({
         <span>range</span>
       </span>
       {draining && (
-        <span data-testid="vitals-fuel-draining" className="font-mono text-[10px] text-amber-600 dark:text-amber-400">
+        <span data-testid="vitals-fuel-draining" className="hud-type-value text-amber-600 dark:text-amber-400">
           draining
         </span>
       )}
@@ -134,7 +134,7 @@ function HoldCell({ roster, scale }: { roster: FleetRoster | undefined; scale: n
           <span className={LABEL}>Hold</span>
           <span
             data-testid="hold-capacity"
-            className="flex items-center gap-1 font-mono text-[11px] text-zinc-500 dark:text-zinc-400"
+            className="flex items-center gap-1 hud-type-value text-zinc-500 dark:text-zinc-400"
           >
             <Figure
               raw={usedRaw}
@@ -152,7 +152,7 @@ function HoldCell({ roster, scale }: { roster: FleetRoster | undefined; scale: n
           </span>
           <Gauge capacity={capacity} segments={segments} data-testid="hold-gauge" className="h-1.5 w-14" />
         </div>
-        <ul className="flex flex-wrap gap-2 font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+        <ul className="flex flex-wrap gap-2 hud-type-value text-zinc-500 dark:text-zinc-400">
           {entries?.map(([kind, tons]) => (
             <li key={kind} data-testid={`hold-${kind}`}>
               <span>{kind}</span>{' '}
@@ -187,7 +187,7 @@ function CreditsCell({ credits, scale }: { credits: number | null; scale: number
         <span
           data-testid="balance-value"
           data-available={credits === null ? 'false' : 'true'}
-          className={`font-mono text-sm ${
+          className={`hud-type-value ${
             credits === null ? 'text-zinc-500 italic' : 'text-zinc-900 dark:text-white'
           }`}
         >
@@ -235,7 +235,7 @@ function ClockCell({
         text={formatByUnit(instant ?? NaN, scale, 'world-ms-instant')}
         title={instantScaleLabel(scale)}
         data-testid="vitals-clock-stamp"
-        className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400"
+        className="hud-type-value text-zinc-500 dark:text-zinc-400"
       />
     </div>
   )

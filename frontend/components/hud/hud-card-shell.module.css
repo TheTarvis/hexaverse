@@ -19,8 +19,7 @@
   min-width: 0;
   min-height: 72px;
   color: #d5e7f1;
-  font-family: var(--font-sans, system-ui, sans-serif);
-  font-size: 14px;
+  font: var(--hud-body-font);
   color-scheme: dark;
   filter: drop-shadow(0 12px 20px rgb(0 0 0 / 32%));
 }
@@ -99,11 +98,8 @@
   background: linear-gradient(120deg, #7493a8, #314a5f 55%, #6d8a9e);
   clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
   color: #c0eaff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 20px;
-  letter-spacing: 0.13em;
+  font: var(--hud-chrome-font);
+  letter-spacing: var(--hud-label-tracking);
   text-transform: uppercase;
 }
 
@@ -210,7 +206,7 @@
 /* iOS focuses small text controls by magnifying the viewport. Keep readable
    control text while leaving browser pinch zoom and viewport scale unrestricted. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px), (pointer: coarse) {
-  .shell input, .shell select, .shell textarea { font-size: 16px; line-height: 1.5; }
+  .shell input, .shell select, .shell textarea { font-size: max(16px, 1rem); line-height: 1.5; }
 }
 
 /* Original 624c4ff chrome stays identical on every viewport. The existing

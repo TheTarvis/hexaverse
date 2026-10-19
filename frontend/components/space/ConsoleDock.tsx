@@ -73,7 +73,7 @@ export interface ConsoleDockProps {
 }
 
 const CONTROL =
-  'min-h-6 min-w-6 rounded-md px-2 font-mono text-[11px] uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400'
+  'min-h-6 min-w-6 rounded-md px-2 hud-type-label focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400'
 
 export function ConsolePanelWaiting() {
   return (
