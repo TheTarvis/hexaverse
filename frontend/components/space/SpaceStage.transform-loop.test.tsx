@@ -4,7 +4,6 @@ import React from 'react'
 import { buildSceneModel, type SceneModel } from './space-scene'
 import { viewBasisOf, projectMarks, hitTargetTransform } from './space-projection'
 import { unprojectToViewPlane, drawOrbitPosition } from '@/lib/space/draw'
-import { panBound } from './space-camera'
 import type { Burn } from '@/lib/types/fleet'
 
 // Resolve the real dynamically imported world before fake-clock interaction.
@@ -403,16 +402,8 @@ describe('SpaceStage + the transform loop — task 4.9', () => {
       ),
     ).toBeGreaterThan(1)
 
-    // reframeOn clamps the new target to the camera's own pan bound
-    // (`clampCamera`, unrelated to this change) — the reframed camera target
-    // is the live position scaled onto that bound, same direction.
-    const bound = panBound(EXTENT)
-    const liveRadius = Math.hypot(livePosition.x, livePosition.y, livePosition.z)
-    const expectedTarget = {
-      x: (livePosition.x / liveRadius) * bound,
-      y: (livePosition.y / liveRadius) * bound,
-      z: (livePosition.z / liveRadius) * bound,
-    }
+    // Following centers the live target, including targets beyond manual pan bounds.
+    const expectedTarget = livePosition
     expect(camera.target.x).toBeCloseTo(expectedTarget.x, 6)
     expect(camera.target.y).toBeCloseTo(expectedTarget.y, 6)
     expect(camera.target.z).toBeCloseTo(expectedTarget.z, 6)

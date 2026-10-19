@@ -16,6 +16,7 @@
 // hit targets and off-screen chips (design.md Decision 7).
 
 import { useEffect, useMemo, useRef } from 'react'
+import { bodyFocusTarget, orbitFrame } from './body-camera-focus'
 import { placeAnnotations } from './space-annotations'
 import type { WorldClock } from '@/lib/client-clock'
 import type { DrawViewBasis } from '@/lib/space/draw'
@@ -105,7 +106,7 @@ export function applyHitTransform(frame: SpaceFrame | null, markId: string, el: 
   const entry = frame.projected.get(markId)
   el.style.transform = hitTargetTransform(entry?.screen)
   if (entry) {
-    const diameter = `${hitDiameter(entry, frame.basis, frame.extent)}px`
+    const diameter = `${entry.mark.kind === 'point-selection' ? 44 : hitDiameter(entry, frame.basis, frame.extent)}px`
     el.style.width = diameter
     el.style.height = diameter
     // Nearer targets win where model silhouettes overlap in this hit layer.
@@ -165,7 +166,12 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
 
   /** Steps 2–6: project, write, publish. Never builds a scene. */
   const publish = (scene: SceneModel, advance = true): void => {
-    const requestedCamera = cameraRef.current
+    let requestedCamera = cameraRef.current
+    const body = requestedCamera.followBodyId ? scene.marks.find(mark => mark.id === requestedCamera.followBodyId) : null
+    if (requestedCamera.followBodyId && !body) {
+      requestedCamera = { ...(frameRef.current?.camera ?? requestedCamera), followBodyId: undefined, focusRequest: undefined }
+      cameraRef.current = requestedCamera
+    }
     const fleet = requestedCamera.followFleetId
       ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === requestedCamera.followFleetId)
       : null
@@ -186,7 +192,7 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
     if (source?.inputsRef.current?.reducedMotion) transition = null
     const progress = transition ? Math.min(1, (now - transition.start) / 650) : 1
     const remaining = 1 - progress * progress * (3 - 2 * progress)
-    const followedCamera = target ? {
+    let followedCamera = target ? {
       ...requestedCamera,
       target: {
         x: target.x + (transition?.offset.x ?? 0) * remaining,
@@ -195,6 +201,11 @@ export function startSpaceTransformLoop(options: SpaceTransformLoopOptions): Tra
       },
       distance: distance + (transition?.distance ?? 0) * remaining,
     } : requestedCamera
+    if (body) {
+      followedCamera = { ...requestedCamera, target: bodyFocusTarget(scene, body).position,
+        followRotation: requestedCamera.followOrientation === 'orbit' && body.cameraOrbit
+          ? orbitFrame(body.cameraOrbit, scene.positionTimeMs) : undefined }
+    }
     if (progress === 1) transition = null
     const camera = prepareCamera?.(followedCamera, advance, requestedCamera) ?? followedCamera
     const basis = viewBasisOf(camera, { width, height })

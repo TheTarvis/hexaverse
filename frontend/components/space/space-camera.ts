@@ -4,6 +4,13 @@
 export interface SpaceCamera {
   /** Live fleet pivot, resolved by the transform loop. */
   followFleetId?: string
+  focusPoint?: SpaceCamera['target']
+  followBodyId?: string
+  followOrientation?: 'steady' | 'orbit'
+  followRotation?: { x: number; y: number; z: number; w: number }
+  focusRequest?: { durationMs: number; from?: Pick<SpaceCamera, 'yaw' | 'pitch' | 'distance' | 'target'> }
+  /** Close body views retain their safe minimum after a pan releases follow. */
+  minDistance?: number
 
   /** Rotation about the world Y axis, radians. */
   yaw: number
@@ -157,7 +164,7 @@ function panBy(camera: SpaceCamera, alongRight: number, alongUp: number, bound: 
     y: camera.target.y + right.y * alongRight + up.y * alongUp,
     z: camera.target.z + right.z * alongRight + up.z * alongUp,
   }
-  return { ...camera, followFleetId: undefined, target: clampTarget(camera.target, next, bound) }
+  return { ...camera, followFleetId: undefined, followBodyId: undefined, focusPoint: undefined, target: clampTarget(camera.target, next, bound) }
 }
 
 export function panBySteps(
@@ -176,7 +183,8 @@ export function atPanLimit(camera: SpaceCamera, extent: number): boolean {
 
 /** Which zoom clamp the camera is resting on, or null. */
 export function atZoomLimit(camera: SpaceCamera, extent: number): 'min' | 'max' | null {
-  const { min, max } = zoomRange(extent)
+  const { min: defaultMin, max } = zoomRange(extent)
+  const min = camera.minDistance ?? defaultMin
   if (camera.distance <= min * (1 + 1e-12)) return 'min'
   if (camera.distance >= max * (1 - 1e-12)) return 'max'
   return null
@@ -185,7 +193,8 @@ export function atZoomLimit(camera: SpaceCamera, extent: number): 'min' | 'max' 
 // --- total clamp ---------------------------------------------------------
 
 export function clampCamera(camera: SpaceCamera, extent: number): SpaceCamera {
-  const { min, max } = zoomRange(extent)
+  const { min: defaultMin, max } = zoomRange(extent)
+  const min = camera.minDistance ?? defaultMin
   const bound = panBound(extent)
   return {
     ...camera,

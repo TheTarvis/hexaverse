@@ -149,7 +149,7 @@ const LIT_TYPES = new Set(['rocky', 'gas_giant', 'ice', 'moon', 'belt', 'ruin', 
 /** Marks drawn as an octahedron rather than a sphere. */
 const FACETED_TYPES = new Set(['station', 'gate'])
 /** Marks drawn as a hollow wireframe — previews and records, not things. */
-const WIRE_KINDS = new Set<SceneMark['kind']>(['ghost', 'sighting', 'point-selection'])
+const WIRE_KINDS = new Set<SceneMark['kind']>(['ghost', 'sighting'])
 
 const ORBIT_RING_SAMPLES = 128
 const BELT_RADIAL_JITTER = 0.05
@@ -492,6 +492,8 @@ export function SpaceWorld({
         return drawRadiusOf(mark) * frameRef.current.basis.heightPx / (Math.max(depth, 0.001) * TAN_HALF_FOV) >= 48
       }).sort((a, b) => Number(b.selected) - Number(a.selected)).slice(0, 3).map(mark => mark.id) : [])
       for (const mark of liveScene.marks) {
+        // Selected locations use a constant-screen-size reticle in the DOM hit layer.
+        if (mark.kind === 'point-selection') continue
         live.add(mark.id)
         let entry = meshes.get(mark.id)
         const variant = mark.kind === 'fleet' ? mark.fleetMode : undefined
@@ -561,7 +563,7 @@ export function SpaceWorld({
           starLight.position.set(mark.position.x, mark.position.y, mark.position.z)
           starLight.color.set(tintOf(mark))
         }
-        if (mark.selected && mark.kind !== 'point-selection' && !selected) selected = { mark, radius: size }
+        if (mark.selected && !selected) selected = { mark, radius: size }
         if (mark.kind === 'fleet' && mark.id === actingRef.current) acting = { mark, radius: size }
       }
       for (const [id, entry] of meshes) {
@@ -650,6 +652,8 @@ export function SpaceWorld({
       // A drifting fleet's heading: a streak from the mark along its SERVED
       // velocity. Decorative — the facts card displays the served figures.
       for (const mark of liveScene.marks) {
+        // Selected locations use a constant-screen-size reticle in the DOM hit layer.
+        if (mark.kind === 'point-selection') continue
         if (mark.kind !== 'fleet' || mark.fleetMode !== 2 || !mark.velocity) continue
         const v = mark.velocity
         const speed = Math.hypot(v.x, v.y, v.z)

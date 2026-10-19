@@ -36,6 +36,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { usePhoneHud } from '@/hooks/use-phone-sheet'
+import { bodyFocusCamera, DEFAULT_BODY_FOCUS, type BodyFocusSettings } from './body-camera-focus'
 import { createSystemCameraAdapter } from './system-camera-adapter'
 import { Figure } from '@/components/figure/Figure'
 import { formatByUnit, formatInstant, instantScaleLabel } from '@/lib/format'
@@ -50,7 +51,6 @@ import {
   atPanLimit,
   atZoomLimit,
   beginDrag,
-  clampCamera,
   defaultCamera,
   fleetCamera,
   isGesture,
@@ -85,6 +85,7 @@ const NO_BASIS_SCREEN = { x: NaN, y: NaN, depth: 0, onScreen: false } as const
 
 export interface SpaceStageProps {
   /** Shared scene treatment; Storybook can compare alternate grid modes. */
+  bodyFocusSettings?: BodyFocusSettings
   orbitAppearance?: OrbitAppearance
   labelAppearance?: LabelAppearance
   gridMode?: SpaceGridMode
@@ -129,7 +130,7 @@ export interface SpaceStageProps {
    */
   initialFocusFleetId?: string | null
   focusFleetRequest?: { fleetId: string; sequence: number } | null
-  focusBodyRequest?: { bodyId: string; sequence: number } | null
+  focusBodyRequest?: { bodyId: string; sequence: number; replay?: boolean } | null
   actingFleetId?: string | null
   onActivateFleet?: (fleetId: string) => void
   /**
@@ -157,6 +158,7 @@ function selectionAttr(selection: SpaceSelection | null): string {
 }
 
 export function SpaceStage({
+  bodyFocusSettings = DEFAULT_BODY_FOCUS,
   orbitAppearance,
   labelAppearance,
   gridMode,
@@ -229,9 +231,14 @@ export function SpaceStage({
   const focusedRequest = useRef<string | null>(null)
   const requestKey = focusBodyRequest ? `${systemId}:${focusBodyRequest.bodyId}:${focusBodyRequest.sequence}` : null
   const requestedMark = focusBodyRequest ? scene.marks.find(mark => mark.id === focusBodyRequest.bodyId && mark.kind !== 'fleet') : null
-  if (requestedMark && requestKey !== focusedRequest.current) {
+  if (requestedMark && host && requestKey !== focusedRequest.current) {
     focusedRequest.current = requestKey
-    setCamera(clampCamera({ ...defaultCamera(extent), target: { ...requestedMark.position } }, extent))
+    setCamera(prev => {
+      const next = bodyFocusCamera(prev, scene, requestedMark, extent, host?.clientWidth ?? 1, host?.clientHeight ?? 1, bodyFocusSettings)
+      if (focusBodyRequest?.replay) next.focusRequest = { ...next.focusRequest!, from: defaultCamera(extent) }
+      if (frameSource?.inputsRef.current?.reducedMotion) next.focusRequest = { ...next.focusRequest!, durationMs: 0 }
+      return next
+    })
   }
 
   // THE transform loop's published frame (design.md Decision 3, decided
@@ -313,10 +320,12 @@ export function SpaceStage({
   }, [available, onFirstFrame])
 
   const reframeOn = useCallback(
-    (position: DrawVec3) => {
-      setCamera((prev) => clampCamera({ ...prev, followFleetId: undefined, target: { ...position } }, extent))
+    (mark: SceneMark) => {
+      const liveScene = frameRef.current?.scene ?? scene
+      const settings = frameSource?.inputsRef.current?.reducedMotion ? { ...bodyFocusSettings, durationMs: 0 } : bodyFocusSettings
+      setCamera(prev => bodyFocusCamera(prev, liveScene, mark, extent, host?.clientWidth ?? 1, host?.clientHeight ?? 1, settings))
     },
-    [extent, setCamera],
+    [extent, setCamera, scene, host, bodyFocusSettings, frameSource],
   )
 
   const recenter = useCallback(() => setCamera(defaultCamera(extent)), [extent, setCamera])
@@ -365,7 +374,7 @@ export function SpaceStage({
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const bodyIdUnder = (target: EventTarget | null): string | null =>
     target instanceof Element
-      ? (target.closest<HTMLElement>('[data-body-id]')?.dataset.bodyId ?? null)
+      ? (target.closest<HTMLElement>('[data-body-id], [data-focus-mark-id]')?.dataset.bodyId ?? target.closest<HTMLElement>('[data-focus-mark-id]')?.dataset.focusMarkId ?? null)
       : null
 
   const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -401,15 +410,17 @@ export function SpaceStage({
         lastTap.current = { id: gesture.bodyId, at: now }
         if (previous?.id === gesture.bodyId && now - previous.at < 350) {
           const mark = frameRef.current?.projected.get(gesture.bodyId)?.mark
-          if (mark) reframeOn(mark.position)
+          if (mark) reframeOn(mark)
           lastTap.current = null
           return
         }
+        if (gesture.bodyId === 'point-selection') return
         onSelect?.({ bodyId: gesture.bodyId })
         return
       }
       const picked = pickAt(clientX, clientY, marks)
       if (picked === undefined) return
+      lastTap.current = picked?.point ? { id: 'point-selection', at } : null
       onSelect?.(picked)
     },
     [onSelect, pickAt, reframeOn],
@@ -481,9 +492,7 @@ export function SpaceStage({
       }).join(' ') || undefined}
       data-selection={selectionAttr(selection)}
       data-draw-world-time={String(drawWorldTime)}
-      // Reframing is immediate: an eased camera move under a player reaching
-      // for an off-screen gate is a moving target.
-      data-reframe-animated="false"
+      data-reframe-animated={(camera.followBodyId || camera.focusPoint) && (camera.focusRequest?.durationMs ?? 0) > 0 ? 'true' : 'false'}
       className="absolute inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400"
       style={{ touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', isolation: 'isolate' }}
       onFocus={handleFocusIn}
@@ -529,16 +538,16 @@ export function SpaceStage({
           onFocusMark={(id) => {
             setFocusedMarkId(id)
             const live = frameRef.current?.projected.get(id)
-            if (live && !live.screen.onScreen) reframeOn(live.mark.position)
+            if (live && !live.screen.onScreen) reframeOn(live.mark)
           }}
           onBlurMark={() => setFocusedMarkId(null)}
           onHoverContact={setHoveredContactId}
           onHoverGhost={setHoveredGhostId}
           onHighlightGhost={onHighlightGhost}
           onSelect={(next) => onSelect?.(next)}
-          onReframe={(markId, coarsePosition) => {
-            const live = frameRef.current?.projected.get(markId)
-            reframeOn(live?.mark.position ?? coarsePosition)
+          onReframe={(markId) => {
+            const mark = frameRef.current?.projected.get(markId)?.mark ?? scene.marks.find(mark => mark.id === markId)
+            if (mark) reframeOn(mark)
           }}
           onPointerUpCapture={() => { /* Region capture owns each release once. */ }}
         />}
@@ -883,11 +892,6 @@ function SpaceLayers({
               onReframe(mark.id, mark.position)
               onSelect({ bodyId: mark.id })
             }}
-            onTouchEnd={(e) => {
-              e.preventDefault()
-              onReframe(mark.id, mark.position)
-              onSelect({ bodyId: mark.id })
-            }}
           >
             {mark.name || mark.id}
           </button>
@@ -896,7 +900,27 @@ function SpaceLayers({
 
       {/* The selected mark, drawn — including a bare point in vacuum, which
           has no body mark to highlight and no intrinsic outline. */}
-      {selection?.point && <span className="sr-only" data-testid="point-selection-mark" />}
+      {selection?.point && marks.some(mark => mark.kind === 'point-selection') && (
+        <button
+          type="button"
+          ref={registry.refFor('point-selection')}
+          data-testid="point-selection-mark"
+          data-focus-mark-id="point-selection"
+          aria-label="Selected location. Double-click to focus."
+          className="pointer-events-auto absolute left-0 top-0 grid place-items-center rounded-full text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-200"
+          onKeyDown={event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            const mark = marks.find(mark => mark.kind === 'point-selection')
+            if (mark) onReframe(mark.id, mark.position)
+          }}
+        >
+          <svg aria-hidden="true" width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ filter: 'drop-shadow(0 1px 2px #000)' }}>
+            <path d="M10 3H6a3 3 0 0 0-3 3v4m15-7h4a3 3 0 0 1 3 3v4M3 18v4a3 3 0 0 0 3 3h4m8 0h4a3 3 0 0 0 3-3v-4M14 9v3m0 4v3M9 14h3m4 0h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="14" cy="14" r="1" fill="currentColor" />
+          </svg>
+        </button>
+      )}
       </div>
     </>
   )

@@ -13,6 +13,10 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
   const camera = new THREE.PerspectiveCamera(Math.atan(TAN_HALF_FOV) * 360 / Math.PI, 1, 0.01, Math.max(10000, extent * 100))
   const range = zoomRange(extent)
   let current = initial, lastRequested = initial, stepping = false
+  let focusRequest: SpaceCamera['focusRequest']
+  let liveBody = initial
+  const bodyPose = () => liveBody.followBodyId || liveBody.focusPoint ? { position: liveBody.focusPoint ?? liveBody.target,
+    rotation: liveBody.followRotation ? new THREE.Quaternion().copy(liveBody.followRotation) : undefined } : null
   const stable = (value: number, previous: number) => Math.abs(value - previous) <= Math.max(1, Math.abs(previous)) * 1e-12 ? previous : value
   const read = (): SpaceCamera => {
     const offset = camera.position.clone().sub(rig.controls.target)
@@ -27,7 +31,7 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
     callbacks.onChange(current)
   }
   const intent = (kind: CameraIntent) => {
-    if (kind === 'pan') current = { ...current, followFleetId: undefined }
+    if (kind === 'pan') current = { ...current, followFleetId: undefined, followBodyId: undefined, focusPoint: undefined }
   }
   const rig = new MapCameraRig(camera, host, host, null, false, {
     up: new THREE.Vector3(0, 1, 0), minDistance: range.min, maxDistance: range.max,
@@ -43,14 +47,25 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
     camera.lookAt(rig.controls.target)
     camera.updateMatrixWorld()
   }
-  sync(initial)
+  sync(initial.focusRequest?.from ? { ...initial, ...initial.focusRequest.from } : initial)
   return {
     rig,
     /** Runs after live fleet-follow resolution and before projection/picking publication. */
     step(resolved: SpaceCamera, advance = true, requested = resolved) {
       stepping = true
       try {
-        if (requested !== lastRequested) { rig.clearMotion(); sync(resolved); lastRequested = requested }
+        liveBody = resolved
+        rig.controls.minDistance = resolved.minDistance ?? range.min
+        rig.controls.maxTargetRadius = Math.max(panBound(extent), Math.hypot(resolved.target.x, resolved.target.y, resolved.target.z))
+        if (requested.followBodyId || requested.focusPoint) {
+          current = resolved
+          if (requested.focusRequest !== focusRequest) {
+            focusRequest = requested.focusRequest
+            if (requested.focusRequest?.from) sync({ ...resolved, ...requested.focusRequest.from })
+            rig.follow(bodyPose, requested.distance, requested.focusRequest?.durationMs ?? 600)
+          }
+          lastRequested = requested
+        } else if (requested !== lastRequested) { rig.stopFollowing(); rig.clearMotion(); sync(resolved); lastRequested = requested }
         else if (requested.followFleetId) {
           const offset = camera.position.clone().sub(rig.controls.target)
           if (offset.length() < resolved.distance) offset.setLength(resolved.distance)

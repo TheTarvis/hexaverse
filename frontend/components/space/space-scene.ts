@@ -88,6 +88,7 @@ export interface SceneMark {
    */
   fleetMode?: 0 | 1 | 2
   /** Stable parked camera pivot and local orbital envelope; never gameplay state. */
+  cameraOrbit?: DrawOrbitElements
   followAnchor?: { id: string; position: DrawVec3; radius: number }
   /** Own fleets under a burn only — the burn's served `ArriveMs`, for the facts card's countdown. */
   arriveMs?: number
@@ -343,7 +344,8 @@ export function buildSceneModel(input: SceneInput): SceneModel {
       kind,
       position,
       radius: feature.size,
-      pickable: kind !== 'star',
+      pickable: true,
+      cameraOrbit: feature.orbitElements,
       selected: selectionMatches(selection, feature.id),
       bodyType: feature.type,
       ...(kind === 'star' && interior.starClass ? { starClass: interior.starClass } : {}),

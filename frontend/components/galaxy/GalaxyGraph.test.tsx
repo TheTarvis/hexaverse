@@ -164,7 +164,7 @@ describe('GalaxyGraph owned renderer', () => {
     clickAt(candidate.canvas, x, y)
     await frames(20) // 340ms, just inside the 350ms double-click window.
     clickAt(candidate.canvas, x, y)
-    expect(focus).toHaveBeenLastCalledWith({ x: nodeA.x, y: nodeA.y, z: nodeA.z }, 600)
+    expect(focus).toHaveBeenLastCalledWith(nodeA, 600, 240)
     expect(onSelect).toHaveBeenLastCalledWith(nodeA)
   })
 

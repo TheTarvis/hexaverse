@@ -42,3 +42,26 @@ describe('System coordinate adapter for the shared camera', () => {
     expect(adapter.rig.controls.minDistance).toBe(range.min)
   })
 })
+
+it('body focus glides from the current pose, follows live positions and keeps user zoom', () => {
+  let now = 0
+  const time = vi.spyOn(performance, 'now').mockImplementation(() => now)
+  const initial = defaultCamera(100), { adapter, host, onChange } = setup(initial)
+  const request = { ...initial, followBodyId: 'moon', focusRequest: { durationMs: 600 }, minDistance: 1, distance: 5, target: { x: 30, y: 0, z: 0 } }
+  try {
+    expect(adapter.step(request).target.x).toBeCloseTo(0)
+    now = 300
+    const half = adapter.step({ ...request, target: { x: 40, y: 0, z: 0 } }, true, request)
+    expect(half.target.x).toBeCloseTo(20)
+    now = 600
+    const end = adapter.step({ ...request, target: { x: 50, y: 0, z: 0 } }, true, request)
+    expect(end.target.x).toBeCloseTo(50); expect(end.distance).toBeCloseTo(5)
+    host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: '+' }))
+    const zoomed = onChange.mock.calls.at(-1)![0]
+    expect(zoomed.followBodyId).toBe('moon')
+    const followed = adapter.step({ ...zoomed, target: { x: 60, y: 0, z: 0 } }, true, zoomed)
+    expect(followed.target.x).toBeCloseTo(60); expect(followed.distance).toBeCloseTo(zoomed.distance)
+    host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight', shiftKey: true }))
+    expect(onChange.mock.calls.at(-1)![0].followBodyId).toBeUndefined()
+  } finally { time.mockRestore() }
+})

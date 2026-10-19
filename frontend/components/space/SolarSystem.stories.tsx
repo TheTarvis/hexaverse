@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
+import { Button } from '@/components/catalyst/button'
+import { DEFAULT_BODY_FOCUS, type BodyFocusSettings } from './body-camera-focus'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { createWorldClock } from '@/lib/client-clock'
 import type { SpaceBody, SystemSpace } from '@/lib/types/system-space'
@@ -21,7 +23,8 @@ const bodies: SpaceBody[] = [
   })),
 ]
 
-function SolarSystem({ starClass = 'G', animate = true, extent = 500, gridMode = 'surround', gridDistance = DEFAULT_HEX_SKY.distance, gridBrightness = DEFAULT_HEX_SKY.brightness, gridThickness = DEFAULT_HEX_SKY.thickness, gridStyle = DEFAULT_HEX_SKY.style }: { starClass?: string; animate?: boolean; extent?: number; gridMode?: SpaceGridMode; gridDistance?: number; gridBrightness?: number; gridThickness?: number; gridStyle?: HexSkyStyle }) {
+function SolarSystem({ pointDistance = 40, framing = DEFAULT_BODY_FOCUS.framing, glideDuration = DEFAULT_BODY_FOCUS.durationMs, followOrientation = DEFAULT_BODY_FOCUS.orientation, starClass = 'G', animate = true, extent = 500, gridMode = 'surround', gridDistance = DEFAULT_HEX_SKY.distance, gridBrightness = DEFAULT_HEX_SKY.brightness, gridThickness = DEFAULT_HEX_SKY.thickness, gridStyle = DEFAULT_HEX_SKY.style }: { pointDistance?: number; framing?: number; glideDuration?: number; followOrientation?: BodyFocusSettings['orientation']; starClass?: string; animate?: boolean; extent?: number; gridMode?: SpaceGridMode; gridDistance?: number; gridBrightness?: number; gridThickness?: number; gridStyle?: HexSkyStyle }) {
+  const [focusRequest, setFocusRequest] = useState<{ bodyId: string; sequence: number; replay: boolean } | null>(null)
   const [selection, select] = useState<SpaceSelection | null>(null)
   const clock = useMemo(() => {
     const value = createWorldClock()
@@ -41,7 +44,10 @@ function SolarSystem({ starClass = 'G', animate = true, extent = 500, gridMode =
   const frameSource = useMemo(() => ({ clock, inputsRef }), [clock])
   const scene = useMemo(() => buildSceneModel({ ...inputs, worldTimeMs: 120_000 }), [inputs])
   return <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#05070d' }}>
-    <SpaceStage systemId={interior.systemId} scene={scene} extent={interior.extent}
+    <div style={{ position: 'absolute', zIndex: 20, top: 12, left: 12 }}>
+      <Button onClick={() => setFocusRequest(previous => ({ bodyId: selection?.point ? 'point-selection' : selection?.bodyId ?? 'rocky', sequence: (previous?.sequence ?? 0) + 1, replay: true }))}>Replay focus</Button>
+    </div>
+    <SpaceStage bodyFocusSettings={{ framing, pointDistance, durationMs: glideDuration, orientation: followOrientation }} focusBodyRequest={focusRequest} systemId={interior.systemId} scene={scene} extent={interior.extent}
       worldTime={120_000} scale={1} selection={selection} onSelect={select} frameSource={frameSource} gridMode={gridMode}
       gridSettings={{ distance: gridDistance, brightness: gridBrightness, thickness: gridThickness, style: gridStyle }} />
   </div>
@@ -51,9 +57,13 @@ const meta = {
   title: 'Graphics/Solar System',
   component: SolarSystem,
   tags: ['autodocs'],
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Production SpaceStage and SpaceWorld with a fixed review system: star, rocky world, gas giant, ice world, belt, station and lane gate. Uses the real camera, picking, orbit drawing, materials and guarded renderer. No backend or sign-in required. Freeze animation or change spectral class in Controls.' } } },
-  args: { starClass: 'G', animate: true, extent: 500, gridMode: 'surround', gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'Production SpaceStage and SpaceWorld with a fixed review system: star, rocky world, gas giant, ice world, belt, station and lane gate. Uses the real camera, picking, orbit drawing, materials and guarded renderer. No backend or sign-in required. Double-click a body to frame and follow it. Tune framing, glide duration and follow orientation in Controls, then use Replay focus to compare from the same starting view. Freeze animation or change spectral class in Controls.' } } },
+  args: { pointDistance: 40, framing: DEFAULT_BODY_FOCUS.framing, glideDuration: DEFAULT_BODY_FOCUS.durationMs, followOrientation: DEFAULT_BODY_FOCUS.orientation, starClass: 'G', animate: true, extent: 500, gridMode: 'surround', gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style },
   argTypes: {
+    pointDistance: { control: { type: 'number', min: 0.1, max: 1000, step: 1 }, description: 'Viewing distance for a selected location in scene units. Click empty space, then replay focus.', table: { category: 'Camera' } },
+    framing: { control: { type: 'number', min: 0.05, max: 0.9, step: 0.01 }, description: 'Body diameter as a fraction of the smaller viewport dimension.', table: { category: 'Camera' } },
+    glideDuration: { control: { type: 'number', min: 0, max: 5000, step: 50 }, description: 'Focus glide duration in milliseconds.', table: { category: 'Camera' } },
+    followOrientation: { options: ['steady', 'orbit'], control: { type: 'select', labels: { steady: 'Steady direction', orbit: 'Rotate with orbit' } }, description: 'Steady direction or rotate with orbit. Non-orbiting targets stay steady.', table: { category: 'Camera' } },
     starClass: { control: 'select', options: ['O', 'B', 'A', 'F', 'G', 'K', 'M'] },
     extent: { control: { type: 'range', min: 80, max: 600, step: 10 } },
     gridMode: { control: 'select', options: ['surround', 'ground', 'none'] },

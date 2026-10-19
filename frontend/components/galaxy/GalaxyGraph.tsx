@@ -194,10 +194,14 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
     rebuild()
     rebuildRef.current = () => { void owner?.update(rebuild) }
     const home = () => latest.current.galaxy.nodes.find(node => node.id === latest.current.homeSystemId)
+    const focusSystem = (id: string) => rig?.follow(() => {
+      const node = latest.current.galaxy.nodes.find(node => node.id === id)
+      return node ? { position: node } : null
+    }, 240)
     const controller: GalaxyGraphController = {
       recenter: () => { const node = home(); if (node) rig?.recenter(node); else rig?.frameBounds(latest.current.galaxy.bounds) },
-      focusSystem: id => { const node = latest.current.galaxy.nodes.find(node => node.id === id); if (node) rig?.focus(node) },
-      focusPoint: point => rig?.focus(point),
+      focusSystem,
+      focusPoint: point => { rig?.stopFollowing(); rig?.focus(point) },
       canvas: () => canvas,
       pause: () => { paused = true; eligibility() },
       resume: () => { paused = false; eligibility(); schedule() },
@@ -272,7 +276,7 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
           const node = pick(event)
           const now = event.timeStamp
           if (node && last.id === node.id && now - last.time < 350) {
-            rig?.focus({ x: node.x, y: node.y, z: node.z }, 600)
+            focusSystem(node.id)
             last = { id: '', time: -Infinity }
             latest.current.onSelect(node)
           } else {

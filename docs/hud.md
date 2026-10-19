@@ -791,7 +791,8 @@ Enter-to-select-center remains a scene-specific selection callback. No camera
 buttons or hidden gesture mode are added.
 
 System's adapter supplies Y-up coordinates, extent-based limits and framing;
-Galaxy retains Z-up coordinates and its existing framing. System double-tap/
+Galaxy retains Z-up coordinates and its existing framing. At this implementation,
+System double-tap/
 double-click focuses a body while retaining angle/distance, after which orbit
 pivots on it. Camera focus does not choose a command fleet. Orbit/dolly preserve
 fleet following; pan, recenter and other-object focus release it. Existing body,
@@ -805,6 +806,72 @@ Native Pointer Events replace System's separate TouchList gesture mapping, using
 the same input path as Galaxy. Existing safe-area/focus handling, original card
 chrome, 16px fields and browser zoom accessibility remain unchanged. Physical
 iPhone gesture/focus acceptance remains separate from browser automation.
+
+## Double-click camera framing and following — 2026-10-19
+
+Accepted intent from Travis's design interview; implemented 2026-10-19.
+This supersedes the body double-click distance/follow behavior described above.
+Double-click framing chooses a viewing distance from the target's size so bodies
+of different sizes occupy roughly the same amount of the screen, then holds that
+distance while following the target's movement. Orbiting and zooming preserve
+following; manual panning releases it. Zooming changes the held viewing distance.
+The camera glides into position rather than jumping immediately.
+
+In Galaxy, double-click frames the system marker at a consistent distance and
+stays in Galaxy; entering the system remains separate. Framing preserves the
+current viewing direction. Stars become selectable and join planets and moons as
+framing/follow targets; belts frame their full extent. Existing fleet behavior is
+unchanged. Other explicit body-focus actions use the same framing, glide and
+follow behavior; single-click inspection does not move the camera.
+
+Provisional tuning, accepted for playtesting: a roughly 600 ms glide tracks the
+target's current position throughout. Manual orbit or zoom interrupts the glide
+and retains following; pan interrupts and releases following. Reduced-motion
+settings reposition immediately. Travis wants to assess glide timing and
+interruption by feel in the running game before treating that tuning as final.
+
+Initial body framing targets roughly one-third of the viewport's smaller
+dimension; belts fit their full extent with padding. This scale is provisional
+tuning. Storybook must provide an editable framing input so Travis can tune it.
+Gameplay following tracks position while preserving viewing direction rather
+than rotating with the body's surface or orbit. Storybook must also provide a
+dropdown with Steady direction (default) and Rotate with orbit. Rotate with orbit
+maintains the viewing angle relative to the target's parent as the target orbits;
+targets without an orbit use Steady direction. Surface locking is outside this
+design because the simulation has no body surface-rotation data.
+
+Storybook also exposes glide duration (initially 600 ms) and a Replay focus button
+that repeats the glide from the same starting view for comparison. Framing,
+orientation and duration controls are Storybook tuning controls, not gameplay UI.
+
+The production shared camera rig owns live-target glides and their interruption.
+System resolves body positions at the frame's world time, uses rendered body
+sizes for framing, and lowers the close-view zoom minimum to clear the body.
+Galaxy system focus uses a consistent 240 scene-unit distance. Storybook's
+Graphics/Solar System story exposes the tuning controls and Replay focus.
+
+Only one target is followed at a time. Focusing another replaces it and begins a
+fresh glide from the current camera pose. A disappearing target releases following
+and leaves the camera at its last position. Recenter and leaving the current view
+end following; single-click inspection leaves it active. Together with manual
+pan, these are the release conditions; orbit and zoom retain following.
+
+## Selected-location reticle and camera focus — 2026-10-19
+
+Travis requested a reticle in place of the pink empty-space selection sphere
+and camera focus on that location. The selected coordinate now has a constant
+28px cyan reticle with a 44px hit target, positioned through the same live camera
+basis as bodies. It represents a location, with no physical size or motion.
+Double-click/tap, or Enter/Space on the focused reticle, glides to the exact
+coordinate and makes it the orbit pivot. Activating the marker does not toggle
+or replace the travel selection. Orbit/zoom retain this fixed pivot; pan releases
+it, and recenter or another explicit focus replaces it. Changing the inspected
+object does not move the fixed pivot.
+
+Initial viewing distance is 8% of system extent, using the same glide duration
+and reduced-motion behavior as body focus. Storybook's Solar System exposes a
+separate point-distance input and Replay focus also accepts the selected location.
+This remains tuning for review alongside body framing and glide duration.
 
 ## Shared signal highlights — 2026-10-18
 

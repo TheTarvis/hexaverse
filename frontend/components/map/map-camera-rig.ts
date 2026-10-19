@@ -45,6 +45,11 @@ export class MapCameraRig {
   private changed: () => void
   private onKey: (event: KeyboardEvent) => void
   private onPointerIntent: (event: PointerEvent) => void
+  private onPointerMove: (event: PointerEvent) => void
+  private onPointerUp: (event: PointerEvent) => void
+  private presses = new Map<number, { x: number; y: number; currentX: number; currentY: number; intent: CameraIntent }>()
+  private following: (() => { position: Vec3; rotation?: THREE.Quaternion } | null) | null = null
+  private followRotation: THREE.Quaternion | null = null
   private options: MapCameraOptions
   private onWheelCapture: (e: WheelEvent) => void
 
@@ -108,14 +113,31 @@ export class MapCameraRig {
     controls.addEventListener('change', this.changed)
     this.onPointerIntent = event => {
       if (!controls.enabled || domElement.closest('[inert]')) return
-      this.glide = null
       const intent = event.pointerType === 'touch'
         ? (event.isPrimary === false ? 'pan' : 'orbit')
         : event.button === 1 ? 'zoom' : event.button === 2 || event.ctrlKey || event.metaKey || event.shiftKey ? 'pan' : 'orbit'
-      options.onIntent?.(intent)
+      this.presses.set(event.pointerId, { x: event.clientX, y: event.clientY, currentX: event.clientX, currentY: event.clientY, intent })
     }
-    // Capture precedes OrbitControls so the scene adapter can release following.
+    this.onPointerMove = event => {
+      const press = this.presses.get(event.pointerId)
+      if (!controls.enabled || !press) return
+      press.currentX = event.clientX; press.currentY = event.clientY
+      if (event.pointerType === 'touch' && this.presses.size === 2) {
+        const [a, b] = [...this.presses.values()]
+        const pan = Math.hypot((a.currentX + b.currentX - a.x - b.x) / 2, (a.currentY + b.currentY - a.y - b.y) / 2)
+        const zoom = Math.abs(Math.hypot(a.currentX - b.currentX, a.currentY - b.currentY) - Math.hypot(a.x - b.x, a.y - b.y))
+        // Pointer moves arrive one finger at a time. Do not misclassify half
+        // of a symmetric pinch as a pan that would release following.
+        if (pan >= 6 && pan > zoom * 0.75) this.interrupt('pan')
+        else if (zoom >= 6) this.interrupt('zoom')
+      } else if (Math.hypot(event.clientX - press.x, event.clientY - press.y) >= 6) this.interrupt(press.intent)
+    }
+    this.onPointerUp = event => { this.presses.delete(event.pointerId) }
+    // A click only inspects. Interrupt camera motion when a drag actually begins.
     domElement.addEventListener('pointerdown', this.onPointerIntent, true)
+    domElement.addEventListener('pointermove', this.onPointerMove, true)
+    domElement.addEventListener('pointerup', this.onPointerUp, true)
+    domElement.addEventListener('pointercancel', this.onPointerUp, true)
     this.onKey = event => this.handleKey(event)
     domElement.addEventListener('keydown', this.onKey)
 
@@ -142,13 +164,19 @@ export class MapCameraRig {
 
   update() {
     if (this.disposed) return
-    const before = this.camera.position.clone().sub(this.controls.target)
+    let residual = 0
     this.stepping = true
-    try { this.stepGlide(); this.controls.update() } finally { this.stepping = false }
+    try {
+      this.stepFollow()
+      this.stepGlide()
+      const before = this.camera.position.clone().sub(this.controls.target)
+      this.controls.update()
+      residual = before.distanceTo(this.camera.position.clone().sub(this.controls.target))
+    } finally { this.stepping = false }
     this.publish()
     // Follow translation does not count as residual camera motion. Publish
     // coarse overlay membership once damping settles, never every frame.
-    if (this.awaitingRest && !this.glide && before.distanceTo(this.camera.position.clone().sub(this.controls.target)) < 1e-7) {
+    if (this.awaitingRest && !this.glide && residual < 1e-7) {
       this.awaitingRest = false
       this.options.onRest?.()
     }
@@ -168,7 +196,7 @@ export class MapCameraRig {
 
   private handleWheel(e: WheelEvent) {
     if (!this.controls.enabled) return
-    this.options.onIntent?.(e.ctrlKey ? 'zoom' : 'pan')
+    this.interrupt(e.ctrlKey ? 'zoom' : 'pan')
     if (e.ctrlKey) return // pinch — leave it for OrbitControls to dolly
     const cam = this.camera
     const target = this.controls.target
@@ -198,8 +226,7 @@ export class MapCameraRig {
     const direction: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }
     const step = direction[event.key]
     if (step) {
-      this.options.onIntent?.(event.shiftKey ? 'pan' : 'orbit')
-      this.glide = null
+      this.interrupt(event.shiftKey ? 'pan' : 'orbit')
       const offset = this.camera.position.clone().sub(this.controls.target)
       if (event.shiftKey) {
         const up = this.camera.up.clone().normalize()
@@ -219,15 +246,59 @@ export class MapCameraRig {
         this.camera.position.copy(this.controls.target).add(offset)
       }
     } else if (['+', '=', '-', '_'].includes(event.key)) {
-      this.options.onIntent?.('zoom')
+      this.interrupt('zoom')
       const offset = this.camera.position.clone().sub(this.controls.target)
       offset.multiplyScalar(['+', '='].includes(event.key) ? 0.9 : 1 / 0.9)
       this.camera.position.copy(this.controls.target).add(offset)
-    } else if (event.key === 'Home') { event.preventDefault(); this.clearMotion(); this.glide = null; this.options.onHome?.(); return }
+    } else if (event.key === 'Home') { event.preventDefault(); this.stopFollowing(); this.clearMotion(); this.glide = null; this.options.onHome?.(); return }
     else if (event.key === 'Enter') { event.preventDefault(); this.options.onConfirm?.(); return }
     else return
     event.preventDefault()
     this.controls.update()
+  }
+
+  private interrupt(intent: CameraIntent) {
+    this.glide = null
+    if (intent === 'pan') this.stopFollowing()
+    this.options.onIntent?.(intent)
+  }
+
+  stopFollowing() {
+    this.glide = null
+    this.following = null
+    this.followRotation = null
+  }
+
+  /** Follow live positions during and after the glide. Null releases at the last pose. */
+  follow(resolve: () => { position: Vec3; rotation?: THREE.Quaternion } | null, distance: number, ms = 600) {
+    this.stopFollowing()
+    this.clearMotion()
+    this.following = resolve
+    const target = resolve()
+    if (!target) { this.stopFollowing(); return }
+    this.followRotation = target.rotation?.clone() ?? null
+    this.focus(target.position, ms, distance)
+  }
+
+  private stepFollow() {
+    if (!this.following) return
+    const next = this.following()
+    if (!next) { this.stopFollowing(); this.glide = null; return }
+    const target = new THREE.Vector3(next.position.x, next.position.y, next.position.z)
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const rotation = next.rotation && this.followRotation
+      ? next.rotation.clone().multiply(this.followRotation.clone().invert()) : null
+    this.followRotation = next.rotation?.clone() ?? null
+    if (this.glide) {
+      const goalOffset = this.glide.toPos.clone().sub(this.glide.toTarget)
+      if (rotation) goalOffset.applyQuaternion(rotation)
+      this.glide.toTarget.copy(target)
+      this.glide.toPos.copy(target).add(goalOffset)
+    } else {
+      if (rotation) offset.applyQuaternion(rotation)
+      this.controls.target.copy(target)
+      this.camera.position.copy(target).add(offset)
+    }
   }
 
   private stepGlide() {
@@ -242,13 +313,13 @@ export class MapCameraRig {
   }
 
   /**
-   * Glide a system to centre, PRESERVING the current viewing angle & zoom
-   * (double-click focus). The camera keeps its offset from the target so
-   * orbit/pan/zoom pivot on the new star with no jump.
+   * Glide to a target, preserving viewing direction. Omit distance to retain
+   * zoom; focus/follow callers can instead request a consistent framing.
    */
-  focus(pos: Vec3, ms = 600) {
+  focus(pos: Vec3, ms = 600, distance?: number) {
     const target = new THREE.Vector3(pos.x, pos.y, pos.z)
     const offset = this.camera.position.clone().sub(this.controls.target)
+    if (distance !== undefined) offset.setLength(THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance))
     this.startGlide(target.clone().add(offset), target, ms)
   }
 
@@ -257,13 +328,17 @@ export class MapCameraRig {
    * viewing angle/distance, not just the target.
    */
   recenter(pos: Vec3, ms = 600) {
+    this.stopFollowing()
     const target = new THREE.Vector3(pos.x, pos.y, pos.z)
     const camPos = target.clone().add(FRAME_OFFSET.clone().multiplyScalar(FRAME_DIST))
     this.startGlide(camPos, target, ms)
   }
 
   private startGlide(toPos: THREE.Vector3, toTarget: THREE.Vector3, ms: number) {
-    if (ms <= 0) {
+    this.glide = null
+    this.clearMotion()
+    this.awaitingRest = true
+    if (ms <= 0 || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
       this.camera.position.copy(toPos)
       this.controls.target.copy(toTarget)
       this.controls.update()
@@ -284,6 +359,7 @@ export class MapCameraRig {
    * off far enough to see it all, in the standard oblique angle.
    */
   frameBounds(bounds: MapBounds) {
+    this.stopFollowing()
     const cx = (bounds.x[0] + bounds.x[1]) / 2
     const cy = (bounds.y[0] + bounds.y[1]) / 2
     const cz = (bounds.z[0] + bounds.z[1]) / 2
@@ -301,6 +377,9 @@ export class MapCameraRig {
     this.wrapper.removeEventListener('wheel', this.onWheelCapture, { capture: true })
     this.input.removeEventListener('keydown', this.onKey)
     this.input.removeEventListener('pointerdown', this.onPointerIntent, true)
+    this.input.removeEventListener('pointermove', this.onPointerMove, true)
+    this.input.removeEventListener('pointerup', this.onPointerUp, true)
+    this.input.removeEventListener('pointercancel', this.onPointerUp, true)
     this.controls.removeEventListener('change', this.changed)
     this.controls.dispose()
   }

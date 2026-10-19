@@ -281,7 +281,7 @@ describe('SpaceStage — keyboard camera', () => {
       const after = JSON.parse(region().getAttribute('data-camera')!)
       expect(after, 'the camera must reframe to bring the focused target into view').not.toEqual(before)
     })
-    expect(region()).toHaveAttribute('data-reframe-animated', 'false')
+    expect(region()).toHaveAttribute('data-reframe-animated', 'true')
   })
 })
 
@@ -563,7 +563,7 @@ describe('SpaceStage — shared Galaxy touch controls', () => {
     await stage(); const hit = screen.getByTestId('body-hit-feat-body-0')
     touch('pointerDown', hit, 300, 300); touch('pointerUp', region(), 300, 300)
     const before = read(); touch('pointerDown', hit, 300, 300); touch('pointerUp', region(), 300, 300)
-    expect(read().target).toEqual(marks[1].position); expect(read().distance).toBeCloseTo(before.distance); expect(read().yaw).toBeCloseTo(before.yaw)
+    expect(read().target).toEqual(marks[1].position); expect(read().distance).toBeLessThan(before.distance); expect(read().followBodyId).toBe('feat-body-0'); expect(read().yaw).toBeCloseTo(before.yaw)
     expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'feat-body-0' })
   })
 })
@@ -622,4 +622,21 @@ it('can hide ordinary labels while keeping the selected label and body hit targe
   expect(screen.getByTestId('body-hit-feat-body-1')).toHaveAccessibleName('feat-body-1')
   fireEvent.keyDown(screen.getByTestId('body-hit-feat-body-1'), { key: 'Enter' })
   expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-1' })
+})
+
+it('double-clicking the selected-point reticle glides closer and makes the exact point the orbit pivot', async () => {
+  const point = { x: 25, y: 4, z: -10 }
+  const pointScene = { ...scene, marks: [...marks, { id: 'point-selection', kind: 'point-selection', position: point, radius: 0.5, pickable: false, selected: true }] }
+  await stage({ scene: pointScene, selection: { point } })
+  const before = JSON.parse(region().getAttribute('data-camera')!)
+  const reticle = screen.getByRole('button', { name: 'Selected location. Double-click to focus.' })
+  for (let i = 0; i < 2; i++) {
+    fireEvent.pointerDown(reticle, { pointerId: 1, button: 0, clientX: 600, clientY: 450 })
+    fireEvent.pointerUp(region(), { pointerId: 1, button: 0, clientX: 600, clientY: 450 })
+  }
+  const focused = JSON.parse(region().getAttribute('data-camera')!)
+  expect(focused.focusPoint).toEqual(point)
+  expect(focused.target).toEqual(point)
+  expect(focused.distance).toBeLessThan(before.distance)
+  expect(onSelect).not.toHaveBeenCalled()
 })
