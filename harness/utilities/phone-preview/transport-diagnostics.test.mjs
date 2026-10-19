@@ -138,3 +138,16 @@ test('valid fragmented gzip remains complete and silent; completed 5xx records n
   const brokenCallback = await listen(createPreviewGateway({ previewOrigin: origin, expiresAt: expiry(), frontendPort, onTransportError: () => { throw new Error('fixture telemetry failure') } }))
   assert.equal((await read(brokenCallback, '/login')).status, 503)
 })
+
+test('galaxy read rejection records only status and fixed route, preserving the response and no credentials', async () => {
+  const backendPort = await listen(http.createServer((_request, response) => {
+    response.writeHead(401, { 'content-type': 'application/json' }); response.end('{"error":"private-body"}')
+  }))
+  const events = []
+  const port = await listen(createPreviewGateway({ previewOrigin: origin, expiresAt: expiry(), backendPort, onTransportError: event => events.push(event) }))
+  const response = await read(port, '/api/v1/galaxy?private-query=secret')
+  assert.equal(response.status, 401)
+  assert.equal(events.length, 1); assert.equal(events[0].status, 401); assert.equal(events[0].code, 'HTTP_4XX')
+  assert.equal(events[0].pathname, '/api/v1/galaxy')
+  assert.doesNotMatch(JSON.stringify(events), /private-|secret|authorization|cookie/)
+})

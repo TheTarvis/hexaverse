@@ -275,7 +275,10 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
       }
       incoming.once('aborted', () => truncated())
       incoming.on('error', truncated)
-      incoming.once('end', () => { if (responseStatus >= 500) report('upstream_http_error', 'HTTP_5XX') })
+      incoming.once('end', () => {
+        if (responseStatus >= 500) report('upstream_http_error', 'HTTP_5XX')
+        else if (route.service === 'backend' && route.path.split('?', 1)[0] === '/v1/galaxy' && responseStatus >= 400) report('upstream_http_error', 'HTTP_4XX')
+      })
       // Pipe each received chunk immediately; no compression or response buffer.
       response.writeHead(incoming.statusCode ?? 502, headersWithoutHop(incoming.headers))
       incoming.pipe(response)
