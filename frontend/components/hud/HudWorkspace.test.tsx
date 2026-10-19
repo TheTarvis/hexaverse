@@ -298,6 +298,8 @@ it('offers direct labeled phone icons with one visible navigation and restores i
   const activate = vi.fn()
   render(<><button>Map action</button><HudWorkspace corporationId="direct-icons" panels={panels} onPanelActivate={activate} /></>)
   const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
+  const mapFrame = navigation.closest('[data-slot="hud-card"]')!
+  expect(mapFrame).toHaveAttribute('data-hud-framing', 'frame')
   expect(screen.queryByRole('button', { name: 'HUD menu' })).toBeNull()
   expect(within(navigation).getAllByRole('button').map(button => button.getAttribute('aria-label'))).toEqual(['Objects', 'Command', 'Arrange HUD'])
   for (const button of within(navigation).getAllByRole('button')) {
@@ -308,6 +310,9 @@ it('offers direct labeled phone icons with one visible navigation and restores i
   }
   const trigger = within(navigation).getByRole('button', { name: 'Command' })
   trigger.focus(); fireEvent.click(trigger)
+  const panelFrame = screen.getByRole('navigation', { name: 'HUD panels' }).closest('[data-slot="hud-card"]')!
+  expect(panelFrame).toHaveAttribute('data-hud-framing', 'frame')
+  expect(panelFrame.className).toBe(mapFrame.className)
   expect(activate).toHaveBeenCalledWith('command')
   expect(screen.getAllByRole('navigation', { name: 'HUD panels' })).toHaveLength(1)
   expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Command' })).toHaveAttribute('aria-pressed', 'true')
@@ -327,6 +332,11 @@ it('uses one shared signal layer per owning panel and settings without lighting 
   const { container } = render(<HudWorkspace corporationId="lighting" panels={content} />)
   await waitFor(() => expect(container.querySelectorAll('[data-panel] > [data-slot="hud-card"] > [data-slot="hud-frame-lighting"]')).toHaveLength(2))
   expect(container.querySelectorAll('[data-hud-framing="section"] [data-slot="hud-frame-lighting"]')).toHaveLength(0)
+  const navigationFrame = screen.getByRole('navigation', { name: 'HUD panels' }).closest('[data-slot="hud-card"]')!
+  expect(navigationFrame).toHaveAttribute('data-hud-framing', 'frame')
+  expect(navigationFrame.querySelector('[data-slot="hud-title"]')).toBeNull()
+  expect(navigationFrame.querySelector('[data-slot="hud-close"]')).toBeNull()
+  await waitFor(() => expect(navigationFrame.querySelector(':scope > [data-slot="hud-frame-lighting"]')).not.toBeNull())
   settings()
   await waitFor(() => expect(screen.getByRole('region', { name: 'Arrange HUD' }).querySelector(':scope > [data-slot="hud-frame-lighting"]')).not.toBeNull())
 })

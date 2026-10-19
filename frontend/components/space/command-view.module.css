@@ -51,20 +51,6 @@
   0%, 100% { box-shadow: 0 0 0 0 #76e3ef00, 0 0 8px #76e3ef30; }
   50% { box-shadow: 0 0 0 8px #76e3ef65, 0 0 32px #76e3ef80, inset 0 0 16px #76e3ef25; }
 }
-.objectiveCard {
-  position: absolute;
-  top: 125px;
-  right: 32px;
-  width: 280px;
-  max-width: calc(100vw - 64px);
-  z-index: 24;
-  border-left: 1px solid #76e3ef70;
-  color: #a7c4d1;
-  background: #071019ed;
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-}
 .transmission[data-phase='objects'] .checks,
 .transmission[data-phase='station'] .checks,
 .transmission[data-phase='scan'] .checks,
@@ -100,21 +86,6 @@
   display: none;
 }
 
-.objectiveCard > p { margin-top: 10px; }
-@media (max-width: 960px) {
-  .commandView .objectiveCard {
-    top: auto;
-    bottom: calc(var(--console-dock-height, 56px) + 16px);
-    left: auto;
-    right: 16px;
-    width: 280px;
-    max-width: calc(100vw - 32px);
-  }
-}
-@media (max-width: 600px) {
-  .commandView:has(.objectiveCard) .objectBrowser { bottom: calc(var(--console-dock-height, 56px) + 300px); }
-  .commandView .objectiveCard { bottom: calc(var(--console-dock-height, 56px) + 170px); }
-}
 
 /* Configurable content leaves the vitals/navigation lane permanently reachable. */
 
@@ -131,8 +102,6 @@
 .transmissionActions { flex-shrink: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .guideLayer { display: flex; position: absolute; z-index: 40; inset: var(--phone-panel-top) max(12px, env(safe-area-inset-right)) var(--phone-bottom) max(12px, env(safe-area-inset-left)); flex-direction: column; min-height: 0; min-width: 0; gap: 8px; pointer-events: none; }
-  .commandView .guideLayer .objectiveCard { position: static; box-sizing: border-box; order: -1; width: 100%; max-width: 100%; padding: 6px 12px; flex-shrink: 0; pointer-events: auto; }
-  .objectiveCard > p { margin: 2px 0 0; }
   .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; width: 100%; max-width: 100%; max-height: 100%; min-height: 0; padding: 8px 12px 12px; overflow: hidden; pointer-events: auto; }
   .guideLayer .transmissionBody { overflow-wrap: anywhere; }
   .transmissionBody > p, .transmission[data-phase='wake'] .transmissionBody > p { font-size: 16px; line-height: 1.5; margin: 8px 0 12px; }
@@ -142,8 +111,6 @@
   .transmission small { display: none; }
 }
 @media (max-height: 500px) and (max-width: 1024px) {
-  .commandView .guideLayer .objectiveCard { display: flex; gap: 12px; align-items: center; padding-block: 2px; }
-  .objectiveCard > p { margin: 0; }
   .guideLayer { gap: 4px; }
   .transmissionBody > p, .transmission[data-phase='wake'] .transmissionBody > p { font-size: 14px; margin-block: 4px; }
 }
@@ -204,12 +171,7 @@
   .recoveryContent .transmissionBody { flex: 1; min-height: 0; overflow: auto; }
 }
 
-.commandView .objectiveCard { border: 0; padding: 0; background: transparent; }
 
-/* Shared frame decoration must stay positioned relative to the objective itself. */
-@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView .guideLayer .objectiveCard { position: relative; inset: auto; flex: 0 0 auto; }
-}
 
 /* A paused guide keeps its own row below the direct HUD navigation. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
@@ -233,14 +195,8 @@
 }
 
 /* Guide layout owns positioning; card chrome never competes with scene docks. */
-.commandView .objectiveDock { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(280px, calc(100% - 32px)); z-index: 40; pointer-events: none; }
-.commandView .objectiveDock > .objectiveCard { position: relative; inset: auto; width: 100%; max-width: none; }
 .commandView .transmission:focus { outline: none; }
 @media (min-width: 761px) and (min-height: 501px) {
   .commandView .guideLayer:has(.transmission) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; box-sizing: border-box; z-index: 80; pointer-events: none; }
-  .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; flex: 0 1 auto; min-height: 0; max-height: calc(100% - 140px); pointer-events: auto; }
-  .commandView .guideLayer:has(.transmission) .objectiveDock { position: relative; inset: auto; transform: none; flex: 0 0 auto; order: -1; width: min(520px, calc(100% - 48px)); }
-}
-@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView .guideLayer .objectiveDock { position: relative; inset: auto; transform: none; flex: 0 0 auto; order: -1; width: 100%; }
+  .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; flex: 0 1 auto; min-height: 0; max-height: 100%; pointer-events: auto; }
 }

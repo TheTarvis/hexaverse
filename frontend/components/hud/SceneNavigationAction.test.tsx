@@ -28,3 +28,8 @@ it('shows enter only when the adapter supplies a disclosed selection and delegat
   expect(enter).toHaveBeenCalledTimes(1)
   expect(screen.queryByRole('link',{name:'Leave system for galaxy'})).toBeNull()
 })
+
+it('carries the current system in the galaxy navigation link', () => {
+  render(<SceneNavigationAction destination="galaxy" systemId="sys/one two" />)
+  expect(screen.getByRole('link', { name: 'Leave system for galaxy' })).toHaveAttribute('href', '/?system=sys%2Fone%20two')
+})

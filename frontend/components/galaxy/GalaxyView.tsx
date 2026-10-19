@@ -155,22 +155,23 @@ export function GalaxyView() {
   // is atomic and single-hop, so there is no held-mid-lane state to occupy).
   const fleetSystemIds = useMemo(() => ownFleetPresenceSystemIds(ownFleets), [ownFleets])
 
-  // The wake-up handoff (#0009): spawn stashes the home system id so the view can
-  // select + glide to it on the first mount after waking. Read once, client-only
-  // (sessionStorage is unavailable during SSR), then cleared so it fires once.
-  const [wakeFocus, setWakeFocus] = useState<string | null>(null)
+  // Leaving local space carries its system in the URL. Otherwise preserve the
+  // one-shot wake-up handoff. Read client-only so SSR keeps its neutral selection.
+  const [entryFocus, setEntryFocus] = useState<string | null>(null)
   useEffect(() => {
+    const systemId = new URLSearchParams(window.location.search).get('system')
+    if (systemId) setEntryFocus(systemId)
     try {
       const w = sessionStorage.getItem('wakeFocus')
       if (w) {
-        setWakeFocus(w)
+        if (!systemId) setEntryFocus(w)
         sessionStorage.removeItem('wakeFocus')
       }
     } catch {
       // sessionStorage may be unavailable (private mode) — non-fatal.
     }
   }, [])
-  const homeSystemId = recenterTargetSystemId(ownFleets) ?? wakeFocus
+  const homeSystemId = recenterTargetSystemId(ownFleets) ?? entryFocus
 
   // Per-system lane (connection) counts and region tallies, derived once.
   const { laneCountById } = useMemo(() => {
@@ -218,18 +219,18 @@ export function GalaxyView() {
     controllerRef.current?.focusSystem(target)
   }, [])
 
-  // On the first mount after waking (#0009): select home and glide the camera to
-  // it once the graph is ready — so the new player lands looking at their system
-  // with the inspector (and "Your fleet is here") already open. Runs once.
-  const wakeHandledRef = useRef(false)
+  // Select and focus the entry system once data and the renderer are ready.
+  // Only disclosed nodes may become the initial selection; later reads must
+  // preserve any selection the player makes after this handoff.
+  const entryHandledRef = useRef(false)
   useEffect(() => {
-    if (wakeHandledRef.current || !graphReady || !wakeFocus || !galaxy) return
-    if (galaxy.nodes.some((n) => n.id === wakeFocus)) {
-      setSelectedId(wakeFocus)
-      controllerRef.current?.focusSystem(wakeFocus)
-      wakeHandledRef.current = true
+    if (entryHandledRef.current || !graphReady || !entryFocus || !galaxy) return
+    if (galaxy.nodes.some((n) => n.id === entryFocus)) {
+      setSelectedId(entryFocus)
+      controllerRef.current?.focusSystem(entryFocus)
+      entryHandledRef.current = true
     }
-  }, [graphReady, wakeFocus, galaxy])
+  }, [graphReady, entryFocus, galaxy])
 
   // Roster commands that need no in-system selection — cut-drive/stop act on
   // the fleet's current state alone. Burn needs a target named by body id

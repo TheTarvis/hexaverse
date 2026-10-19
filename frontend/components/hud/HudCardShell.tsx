@@ -78,7 +78,7 @@ export function HudCardShell({
       className={clsx(styles.shell, section && styles.section, className)}
     >
       {!section && <><div aria-hidden="true" className={styles.surface} />
-      <div aria-hidden="true" className={styles.lights}>
+      <div aria-hidden="true" data-slot="hud-frame-corners" className={styles.lights}>
         {['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((corner) => (
           <svg key={corner} className={styles[corner]} viewBox="0 0 32 32" fill="none">
             <path d="M8 25 L25 8" />

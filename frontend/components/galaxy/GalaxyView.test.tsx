@@ -296,6 +296,7 @@ describe('GalaxyView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
     graphBehavior.throwOnRender = false
   graphBehavior.phase = 'ready'
     // Default: no fleets, inert command mutations.
@@ -402,6 +403,32 @@ describe('GalaxyView', () => {
     expect(focusSpy).toHaveBeenCalledWith('sys-1')
     // Consumed once — the handoff is cleared so a reload doesn't re-snap.
     expect(sessionStorage.getItem('wakeFocus')).toBeNull()
+  })
+
+  it('selects the system left behind after galaxy data arrives, ahead of a wake handoff', async () => {
+    window.history.replaceState(null, '', '/?system=sys-1')
+    sessionStorage.setItem('wakeFocus', 'sys-0')
+    mockGalaxyState({ data: undefined, isLoading: true })
+    const { rerender } = renderView()
+    mockGalaxyState()
+    rerender(<GalaxyView />)
+    await waitFor(() => expect(screen.getByTestId('inspector-name')).toHaveTextContent('Borealis'))
+    expect(focusSpy).toHaveBeenCalledWith('sys-1')
+    expect(screen.getByRole('button', { name: 'Enter selected system: Borealis' })).toBeVisible()
+    fireEvent.click(screen.getByTestId('select-sys-0'))
+    expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+    rerender(<GalaxyView />)
+    expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
+    expect(pushSpy).not.toHaveBeenCalled()
+  })
+
+  it('ignores an entry system absent from the disclosed galaxy', async () => {
+    window.history.replaceState(null, '', '/?system=unknown')
+    mockGalaxyState()
+    renderView()
+    await screen.findByTestId('mock-graph')
+    expect(focusSpy).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /Enter selected system/ })).toBeNull()
   })
 
   it('does not retain the removed Console recenter button (Home belongs to shared camera controls)', () => {

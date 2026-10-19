@@ -1,11 +1,13 @@
 .root { isolation: isolate; }
 .scene { position: absolute; inset: 0; isolation: isolate; z-index: 0; }
-.identity { position: absolute; top: 28px; left: 32px; pointer-events: none; z-index: 10; }
-.workspace { bottom: 0; --workspace-panels-bottom: 16px; --workspace-toolbar-top: 120px; --workspace-panels-top: 188px; --workspace-settings-reserve: 188px; }
+.identity { position: absolute; top: 12px; left: 16px; right: calc(50% + 162px); min-width: 0; pointer-events: none; z-index: 10; }
+.identity > p { display: none; }
+.identity h1 { margin: 0; font-size: 20px; line-height: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace { bottom: 0; --workspace-toolbar-align: center; --workspace-panels-bottom: 16px; --workspace-toolbar-top: 12px; --workspace-panels-top: 104px; --workspace-settings-reserve: 120px; }
 .vitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; min-width: 0; }
 .vitals [data-testid='vitals-details-toggle'] { display: none; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .root { --phone-vitals-height: 0px; --game-navigation-bottom: 112px; --workspace-phone-navigation-top: calc(56px + env(safe-area-inset-top)); --phone-toolbar-top: calc(56px + env(safe-area-inset-top)); --phone-panel-top: calc(116px + env(safe-area-inset-top)); --phone-bottom: calc(12px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
+  .root { --phone-vitals-height: 0px; --game-navigation-bottom: 124px; --workspace-phone-navigation-top: calc(56px + env(safe-area-inset-top)); --phone-toolbar-top: calc(56px + env(safe-area-inset-top)); --phone-panel-top: calc(128px + env(safe-area-inset-top)); --phone-bottom: calc(12px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
   .root:has([data-testid='vitals-strip'][data-expanded='true']) { --phone-vitals-height: 144px; }
   .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); display: block; }
   .identity > p { display: none; }

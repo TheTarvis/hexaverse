@@ -40,7 +40,6 @@ import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameV
 import { Button } from '@/components/catalyst/button'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
-import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudText } from '@/components/hud/HudTypography'
 import { type HudPanelId } from '@/components/hud/HudWorkspace'
 import { HudColumn } from '@/components/hud/GameHud'
@@ -1173,10 +1172,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           onObjects={() => openObjectIndex(true)}
         />
       )}
-      {guiding && guide && <div className={commandStyles.objectiveDock}><HudCardShell lighting="none" className={commandStyles.objectiveCard} aria-label="Current objective"><HudText variant="label">Current objective</HudText><HudText role="status" data-testid="tutorial-objective">Complete tutorial · {guide.phase === 'done' ? '1/1' : '0/1'}</HudText></HudCardShell></div>}
       </div>
       <GameViewWorkspace
-        navigationAction={<SceneNavigationAction destination="galaxy" />}
+        navigationAction={<SceneNavigationAction destination="galaxy" systemId={systemId} />}
         onPanelActivate={id => { setGuidePageVisible(false); if (id === 'objects') openObjectIndex(true) }}
         onPanelDismiss={id => { if (id === 'objects') setObjectIndexOpen(false) }}
         corporationId={corporation?.id ?? sessionCorporation?.id ?? 'unavailable'}

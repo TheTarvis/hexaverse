@@ -1363,7 +1363,7 @@ it.each(['index-feat-body-0', 'guide-target'])('advances object discovery throug
     expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'true')
     await userEvent.click(screen.getByTestId(entry))
     expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
-    expect(screen.getByTestId('tutorial-objective')).toHaveTextContent('Complete tutorial · 0/1')
+    expect(screen.queryByLabelText('Current objective')).not.toBeInTheDocument()
     expect(screen.getByTestId('system-index-search')).toBeVisible()
     expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'false')
     await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
@@ -1376,13 +1376,14 @@ it.each(['index-feat-body-0', 'guide-target'])('advances object discovery throug
 })
 
 
-it.each(['wake', 'target', 'done'] as const)('shows tutorial objective from %s with the correct completion count', async phase => {
+it.each(['wake', 'target', 'done'] as const)('keeps the %s guide without an objective card or count', async phase => {
   const { newGuide } = await import('@/lib/command-onboarding')
   const guide = { ...newGuide('corp-1', 'fleet_1', SYSTEM_ID), phase, targetId: 'feat-body-0', acceptedAt: 1, mineActionId: 'mine-1', resource: 'metals', stationId: 'station-1' }
   vi.mocked(localStorage.getItem).mockImplementation(key => key === 'hexaverse:command-guide:v1:corp-1' ? JSON.stringify(guide) : null)
   try {
     view()
-    expect(screen.getByTestId('tutorial-objective')).toHaveTextContent(`Complete tutorial · ${phase === 'done' ? '1/1' : '0/1'}`)
+    expect(screen.queryByLabelText('Current objective')).not.toBeInTheDocument()
+    expect(screen.getByTestId('recovery-transmission')).toBeInTheDocument()
   } finally {
     vi.mocked(localStorage.getItem).mockReturnValue(null)
   }

@@ -10,7 +10,7 @@ import { Input } from '@/components/catalyst/input'
 const meta: Meta<typeof HudWorkspace> = {
   title: 'HUD/Workspace',
   component: HudWorkspace,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Phone HUD destinations use direct 44px icon controls on the map and the same strip inside an open card; desktop controls stay textual. Docked layout around existing HUD content. Arrange with ordinary keyboard controls, show/hide panels, and reset local preferences. Panel contents remain mounted when moved or hidden. Navigation and vitals stay outside the customizable workspace. These stories use separate demonstration corporation storage keys.' } } },
+  parameters: { layout: 'fullscreen', docs: { description: { component: 'HUD destinations use direct 44px icon controls on desktop and phone; phones repeat the same strip inside an open card. Docked layout around existing HUD content. Arrange with ordinary keyboard controls, show/hide panels, and reset local preferences. Panel contents remain mounted when moved or hidden. Navigation and vitals stay outside the customizable workspace. These stories use separate demonstration corporation storage keys.' } } },
 }
 export default meta
 type Story = StoryObj<typeof meta>

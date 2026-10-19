@@ -52,7 +52,7 @@ export function MobileSystemHud({ gameplay = false, interactiveMap = false, disa
     <HudHeading className={styles.identity} data-testid="command-system-identity" eyebrow="Local space / Command network" title="Serais" detail={gameplay ? "2 fleets · 2 ships" : "1 fleets · 1 ships"} />
     {guide.phase !== 'dismissed' && !guidePageVisible && <Button plain className={styles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
     {guide.phase !== 'dismissed' && guidePageVisible && <div className={styles.guideLayer}><RecoveryTransmission guide={guide} fleet={fleet} bodies={[]} interiorFailed={false} actionFailed={false} onRetryAction={() => {}} onSave={setGuide} onTarget={() => open('objects')} onObjects={() => open('objects')} onScan={() => open('command')} />
-      <div className={styles.objectiveDock}><aside className={styles.objectiveCard} aria-label="Current objective"><span className={styles.signal}>CURRENT OBJECTIVE</span><p>Complete tutorial · 0/1</p></aside></div></div>}
+</div>}
     <HudWorkspace navigationAction={<SceneNavigationAction destination="galaxy" />} className={styles.workspace} corporationId={gameplay ? "isolated-mobile-gameplay-fixture" : "isolated-mobile-responsive-fixture"} request={request} panels={[
       { id: 'objects', label: 'Objects', suspended: guidePageVisible && guide.phase === 'wake', children: <HudCardShell title="Known objects" lighting="none"><input aria-label="Find objects" placeholder="Find objects" /><p>Station · feat-station</p><Button outline onClick={() => open('command')}>Open sensors</Button></HudCardShell> },
       { id: 'command', label: 'Command', children: gameplay ? <>

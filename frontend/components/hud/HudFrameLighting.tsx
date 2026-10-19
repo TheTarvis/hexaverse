@@ -3,19 +3,21 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import * as THREE from 'three'
 import { MeshBasicNodeMaterial } from 'three/webgpu'
-import { uniform, uv, vec2, vec3, vec4, max, exp, atan, cos, smoothstep } from 'three/tsl'
+import { uniform, uv, vec2, vec3, vec4, max, exp, smoothstep } from 'three/tsl'
+import { frameSignal } from './frame-signal'
 import { createRendererOwner } from '@/components/render-guard/renderer-owner'
 import styles from './hud-frame-lighting.module.css'
 
 type Props = {
   hostRef: RefObject<HTMLElement | null>
   intensity?: number
+  /** Screen pixels per second, independent of card dimensions. */
   speed?: number
   paused?: boolean
 }
 
 /** Decorative frame only; CSS remains visible throughout renderer startup or failure. */
-export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused = false }: Props) {
+export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 77, paused = false }: Props) {
   const layerRef = useRef<HTMLDivElement>(null)
   const settings = useRef({ intensity, speed, paused })
   const requestDraw = useRef<() => void>(() => {})
@@ -33,22 +35,22 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
     const padding = 12
     const size = uniform(new THREE.Vector2(1, 1))
     const halfSize = uniform(new THREE.Vector2(1, 1))
-    const time = uniform(0)
+    const cut = uniform(20)
+    const travelPixels = uniform(0)
     const gain = uniform(settings.current.intensity)
     const titleBox = uniform(new THREE.Vector4(0, 0, -1, -1))
 
-    // Pixel-space half-planes describe the same fixed 20px chamfers as the CSS shell.
+    // Pixel-space half-planes follow the shell's CSS corner cut.
     const p = vec2(uv().x.sub(0.5), uv().y.oneMinus().sub(0.5)).mul(size)
     const q = p.abs()
     const edge = max(
       max(q.x.sub(halfSize.x), q.y.sub(halfSize.y)),
-      q.x.add(q.y).sub(halfSize.x).sub(halfSize.y).add(20).mul(Math.SQRT1_2),
+      q.x.add(q.y).sub(halfSize.x).sub(halfSize.y).add(cut).mul(Math.SQRT1_2),
     ).add(2.5).abs()
     const rim = exp(edge.mul(-0.85))
     const halo = exp(edge.mul(-0.2)).mul(0.16)
-    const angle = atan(p.y, p.x)
-    // Absolute cosine produces two matching peaks, exactly half a turn apart.
-    const opposedPulses = exp(cos(angle.sub(time)).abs().sub(1).mul(22))
+    // Pixel distance along the frame prevents highlights stretching at end caps.
+    const opposedPulses = frameSignal(p, halfSize, travelPixels, cut)
     const pulse = opposedPulses.mul(2.1).add(0.025)
     // The title plaque masks its own backing; the transparent close control
     // must not cut a rectangular hole in the illuminated rim.
@@ -93,7 +95,7 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
       last = animated ? now : 0
       gain.value = current.intensity
       if (animated) {
-        time.value += delta * current.speed
+        travelPixels.value += delta * current.speed
       }
       void owner.present(scene, camera)
       if (animated) schedule()
@@ -120,6 +122,8 @@ export function HudFrameLighting({ hostRef, intensity = 1.2, speed = 0.7, paused
       height = rect.height
       size.value.set(width + padding * 2, height + padding * 2)
       halfSize.value.set(width / 2, height / 2)
+      const cssCut = Number.parseFloat(getComputedStyle(host).getPropertyValue('--hud-frame-cut'))
+      cut.value = Number.isFinite(cssCut) ? cssCut : 20
       for (const [element, box] of [[host.querySelector('[data-slot="hud-title"]'), titleBox]] as const) {
         const bounds = element?.getBoundingClientRect()
         if (bounds) box.value.set(bounds.x + bounds.width / 2 - rect.x - width / 2, bounds.y + bounds.height / 2 - rect.y - height / 2, bounds.width / 2, bounds.height / 2)
