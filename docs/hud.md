@@ -892,3 +892,35 @@ acceptance remains separate.
 
 [Design exploration and implementation evidence](../.scratch/hud-navigation/hud-navigation-design.md),
 including the concept comparison and generation prompt, live in `.scratch/`.
+
+## Background music — 2026-10-18
+
+Travis accepted the five-track [round 03 set](../.scratches/ambient-round-03.md)
+and requested game integration. **Arrange HUD → Music** in both galaxy and
+system views provides play/pause, previous/next, track selection, independent
+volume and expandable composer/track/license credits. Music settings remain
+available with configurable panels hidden, including in the guest start area.
+
+One player lives above the routed game views. Closing settings and navigating
+between galaxy and systems preserve playback and position. Per Travis's follow-up,
+music defaults **on** when loading the game. The browser remembers on/off choice,
+track and volume. Pressing Pause or switching Music enabled off persists off;
+later loads attach no audio source while off. Old preferences without an on/off
+field use the new default. Default volume is 35%. The five tracks advance in order
+and repeat after the last.
+
+When a browser blocks audible autoplay, enabled intent remains on and playback
+retries after the first game click/tap or key interaction; explicit Play also works.
+Music controls own their own interactions so switching off cannot accidentally
+unlock playback. Hidden tabs and leaving game routes temporarily pause music,
+then resume when visible/in-game again if the user has kept it on. These temporary
+pauses never persist off. File failures retain retry/next guidance. Browser autoplay
+permission remains outside the game's control; default-on is not a guarantee of
+audible playback before interaction on every browser.
+
+The source MP3s remain unmodified and retain their original starts/endings; there
+is no seamless-loop or loudness-matching claim. Scott Buckley attribution,
+individual source links and CC BY 4.0 are visible in Music credits; source and
+download records also accompany the files. No sound effects or external radio
+integration is introduced. [Integration evidence](../.scratches/music-integration.md)
+records checks and browser/device limits.

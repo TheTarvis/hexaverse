@@ -24,6 +24,11 @@ vi.mock('./corporation-provider', () => ({
   ),
 }))
 
+// This suite checks provider composition; media behavior has focused coverage.
+vi.mock('./audio/AppMusicProvider', () => ({
+  AppMusicProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 describe('Providers', () => {
   it('renders children', () => {
     render(

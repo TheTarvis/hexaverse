@@ -6,6 +6,7 @@ import { SystemViewport } from '@/components/space/SystemViewport'
 import { HudHeading } from './GameHud'
 import { HudWorkspace, type HudWorkspaceProps } from './HudWorkspace'
 import { GameAccountSettings } from './GameAccountSettings'
+import { GameMusicControls } from '@/components/audio/GameMusicControls'
 import { HudHeading as HudContentHeading } from './HudTypography'
 import styles from './game-view-shell.module.css'
 
@@ -23,7 +24,7 @@ export function GameViewScene({ className, ...props }: ComponentPropsWithoutRef<
 }
 
 export function GameViewWorkspace({ className, ...props }: HudWorkspaceProps) {
-  return <HudWorkspace settingsContent={<GameAccountSettings />} {...props} className={clsx(styles.workspace, className)} />
+  return <HudWorkspace settingsContent={<><GameMusicControls /><GameAccountSettings /></>} {...props} className={clsx(styles.workspace, className)} />
 }
 
 export function GameViewVitals({ className, placement = 'footer', children, ...props }: ComponentPropsWithoutRef<'div'> & { placement?: 'footer' | 'panel' }) {

@@ -1,0 +1,12 @@
+.settings { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.enable { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.enable input { accent-color: #76e3ef; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { min-height: 44px; }
+.volume { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.volume > span { grid-column: 1 / -1; }
+.volume input { width: 100%; min-width: 0; accent-color: #76e3ef; min-height: 44px; }
+.credits { min-width: 0; }
+.credits summary { cursor: pointer; min-height: 44px; padding-block: 12px; box-sizing: border-box; }
+.credits a { text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.credits ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
