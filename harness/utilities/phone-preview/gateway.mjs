@@ -236,14 +236,26 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
       responseStatus = incoming.statusCode ?? 502
       if (request.method === 'GET' && (liveProject && route.service === 'frontend' && incoming.headers['content-type']?.includes('text/html') || liveStorybook && route.service === 'storybook' && /(?:javascript|text\/css|text\/html|application\/json)/.test(incoming.headers['content-type'] ?? ''))) {
         const parts = []
-        let bytes = 0
+        let bytes = 0, failed = false
+        const failBuffered = error => {
+          if (failed) return
+          failed = true; upstreamFailed = true
+          if (!downstreamAborted) report('upstream_truncated', error?.code ?? 'INCOMPLETE_UPSTREAM', 502)
+          // No transformed headers/body have been sent. Keep the outer tunnel's
+          // HTTP exchange valid even if a dev rebuild interrupts its upstream.
+          if (!response.destroyed) reject(response, 502)
+        }
         incoming.on('data', part => {
           bytes += part.length
-          if (bytes > 8 * 1024 * 1024) { incoming.destroy(); reject(response, 502) }
+          receivedBytes += part.length
+          if (bytes > 8 * 1024 * 1024) { failBuffered(); incoming.destroy() }
           else parts.push(part)
         })
-        incoming.on('error', () => response.destroy())
+        incoming.once('aborted', () => failBuffered())
+        incoming.on('error', failBuffered)
         incoming.on('end', () => {
+          if (failed || response.destroyed || response.writableEnded) return
+          if (!incoming.complete) return failBuffered()
           if (expired()) return reject(response, 410)
           let html
           try { html = route.service === 'storybook' ? liveStorybook.transform(Buffer.concat(parts), route.path, incoming.headers['content-type']) : injectLiveConfig(Buffer.concat(parts).toString('utf8'), trusted.origin, liveProject) }

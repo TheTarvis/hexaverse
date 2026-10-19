@@ -35,6 +35,18 @@ The app's gateway-only login guidance is applied after initial hydration so a
 fresh dev-server page matches its server-rendered markup; a hydration regression
 test and fresh mobile-browser check cover that handoff.
 
+### Interrupted development responses — 2026-10-19
+
+Travis reported NGROK_3004 after activation. Initial checks found healthy local
+services and SSO redirects; no recorded diagnostic identified his exact request.
+Fault injection reproduced a concrete gap: interruption while buffering live
+HTML/JSON closed the downstream socket before any HTTP response bytes and omitted
+the upstream-truncation record. Buffered failures now return a complete HTTP502,
+record redacted status/byte counts, and allow the next healthy request to succeed.
+This fixes a verified failure mode; it does not establish the cause of the
+original user request. App/mobile and Storybook source-HMR browser checks, active
+update sockets and protected-route checks passed after the preview-only reload.
+
 ## Live development preview — 2026-10-19
 
 Travis approved switching the existing protected endpoint to the separately
