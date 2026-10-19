@@ -1,5 +1,36 @@
 # Authenticated phone preview
 
+## Live development preview — 2026-10-19
+
+Travis approved switching the existing protected endpoint to the separately
+managed development server on localhost:20200. The current cutoff is
+2026-10-19T04:00:00Z. These details supersede the earlier built-preview and
+midnight-cutoff checkpoints below. The ngrok Google identity policy, credentials,
+API/Auth restrictions and static Storybook routing are unchanged.
+
+The loopback gateway's explicit `--live-project hexaverse-emulator` mode injects
+a same-origin browser profile into app HTML. Firebase Auth uses the served
+emulator identity and API requests use `/api`; ordinary direct localhost use
+keeps its existing configuration. Firestore and emulator management stay private.
+Only the exact `/_next/webpack-hmr` upgrade is relayed, with the configured Origin
+required. Client messages admit client-chunk subscriptions and sanitized lifecycle
+notifications; arbitrary module paths and dev commands are not forwarded. Editor,
+debug, dev-login and stack-frame endpoints remain blocked. Development client
+bundles and HMR diagnostics are development output, rather than production assets.
+
+The gateway independently expires HTTP and open HMR/SSE streams. The operational
+supervisor owns only gateway/ngrok, so cutoff cannot stop the separately managed
+dev server, Storybook, backend or emulators. The old isolated frontend on20209 is
+stopped. Live game source is intentionally mutable; gateway/access-policy pins
+remain enforced. Storybook still serves its existing static artifact and requires
+its own refresh workflow when those stories change.
+
+Validation: isolated gateway/Auth/HMR tests, mobile-width browser login routing,
+same-origin API denial and an actual source edit reaching the open browser through
+HMR passed. Active gateway HMR returned101; unauthenticated public app/API/Auth/HMR
+requests still redirected to SSO. No authenticated public browser session or
+physical iPhone was available to this agent, so those remain device acceptance.
+
 Status: protected preview active, 2026-10-16. Current user-approved endpoint is
 https://gulf-identity-scrap.ngrok-free.dev/ for exact Google identity
 wilson.travis.t@gmail.com until 2026-10-19T00:00:00Z, with no paid charges.

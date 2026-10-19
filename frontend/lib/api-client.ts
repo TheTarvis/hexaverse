@@ -1,6 +1,7 @@
 'use client'
 
 import { auth } from './firebase'
+import { livePhonePreviewConfig } from './phone-preview-config'
 
 export interface ApiResponse<T = unknown> {
   data: T
@@ -26,7 +27,7 @@ export class ApiClient {
   private defaultHeaders: Record<string, string>
 
   constructor(config: ApiClientConfig = {}) {
-    const baseURL = config.baseURL || (process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true' ? '/api' : process.env.NEXT_PUBLIC_API_URL)
+    const baseURL = config.baseURL || livePhonePreviewConfig()?.apiBase || (process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true' ? '/api' : process.env.NEXT_PUBLIC_API_URL)
     if (!baseURL) {
       throw new Error('NEXT_PUBLIC_API_URL environment variable is required. Set it in your .env.local file.')
     }

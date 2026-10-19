@@ -1,5 +1,7 @@
 'use client'
 
+import { livePhonePreviewConfig } from '@/lib/phone-preview-config'
+
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/catalyst/button'
@@ -62,7 +64,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = sanitizeRedirect(searchParams.get('redirect'))
-  const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true'
+  const phonePreview = process.env.NEXT_PUBLIC_PHONE_PREVIEW === 'true' || !!livePhonePreviewConfig()
   // Preview uses the same email and simulated Google flows against the emulator.
   const [isSignUp, setIsSignUp] = useState(searchParams.get('signUp') === 'true')
 

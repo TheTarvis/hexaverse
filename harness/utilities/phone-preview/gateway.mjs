@@ -8,6 +8,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ssoHelperAllowed, idpSignInAllowed } from './sso-policy.mjs'
 import { createTransportLog, transportPath, transportRecord } from './transport-diagnostics.mjs'
+import { attachLiveHmr, injectLiveConfig } from './live-frontend.mjs'
 
 const ID = '[A-Za-z0-9_-]{1,180}'
 const api = (pattern) => new RegExp(`^/v1/${pattern}$`)
@@ -130,7 +131,7 @@ async function serveStorybook(request, response, directory, expired) {
 
 /** All upstream hosts are fixed loopback; only their numeric ports are configurable. */
 export function createPreviewGateway({ previewOrigin, frontendPort = 20205, backendPort = 20201, authPort = 20211,
-  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now, onTransportError } = {}) {
+  storybookDirectory = defaultStorybookDirectory, maxBodyBytes = 1_048_576, expiresAt, now = Date.now, onTransportError, liveProject } = {}) {
   let trusted
   try { trusted = new URL(previewOrigin) } catch { throw new Error('Explicit previewOrigin is required') }
   // Local QA is an explicit alternative, never an additional allowed origin on
@@ -152,6 +153,7 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
   }
   if (onTransportError !== undefined && typeof onTransportError !== 'function') throw new Error('Invalid diagnostics callback')
   const expired = () => now() >= deadline
+  if (liveProject !== undefined && (typeof liveProject !== 'string' || !/^[a-z][a-z0-9-]{2,62}$/.test(liveProject))) throw new Error('Invalid live emulator project')
   const ports = { frontend: port(frontendPort), backend: port(backendPort), auth: port(authPort) }
   if (!Number.isSafeInteger(maxBodyBytes) || maxBodyBytes < 1 || maxBodyBytes > 1_048_576) throw new Error('Invalid request body limit')
   const server = http.createServer(async (request, response) => {
@@ -164,7 +166,10 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     // the one configured outer origin before any upstream Origin translation.
     const origin = request.headers.origin
     if ((origin && origin !== trusted.origin) || (request.method !== 'GET' && request.method !== 'HEAD' && origin !== trusted.origin)) return reject(response, 403)
-    const route = previewRoute(request.method, request.url)
+    // Turbopack encodes @ in dependency chunk names. Normalize that one safe
+    // character only in live mode; retain the existing traversal restrictions.
+    const target = liveProject ? request.url.replace(/%40/ig, '@') : request.url
+    const route = previewRoute(request.method, target)
     if (!route || request.headers['x-http-method-override'] || request.headers['x-method-override']) return reject(response, 404)
     if (route.service === 'auth' && ssoHelperPaths.has(route.path.split('?', 1)[0]) && !ssoHelperAllowed(route.path, trusted.origin)) return reject(response, 400)
     let receivedBytes = 0, upstreamFailed = false, downstreamAborted = false, responseStatus
@@ -213,11 +218,34 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     for (const key of spoofHeaders) delete headers[key]
     for (const key of Object.keys(headers)) if (/^x-(?:middleware|invoke|nextjs)-/.test(key)) delete headers[key]
     headers.host = `localhost:${ports[route.service]}`
+    if (liveProject && route.service === 'frontend') {
+      headers['accept-encoding'] = 'identity'
+      if (headers.origin) headers.origin = `http://localhost:${ports.frontend}`
+    }
     if (route.service === 'backend' && headers.origin) headers.origin = 'http://localhost:20200'
     headers['content-length'] = size
     const upstream = http.request({ hostname: '127.0.0.1', port: ports[route.service], method: request.method, path: route.path, headers }, incoming => {
       if (expired()) { incoming.destroy(); reject(response, 410); return }
       responseStatus = incoming.statusCode ?? 502
+      if (liveProject && route.service === 'frontend' && incoming.headers['content-type']?.includes('text/html') && request.method === 'GET') {
+        const parts = []
+        let bytes = 0
+        incoming.on('data', part => {
+          bytes += part.length
+          if (bytes > 8 * 1024 * 1024) { incoming.destroy(); reject(response, 502) }
+          else parts.push(part)
+        })
+        incoming.on('error', () => response.destroy())
+        incoming.on('end', () => {
+          if (expired()) return reject(response, 410)
+          const html = injectLiveConfig(Buffer.concat(parts).toString('utf8'), trusted.origin, liveProject)
+          const outgoing = headersWithoutHop(incoming.headers)
+          delete outgoing['content-length']; delete outgoing['content-encoding']; delete outgoing.etag
+          response.writeHead(incoming.statusCode ?? 502, { ...outgoing, 'cache-control': 'no-store' })
+          response.end(html)
+        })
+        return
+      }
       incoming.on('data', chunk => { receivedBytes += chunk.length })
       const truncated = error => {
         upstreamFailed = true
@@ -249,6 +277,9 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
   })
   server.requestTimeout = 30_000
   server.headersTimeout = 15_000
+  const closeHmr = liveProject ? attachLiveHmr(server, { origin: trusted.origin, frontendPort: ports.frontend, expired }) : () => {}
+  const closeConnections = server.closeAllConnections.bind(server)
+  server.closeAllConnections = () => { closeHmr(); closeConnections() }
   let expiryTimer
   if (Number.isFinite(deadline)) {
     server.on('listening', () => {
@@ -262,19 +293,19 @@ export function createPreviewGateway({ previewOrigin, frontendPort = 20205, back
     server.on('close', () => clearTimeout(expiryTimer))
   }
   // Isolated production Next needs no HMR; reject every upgrade explicitly.
-  server.on('upgrade', (_request, socket) => socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'))
+  if (!liveProject) server.on('upgrade', (_request, socket) => socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'))
   return server
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port', '--error-log'])
+  const allowed = new Set(['--origin', '--until', '--port', '--frontend-port', '--backend-port', '--auth-port', '--error-log', '--live-project'])
   const args = {}
   for (let i = 2; i < process.argv.length; i += 2) {
     if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error('Use --origin and --until UTC-ISO-deadline for HTTPS; optional numeric port flags')
-    args[process.argv[i]] = ['--origin', '--until', '--error-log'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
+    args[process.argv[i]] = ['--origin', '--until', '--error-log', '--live-project'].includes(process.argv[i]) ? process.argv[i + 1] : port(process.argv[i + 1])
   }
   const errorLog = args['--error-log'] ? createTransportLog({ filePath: args['--error-log'], expiresAt: args['--until'] }) : undefined
-  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'], onTransportError: errorLog })
+  const gateway = createPreviewGateway({ previewOrigin: args['--origin'], expiresAt: args['--until'], frontendPort: args['--frontend-port'], backendPort: args['--backend-port'], authPort: args['--auth-port'], onTransportError: errorLog, liveProject: args['--live-project'] })
   gateway.once('close', () => errorLog?.close())
   gateway.on('error', () => { console.error('Preview gateway could not listen'); process.exitCode = 1 })
   gateway.listen(args['--port'] ?? 20204, '127.0.0.1', () => {

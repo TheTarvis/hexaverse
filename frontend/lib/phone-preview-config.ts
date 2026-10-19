@@ -13,3 +13,24 @@ export function phonePreviewConfig(flag: string | undefined, projectId: string |
   }
   return { projectId, apiBase: '/api', authEmulatorUrl }
 }
+
+/** Gateway-only live-dev opt-in; ordinary localhost development stays unchanged. */
+export function livePhonePreviewConfig() {
+  if (typeof document !== 'undefined') {
+    const element = document.getElementById('hexaverse-phone-preview')
+    if (element?.textContent) {
+      const config: unknown = JSON.parse(element.textContent)
+      if (config && typeof config === 'object' && 'origin' in config && config.origin === window.location.origin &&
+        'projectId' in config && typeof config.projectId === 'string') {
+        return phonePreviewConfig('true', config.projectId, window.location.origin)
+      }
+      throw new Error('Invalid live phone preview configuration')
+    }
+  }
+  return null
+}
+
+export function browserPhonePreviewConfig() {
+  return livePhonePreviewConfig() ?? phonePreviewConfig(process.env.NEXT_PUBLIC_PHONE_PREVIEW, process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    typeof window !== 'undefined' ? window.location.origin : undefined)
+}

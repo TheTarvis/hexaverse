@@ -2,13 +2,9 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getAnalytics, type Analytics } from 'firebase/analytics'
-import { phonePreviewConfig } from './phone-preview-config'
+import { browserPhonePreviewConfig } from './phone-preview-config'
 
-const preview = phonePreviewConfig(
-  process.env.NEXT_PUBLIC_PHONE_PREVIEW,
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  typeof window !== 'undefined' ? window.location.origin : undefined,
-)
+const preview = browserPhonePreviewConfig()
 
 const firebaseConfig = {
   apiKey: preview ? 'demo-api-key' : process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -19,7 +15,7 @@ const firebaseConfig = {
       ? `${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`
       : undefined
   ),
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  projectId: preview?.projectId ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
