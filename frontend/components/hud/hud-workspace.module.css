@@ -146,7 +146,3 @@
 .workspace [data-slot='hud-toolbar']:has(> .navigationShell) { margin-inline: 0; padding-inline: 0; justify-content: center; }
 
 .cardNavigation > :is(button, a):not(:last-child) { border-right-color: #435d7050; }
-.workspace .cardNavigation > [data-hud-button][aria-pressed='true']::before,
-.workspace .cardNavigation > [data-hud-button][aria-pressed='true']::after { content: ''; display: block; position: absolute; left: 9px; right: 9px; height: 3px; background: #b1edff; clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 4px 100%); pointer-events: none; }
-.workspace .cardNavigation > [data-hud-button][aria-pressed='true']::before { top: 0; }
-.workspace .cardNavigation > [data-hud-button][aria-pressed='true']::after { bottom: 0; transform: rotate(180deg); }

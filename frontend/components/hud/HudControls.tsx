@@ -6,7 +6,6 @@ import { Button, buttonClassName, TouchTarget } from '@/components/catalyst/butt
 import { Input } from '@/components/catalyst/input'
 import { Select } from '@/components/catalyst/select'
 import { HudIcon } from './HudIcon'
-import { ClockIcon } from '@heroicons/react/24/outline'
 import styles from './hud-controls.module.css'
 import crystal from './hud-crystal.module.css'
 
@@ -15,6 +14,8 @@ type HudActionStyle = {
   tone?: 'neutral' | 'warning' | 'danger'
   /** Action is the accepted Lens; other presentations preserve structured targets. */
   presentation?: 'action' | 'row' | 'chrome' | 'map'
+  /** Paired cyan markers for selected chrome controls, driven by aria-pressed. */
+  selectionIndicator?: boolean
   /** Standard is reserved for comparison stories and account/auth application styling. */
   appearance?: 'standard' | 'crystal'
   /** Existing application primaries: dark auth/gates, cyan first-identity setup. Ignored by Lens. */
@@ -37,7 +38,7 @@ type HudButtonComponent = {
 
 /** Sole HUD action implementation. Native semantics, material and states live here. */
 export const HudButton = forwardRef<HTMLElement, HudActionProps>(function HudButton({
-  variant = 'secondary', tone = 'neutral', presentation = 'action', appearance = 'crystal',
+  variant = 'secondary', tone = 'neutral', presentation = 'action', appearance = 'crystal', selectionIndicator = false,
   standardColor = 'cyan', shape = 'standalone', pending = false, pendingLabel = 'Working…', disabled = false,
   children, className, ...props
 }, ref) {
@@ -50,11 +51,11 @@ export const HudButton = forwardRef<HTMLElement, HudActionProps>(function HudBut
   // Standard application controls keep Catalyst's light/dark recipe and metrics.
   const standard = framed && appearance === 'standard'
   const classes = clsx(!standard && [styles.button, framed ? styles[variant] : [styles.unframed, styles[presentation]],
-    tone !== 'neutral' && styles[tone]], isCrystal && [crystal.surface,
+    tone !== 'neutral' && styles[tone], selectionIndicator && presentation === 'chrome' && styles.selectionIndicator], isCrystal && [crystal.surface,
       tone !== 'neutral' && crystal[tone], shape === 'standalone' && crystal.standalone,
       variant === 'primary' && crystal.primary, variant === 'quiet' && crystal.quiet,
       pending && crystal.pending], className)
-  const content = <>{pending && isCrystal && <span aria-hidden="true" className={crystal.workingHighlight} />}{pending ? <span className={crystal.pendingContent}><HudIcon icon={ClockIcon} size={16} />{pendingLabel && <span>{pendingLabel}</span>}</span> : children}</>
+  const content = <>{pending && isCrystal && <span aria-hidden="true" className={crystal.workingHighlight} />}{pending ? <span className={crystal.pendingContent}>{pendingLabel ? <span>{pendingLabel}</span> : children}</span> : children}</>
   const state = { 'data-hud-button': presentation, 'data-disabled': unavailable ? '' : undefined, 'aria-busy': pending || props['aria-busy'] }
 
   if (props.href !== undefined) {

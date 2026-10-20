@@ -161,7 +161,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     const controls = <nav className={styles.cardNavigation} aria-label="HUD panels" data-testid="hud-icon-navigation">
       {known.map(entry => {
         const destination = panels.find(panel => panel.id === entry.id)!
-        return <HudButton presentation="chrome" key={entry.id} disabled={!ready} ref={floating && returnTo === entry.id ? recoveryRef : undefined}
+        return <HudButton presentation="chrome" selectionIndicator key={entry.id} disabled={!ready} ref={floating && returnTo === entry.id ? recoveryRef : undefined}
           data-workspace-tab={entry.id} aria-label={destination.label} title={destination.label} aria-controls={`${panelPrefix}-${entry.id}`}
           aria-pressed={selected === entry.id} onClick={() => {
             if (floating) setReturnTo(entry.id)
@@ -171,7 +171,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           }}><HudIcon icon={panelIcons[entry.id]} /></HudButton>
       })}
       {navigationAction}
-      <HudButton presentation="chrome" disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
+      <HudButton presentation="chrome" selectionIndicator disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
         data-workspace-tab="arrange" aria-label="Arrange HUD" title="Arrange HUD" aria-controls={settingsId}
         aria-pressed={selected === 'arrange'} onClick={() => { if (floating) setReturnTo('arrange'); setSettings(true) }}>
         <HudIcon icon={Cog6ToothIcon} />
@@ -198,7 +198,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       <nav className={clsx(styles.launchers, styles.cardNavigation)} aria-label="HUD panels" data-testid="hud-desktop-navigation">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <HudButton key={item.id} presentation="chrome" aria-label={`${panel.label}${!item.visible ? ' (hidden)' : ''}`} title={panel.label} disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}><HudIcon icon={panelIcons[item.id]} /></HudButton>
+          return <HudButton key={item.id} presentation="chrome" selectionIndicator aria-label={`${panel.label}${!item.visible ? ' (hidden)' : ''}`} title={panel.label} disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}><HudIcon icon={panelIcons[item.id]} /></HudButton>
         })}
         {navigationAction}
         <HudButton presentation="chrome" className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} aria-label="Arrange HUD" title="Arrange HUD" onClick={() => { setSettings(value => !value) }}><HudIcon icon={Cog6ToothIcon} /></HudButton>

@@ -47,9 +47,10 @@
   --hud-crystal-warning-edge: #e4b66e;
   --hud-crystal-warning-surface: #352719;
   --hud-crystal-warning-text: #ffe0aa;
-  --hud-crystal-danger-edge: #e98e98;
-  --hud-crystal-danger-surface: #371d29;
-  --hud-crystal-danger-text: #ffd5dc;
+  --hud-control-indicator-color: #b1edff;
+  --hud-crystal-danger-edge: #ff8a92;
+  --hud-crystal-danger-surface: #501f29;
+  --hud-crystal-danger-text: #ffe0e4;
   --hud-crystal-cut: 5px;
   --hud-crystal-button-font: 400 13px/1.5 var(--hud-font-identity);
   --hud-crystal-button-tracking: var(--hud-compact-tracking);

@@ -44,3 +44,9 @@
 .unframed.warning { color: var(--hud-crystal-warning-text); }
 .unframed.danger { color: var(--hud-crystal-danger-text); }
 .unframed[data-disabled] { cursor: not-allowed; }
+
+/* Shared selected-navigation markers; chrome retains its plain icon surface. */
+.button.selectionIndicator[aria-pressed='true']::before,
+.button.selectionIndicator[aria-pressed='true']::after { content: ''; display: block; position: absolute; left: 9px; right: 9px; height: 3px; background: var(--hud-control-indicator-color); clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 4px 100%); pointer-events: none; }
+.button.selectionIndicator[aria-pressed='true']::before { top: 0; }
+.button.selectionIndicator[aria-pressed='true']::after { bottom: 0; transform: rotate(180deg); }

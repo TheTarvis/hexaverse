@@ -96,11 +96,11 @@
   color: var(--hud-crystal-warning-text);
 }
 .surface.danger {
-  --hud-crystal-glow: #e98e9830;
-  --hud-crystal-haze: #e98e9818;
+  --hud-crystal-glow: #ff788438;
+  --hud-crystal-haze: #ff788420;
   --hud-crystal-edge: var(--hud-crystal-danger-edge);
   --hud-crystal-surface: var(--hud-crystal-danger-surface);
-  --hud-crystal-hover-surface: #4b2934;
+  --hud-crystal-hover-surface: #652b36;
   --hud-crystal-primary-surface: var(--hud-crystal-danger-surface);
   --hud-crystal-primary-edge: var(--hud-crystal-danger-edge);
   --hud-crystal-primary-text: var(--hud-crystal-danger-text);

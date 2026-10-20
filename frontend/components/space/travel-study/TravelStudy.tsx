@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
-import { Button } from '@/components/catalyst/button'
 import { HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
 import { HudIcon } from '@/components/hud/HudIcon'
 import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudActionBand } from '@/components/hud/HudActionBand'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudHeading, HudText, HudValue } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
@@ -37,26 +37,26 @@ function Chooser({ kind, concept, selected, onChoose, onBack, objective, searchR
   const preferred = kind === 'destination' && objective ? destinations[100] : selected
   const visible = (showContext ? [preferred, ...results.filter(item => item.id !== preferred.id)] : results).slice(0, limit)
   const changeScope = (next: string) => { setScope(next); setLimit(20); setShowSystems(false) }
-  const resultRow = (item: StudyItem) => <Button key={item.id} plain className={styles.result} aria-label={`Choose ${item.name} in ${item.system}`} onClick={() => onChoose(item)}>
+  const resultRow = (item: StudyItem) => <HudButton key={item.id} presentation="row" className={styles.result} aria-label={`Choose ${item.name} in ${item.system}`} onClick={() => onChoose(item)}>
     <HudObjectThumbnail kind={itemArt(item)} />
     <span className={styles.resultText}><span className="hud-type-compact">{item.name}</span><span className="hud-type-secondary">{item.system} · {kind === 'fleet' ? `${item.mining ? 'Mining' : 'Ready'} · ${item.fuel} t fuel` : item.type}</span>{item.id === selected.id && <span className={styles.selected}>Current selection</span>}{objective && item.id === destinations[100].id && <span className={styles.selected}>Ore delivery objective</span>}</span>
     <HudIcon icon={ChevronRightIcon} size={16} className={styles.rowArrow} />
-  </Button>
+  </HudButton>
   return <div className={styles.chooser}>
     <div className={styles.tools}>
-      <div className={styles.backRow}><HudIconButton icon={ArrowLeftIcon} label="Back to trip" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
+      <div className={styles.backRow}><HudIconButton icon={ArrowLeftIcon} label="Back to trip" presentation="chrome" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
       <div className={styles.searchRow}>
         <HudSearchInput ref={searchRef} aria-label={`Search ${kind === 'fleet' ? 'fleets' : 'destinations'}`} placeholder={concept === 'A' ? 'Search by name…' : 'Search all known systems…'} value={query} onChange={event => { setQuery(event.target.value); setLimit(20) }} />
         {concept === 'A' && <div className={styles.scopeToggle} role="group" aria-label="Search scope">
-          <HudIconButton icon={SunIcon} label="This system" variant="secondary" aria-pressed={scope === 'Solace'} onClick={() => changeScope('Solace')} />
-          <HudIconButton icon={SparklesIcon} label="Universe · all known systems" variant="secondary" aria-pressed={scope === 'All known'} onClick={() => changeScope('All known')} />
+          <HudIconButton icon={SunIcon} label="This system" presentation="chrome" selectionIndicator aria-pressed={scope === 'Solace'} onClick={() => changeScope('Solace')} />
+          <HudIconButton icon={SparklesIcon} label="Universe · all known systems" presentation="chrome" selectionIndicator aria-pressed={scope === 'All known'} onClick={() => changeScope('All known')} />
         </div>}
       </div>
       {concept === 'B' ? <div className={styles.scopeRow}><HudText>{globalSearch ? 'Search / All known systems' : `Systems / ${scope}`}</HudText><HudButton onClick={() => setShowSystems(value => !value)}>{showSystems ? 'Show results' : 'Browse systems'}</HudButton></div> : concept === 'C' ? <div className={styles.scopeRow}><HudText variant="secondary">{globalSearch ? 'Searching all known systems' : scope === 'Solace' ? 'For this trip · Solace' : scope}</HudText><HudButton variant="quiet" onClick={() => changeScope(scope === 'All known' ? 'Solace' : 'All known')}>{scope === 'All known' ? 'This system' : 'Browse all'}</HudButton></div> : null}
       <div className={styles.filterRow}><label><span className="hud-type-label">{kind === 'fleet' ? 'Activity' : 'Type'}</span><HudSelect aria-label="Result filter" value={filter} onChange={event => { setFilter(event.target.value); setLimit(20) }}><option>All</option>{(kind === 'fleet' ? ['Ready'] : ['Station', 'Moon', 'Rocky world', 'Lane gate']).map(value => <option key={value}>{value}</option>)}</HudSelect></label><HudText variant="secondary" role="status">{showSystems && concept === 'B' ? `${systems.length} systems` : `${results.length} results`}</HudText></div>
     </div>
     <div className={styles.results} tabIndex={0} aria-label={`${kind} results`}>
-      {showSystems && concept === 'B' ? <>{['All known', ...systems].map(system => <Button key={system} plain className={styles.systemRow} onClick={() => { setQuery(''); changeScope(system) }}><span>{system}</span><span className="hud-type-secondary">{system === 'All known' ? data.length : data.filter(item => item.system === system).length}</span><HudIcon icon={ChevronRightIcon} size={16} className={styles.rowArrow} /></Button>)}</> : <>
+      {showSystems && concept === 'B' ? <>{['All known', ...systems].map(system => <HudButton key={system} presentation="row" className={styles.systemRow} onClick={() => { setQuery(''); changeScope(system) }}><span>{system}</span><span className="hud-type-secondary">{system === 'All known' ? data.length : data.filter(item => item.system === system).length}</span><HudIcon icon={ChevronRightIcon} size={16} className={styles.rowArrow} /></HudButton>)}</> : <>
         {showContext && <HudText variant="label" className={styles.resultHeading}>{objective && kind === 'destination' ? 'Objective and nearby destinations' : 'Current selection and this system'}</HudText>}
         {visible.map(resultRow)}
         {results.length === 0 && !showContext && <HudText className={styles.empty}>No matches. Try another name, type or system.</HudText>}
@@ -121,17 +121,15 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
   return <div className={styles.instance} onKeyDown={event => { if (event.key === 'Escape' && selecting) { event.stopPropagation(); back(selecting) } }}>
     {open ? <HudCardShell title={selecting ? `Choose ${selecting}` : status ? 'Fleet status' : 'Travel review'} lighting="none" className={`${styles.card} ${selecting ? styles.choosing : ''}`} contentClassName={styles.shellContent} onClose={() => { if (selecting) back(selecting); else setOpen(false) }} closeLabel={selecting ? 'Close selector and return to trip' : 'Close travel card'}>
       {(['fleet', 'destination'] as const).map(kind => <div key={kind} hidden={selecting !== kind} className={styles.chooserHost}><Chooser kind={kind} concept={concept} selected={kind === 'fleet' ? fleet : destination} counterpart={kind === 'fleet' ? destination : fleet} onChoose={item => choose(kind, item)} onBack={() => back(kind)} objective={objective} searchRef={kind === 'fleet' ? searchFleet : searchDestination} /></div>)}
-      <div hidden={!!selecting}>
+      <div hidden={!!selecting} className={styles.reviewHost}>
         <div className={styles.review} ref={contentRef} tabIndex={-1}>
           {status && journey ? <>
             <HudHeading size="compact">{fieldName(fleet)}</HudHeading><HudText role="status">{journey.stopped ? 'Stopped · Parked in place' : running ? `Travelling · ${destination.name}` : `Arrived · ${destination.name}`}</HudText>
             {!journey.stopped && <><progress aria-label="Travel progress" className={styles.progress} value={journey.elapsed} max={180} /><HudText>{Math.floor(journey.elapsed / 180 * 100)}% · {180 - journey.elapsed}s remaining</HudText></>}
-            {running && <Button outline onClick={stop}>Stop travel</Button>}
-            <Button plain onClick={() => setStatus(false)}>Back to trip</Button>
           </> : <>
-            <div className={styles.identities}>{([['fleet', fleet], ['destination', destination]] as const).map(([kind, item]) => <Button key={kind} plain ref={kind === 'fleet' ? fleetTrigger : destinationTrigger} className={styles.identity} aria-label={`Change ${kind}`} disabled={pending || recalculating || running} onClick={() => openChooser(kind)}>
+            <div className={styles.identities}>{([['fleet', fleet], ['destination', destination]] as const).map(([kind, item]) => <HudButton key={kind} presentation="row" ref={kind === 'fleet' ? fleetTrigger : destinationTrigger} className={styles.identity} aria-label={`Change ${kind}`} disabled={pending || recalculating || running} onClick={() => openChooser(kind)}>
               <span className={`hud-type-label ${styles.identityLabel}`}>{kind === 'fleet' ? 'Fleet' : 'Destination'}</span><HudObjectThumbnail kind={itemArt(item)} className={styles.identityArt} /><span className={styles.identityText}><span className="hud-type-compact">{fieldName(item)}</span><span className="hud-type-secondary">{kind === 'fleet' ? item.mining ? 'Mining' : 'Ready' : item.type}{item.system !== 'Solace' ? ` · ${item.system}` : ''}</span></span><HudIcon icon={ChevronDownIcon} size={16} className={styles.identityChevron} />
-            </Button>)}</div>
+            </HudButton>)}</div>
             {recalculating ? <HudText role="status">Recalculating trip…</HudText> : <HudFacts layout="rows" className={styles.facts} items={[
               { label: 'Travel time', value: <HudValue>{remote ? '—' : '3m 00s'}</HudValue> }, { label: 'Fuel cost', value: <HudValue>{remote ? '—' : '18 t'}</HudValue> }, { label: 'Fuel aboard', value: <HudValue>{fleet.fuel} t</HudValue> },
               { label: shortfall ? 'Fuel shortfall' : 'Fuel remaining', value: <HudValue>{remote ? '—' : `${shortfall || (fleet.fuel ?? 0) - 18} t`}</HudValue> }, { label: 'Fuel ceiling', value: <HudValue>{remote ? '—' : `${Number((18 * BURN_FUEL_ALLOWANCE).toFixed(2))} t`}</HudValue> },
@@ -140,12 +138,18 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
             {fleet.mining && <HudText className={styles.warning}>Stop mining before travelling.</HudText>}
             {shortfall > 0 && <HudText className={styles.warning}>Insufficient fuel. Short by {shortfall} t.</HudText>}
             {error && <HudText className={styles.warning} role="alert">The order failed. No travel started. Try again.</HudText>}
-            <div className={styles.actions}><Button outline disabled={pending} onClick={() => setOpen(false)}>Back</Button><Button color="cyan" disabled={blocked || pending || recalculating} onClick={start}>{pending ? 'Starting…' : 'Start travel'}</Button></div>
           </>}
         </div>
+        <HudActionBand label={status ? 'Fleet travel actions' : 'Trip actions'} actions={status ? [
+          { id: 'back', label: 'Back to trip', onClick: () => setStatus(false) },
+          { id: 'stop', label: 'Stop travel', tone: 'danger', disabled: !running, onClick: stop },
+        ] : [
+          { id: 'back', label: 'Back', onClick: () => setOpen(false) },
+          { id: 'start', label: 'Start travel', pending, pendingLabel: 'Starting…', disabled: blocked || recalculating, onClick: start },
+        ]} />
       </div>
-    </HudCardShell> : <div className={styles.closed}><HudText>Card closed. {running ? 'Travel continues.' : 'No order changed.'}</HudText><Button outline onClick={() => setOpen(true)}>Reopen card</Button></div>}
-    {journey && <div className={styles.reviewerTools}><Button plain onClick={() => { setStatus(true); setOpen(true) }}>Open fleet status</Button>{running && <Button plain onClick={() => setJourney(current => current ? { ...current, elapsed: 180 } : null)}>Simulate arrival</Button>}</div>}
+    </HudCardShell> : <div className={styles.closed}><HudText>Card closed. {running ? 'Travel continues.' : 'No order changed.'}</HudText><HudButton onClick={() => setOpen(true)}>Reopen card</HudButton></div>}
+    {journey && <div className={styles.reviewerTools}><HudButton variant="quiet" onClick={() => { setStatus(true); setOpen(true) }}>Open fleet status</HudButton>{running && <HudButton variant="quiet" onClick={() => setJourney(current => current ? { ...current, elapsed: 180 } : null)}>Simulate arrival</HudButton>}</div>}
     <HudText variant="caption" className={styles.disclaimer}>Fictional data: 240 fleets, 1,200 destinations. Remote selections test context only; route execution is not part of this preview.</HudText>
   </div>
 }

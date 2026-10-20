@@ -79,7 +79,7 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         {notice && <p role="status">{notice}</p>}
         {warning && <p className={styles.warning}>This course leaves the fleet unable to reach a station or lane gate.</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}
-        {fleet && !fleet.jump && (traveling || fleet.state?.Mode === 2) && <HudButton tone="warning" data-testid="travel-stop" disabled={pending} pending={stopPending} pendingLabel="Stopping…" onClick={onStop}>Stop travel</HudButton>}
+        {fleet && !fleet.jump && (traveling || fleet.state?.Mode === 2) && <HudButton tone="danger" data-testid="travel-stop" disabled={pending} pending={stopPending} pendingLabel="Stopping…" onClick={onStop}>Stop travel</HudButton>}
         {additionalActions}
         <HudButton variant="quiet" onClick={onBack}>Browse destinations</HudButton>
       </>}

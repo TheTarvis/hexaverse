@@ -66,13 +66,13 @@ function ButtonStudy() {
       <HudText variant="secondary">Cancel leaves an uncommitted choice. Stop interrupts an active order. Destructive actions name what will be removed.</HudText>
       <div className={styles.row}>
         <HudButton appearance="crystal" onClick={() => setNotice('Cancelled this preview choice.')}>Cancel</HudButton>
-        <HudButton appearance="crystal" tone="warning" onClick={() => setNotice('Stop travel preview only.')}>Stop travel</HudButton>
+        <HudButton appearance="crystal" tone="danger" onClick={() => setNotice('Stop travel preview only.')}>Stop travel</HudButton>
         <HudButton appearance="crystal" variant="primary" tone="danger" onClick={() => setNotice('Delete preset preview only. Nothing was deleted.')}>Delete preset</HudButton>
         <HudIconButton appearance="crystal" variant="secondary" tone="danger" icon={TrashIcon} label="Delete preset icon" onClick={() => setNotice('Delete preset icon preview only.')} />
       </div>
       <div className={styles.row}>
         <HudButton appearance="crystal" pending pendingLabel="Working…">Neutral task</HudButton>
-        <HudButton appearance="crystal" tone="warning" pending pendingLabel="Stopping…">Stop travel</HudButton>
+        <HudButton appearance="crystal" tone="danger" pending pendingLabel="Stopping…">Stop travel</HudButton>
         <HudButton appearance="crystal" variant="primary" tone="danger" pending pendingLabel="Deleting…">Delete preset</HudButton>
         <HudButton appearance="crystal" tone="danger" disabled>Delete unavailable</HudButton>
       </div>

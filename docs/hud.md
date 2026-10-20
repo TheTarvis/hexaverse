@@ -122,11 +122,11 @@ and requested a standalone-button preview before broader adoption.
 `--hud-crystal-*` tokens own material colors and corner cuts; `--hud-band-height`
 owns band height. Hover, keyboard focus and
 press have visible treatments; disabled cells mute, and a pending action locks
-the band with a clock and pending label. Pending crystal controls show a narrow
+the band with a pending label. Pending controls have no clock icon. Pending crystal controls show a narrow
 `/` highlight sweeping left to right, including neutral working buttons. The
 shared `--hud-working-sweep-duration` controls its 1.8s cycle; idle and merely
 disabled controls stay still. Reduced motion uses a static highlight; forced
-colors hides the decoration while retaining the busy label and clock. The standalone `HUD/Card Layout/Stationary Actions` story reviews
+colors hides the decoration while retaining the busy label or original utility glyph. The standalone `HUD/Card Layout/Stationary Actions` story reviews
 two/three actions, short/overflowing content, natural/fixed sizing and states.
 `HudButton` and `HudIconButton` default to `appearance="crystal"` for standalone
 primary, secondary and quiet controls. Both forms use `hud-crystal.module.css`;
@@ -147,7 +147,9 @@ Button coverage includes primary, secondary, quiet, icon-only, selected toggle,
 long-label, disabled and pending states. `tone="neutral" | "warning" | "danger"`
 is independent of emphasis and is also available on `HudBandAction`. Cancel/Back
 that leave an uncommitted choice use neutral secondary (or quiet in compact
-contexts). Interrupting an active order, such as Stop travel, uses warning.
+contexts). Stop travel uses red (`danger`), including its pending state, per
+Travis’s correction on 2026-10-19. This is presentation only; stopping retains
+its existing gameplay behavior.
 Destructive actions use danger and explicit verb/object labels, such as Delete
 preset; red alone must not communicate the action. Tone supplies presentation,
 not confirmation or gameplay behavior. Features own consequence explanations and
@@ -163,8 +165,8 @@ anchor with a string `href`. Refs match the rendered element. Buttons default to
 `type="button"`; forms set `type="submit"` intentionally. Links preserve href,
 modifier-click, target and download semantics. Disabled/pending links render an
 anchor without href, with `aria-disabled` and `tabIndex=-1`; click activation callbacks are blocked.
-`pending` locks activation, sets `aria-busy` and replaces content with a clock and
-`pendingLabel`. Use actual request state; a running game order is not a pending UI
+`pending` locks activation, sets `aria-busy` and replaces text with
+`pendingLabel`; icon-only actions retain their original utility glyph. Use actual request state; a running game order is not a pending UI
 request. Icon helpers require `label` for both button and link forms.
 
 | Choice | Use |
@@ -181,6 +183,11 @@ preserves the existing dark login/gating primary. This option affects standard
 primary actions only. Lens and structured presentations retain their shared HUD
 owners. Disabled standard links reuse the same Catalyst class recipe and touch
 target as enabled links while removing their destination.
+
+Chrome controls can opt into `selectionIndicator` for the shared paired cyan
+markers above/below an `aria-pressed="true"` selection. HUD navigation and the
+travel chooser’s system/universe scope toggle use this same treatment; marker
+color lives in `--hud-control-indicator-color`.
 
 Presentation selects geometry, not interaction logic: menu owners still manage
 roving focus, map owners still manage events/camera and forms still own validation.
