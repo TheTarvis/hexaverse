@@ -1,7 +1,7 @@
 'use client'
 
 import { fleetLabel } from '@/lib/fleet-label'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { Figure } from '@/components/figure/Figure'
@@ -32,8 +32,8 @@ export function FleetLocationPanel({ fleet, names, worldTime, scale, failed = fa
         {worldTime < jump.arriveMs ? <Figure raw={jump.arriveMs - worldTime} unit="world-ms-span-left" text={formatByUnit(jump.arriveMs - worldTime, scale, 'world-ms-span-left')} data-testid="fleet-transit-eta" /> : <p role="status">Awaiting arrival confirmation</p>}
       </>}
       <div className="flex flex-wrap gap-2">
-        {onFocus && <Button plain className="!text-cyan-200" data-testid="focus-selected-fleet" onClick={() => onFocus(target)}>{jump ? 'Focus destination' : 'Focus fleet'}</Button>}
-        {onOpen && <Button color="cyan" data-testid="open-fleet-system" onClick={() => onOpen(target)}>{jump ? 'View destination' : 'Open fleet system'}</Button>}
+        {onFocus && <HudButton data-testid="focus-selected-fleet" onClick={() => onFocus(target)}>{jump ? 'Focus destination' : 'Focus fleet'}</HudButton>}
+        {onOpen && <HudButton variant="primary" data-testid="open-fleet-system" onClick={() => onOpen(target)}>{jump ? 'View destination' : 'Open fleet system'}</HudButton>}
       </div>
     </>}
   </HudCardShell>

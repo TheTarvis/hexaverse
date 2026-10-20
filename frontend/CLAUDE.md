@@ -53,7 +53,17 @@ queryKeys.widgets.detail(id)          // ['widgets', 'detail', id]
 ```
 On mutate, invalidate at the right level. Adding a new widget invalidates `lists()`; updating one invalidates `detail(id)` and `lists()`.
 
-**Catalyst, not Headless UI.** All UI primitives live in `components/catalyst/`. If you need a button, import `Button` from there. Don't reach into `@headlessui/react` directly.
+**Shared actions over Catalyst.** App action buttons use `HudControls` (below). Generic library primitives live in `components/catalyst/`; retain Catalyst as the behavioral backend rather than importing `@headlessui/react` directly into features.
+
+**Game HUD foundations.** Read `docs/hud.md#shared-hud-foundations` for game
+typography, icons and controls. Use `HudTypography`, `HudIcon` and `HudControls`
+(which wrap Catalyst); edit shared defaults in `components/hud/hud-tokens.css`.
+For action buttons, `HudControls` is the single interface: default Lens for game
+commands, explicit row/chrome/map presentations for structured targets, `href` for
+links and intentional `type="submit"` in forms. Feature CSS owns layout and
+accepted spatial/chrome geometry; shared CSS owns button material and states.
+Account/auth forms retain application styling through `appearance="standard"`
+when migrated. Catalyst internals remain the shared behavioral backend.
 
 **Toasts via the wrapper.**
 ```ts

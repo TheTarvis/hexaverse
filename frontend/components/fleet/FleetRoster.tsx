@@ -31,6 +31,7 @@
 // the picture.
 
 import { fleetLabel } from '@/lib/fleet-label'
+import { HudButton } from '@/components/hud/HudControls'
 import { HudPanel } from '@/components/hud/GameHud'
 import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -52,9 +53,6 @@ const TONE_DOT: Record<StatusTone, string> = {
   drifting: 'bg-violet-300 animate-pulse',
   transit: 'bg-cyan-300 animate-pulse',
 }
-
-const CMD_BUTTON =
-  'rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-700/60 disabled:hover:text-zinc-300'
 
 /**
  * Who renders the fleet verbs on this mounting view. `'roster'` — the view
@@ -149,8 +147,11 @@ export function FleetRoster({
 
   return (
     <HudPanel as="aside" data-testid="fleet-roster" className="flex w-full max-w-full flex-col self-start">
-      <button
+      <HudButton
         type="button"
+        presentation="row"
+        aria-expanded={open}
+        style={{ padding: '12px 16px' }}
         data-testid="fleet-roster-toggle"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-between gap-2 px-4 py-3 text-left"
@@ -159,7 +160,7 @@ export function FleetRoster({
           Command fleet <span className="text-zinc-400">· {own.length} available</span>
         </span>
         <span className="hud-type-value text-zinc-400">{open ? '▾' : '▸'}</span>
-      </button>
+      </HudButton>
 
       {open && (
         <ul className="border-t border-zinc-200 dark:border-zinc-800/50">
@@ -178,15 +179,17 @@ export function FleetRoster({
 
             return (
               <li key={f.id} className="px-4 py-2.5">
-                <button
+                <HudButton
                   type="button"
+                  presentation="row"
                   data-testid={`fleet-row-${f.id}`}
                   data-active={active}
+                  style={{ minHeight: 64, padding: 12, alignItems: 'stretch' }}
                   aria-pressed={active}
                   disabled={selectionDisabled || isError}
                   onClick={() => onSelect?.(f)}
                   title={f.id}
-                  className={`flex min-h-16 w-full flex-col gap-1 rounded p-3 text-left ${active ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-400/30' : ''}`}
+                  className="flex min-h-16 w-full flex-col gap-1 p-3 text-left"
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2 hud-type-body text-white"><span className="hud-type-compact">{fleetLabel(f)}</span>{active && <span className="hud-type-caption text-cyan-200">Selected command fleet</span>}</span>
                   <span className="flex items-center gap-2">
@@ -245,58 +248,59 @@ export function FleetRoster({
                       </span>
                     )}
                   </span>
-                </button>
+                </HudButton>
 
                 {rowOwnsCommands && (
                   <div className="mt-1.5 flex flex-wrap gap-1 pl-3.5">
                     {visibility.burn && (
-                      <button
+                      <HudButton
                         type="button"
                         data-testid={`fleet-cmd-burn-${f.id}`}
                         disabled={mineGate.gated}
                         onClick={() => onBurn?.(f)}
-                        className={CMD_BUTTON}
                       >
                         Burn
-                      </button>
+                      </HudButton>
                     )}
                     {visibility.cutDrive && (
-                      <button
+                      <HudButton
                         type="button"
+                        tone="warning"
                         data-testid={`fleet-cmd-cut-drive-${f.id}`}
                         disabled={mineGate.gated}
                         onClick={() => onCutDrive?.(f)}
-                        className={CMD_BUTTON}
                       >
                         Cut drive
-                      </button>
+                      </HudButton>
                     )}
                     {visibility.stop && (
-                      <button
+                      <HudButton
                         type="button"
+                        tone="warning"
                         data-testid={`fleet-cmd-stop-${f.id}`}
                         disabled={mineGate.gated}
                         onClick={() => onStop?.(f)}
-                        className={CMD_BUTTON}
                       >
                         Stop
-                      </button>
+                      </HudButton>
                     )}
                     {visibility.jump && (
-                      <button
+                      <HudButton
                         type="button"
                         data-testid={`fleet-cmd-jump-${f.id}`}
                         disabled={mineGate.gated}
                         onClick={() => onJump?.(f)}
-                        className={CMD_BUTTON}
                       >
                         Jump
-                      </button>
+                      </HudButton>
                     )}
                     {mineGate.gated && runningMine && (
-                      <button
+                      <HudButton
                         type="button"
+                        tone="warning"
                         data-testid={`fleet-cmd-cancel-mine-${f.id}`}
+                        pending={cancelAction.isPending && cancelAction.variables?.fleetId === f.id}
+                        pendingLabel="Cancelling…"
                         onClick={() =>
                           cancelAction.mutate(
                             { actionId: runningMine.id, fleetId: f.id },
@@ -306,10 +310,9 @@ export function FleetRoster({
                             },
                           )
                         }
-                        className={CMD_BUTTON}
                       >
                         Cancel mine
-                      </button>
+                      </HudButton>
                     )}
                   </div>
                 )}

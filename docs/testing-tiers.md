@@ -9,6 +9,7 @@ the relevant package.
 | Backend/frontend static and unit checks | `bash harness/check.sh` | Go, Node, installed frontend dependencies |
 | Frontend unit tests | `cd frontend && npx vitest run <test-file>` | Frontend dependencies |
 | Frontend types | `cd frontend && npx tsc --noEmit` | Frontend dependencies |
+| Production action interface | `node harness/utilities/check-hud-actions.cjs` | Frontend TypeScript dependency; `--inventory` also lists dev/unused findings |
 | Go unit tests | `cd backend && go test -short ./...` | Go modules |
 | Targeted Go integration test | `cd backend && go test -run '^TestName$' ./<package>/` | Test emulators |
 | Full Go suite, including router e2e | `npm run test:backend:all` | Emulator wrapper starts/reuses the test emulators |

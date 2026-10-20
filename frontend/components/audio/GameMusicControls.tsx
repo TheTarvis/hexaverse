@@ -1,7 +1,7 @@
 'use client'
 
 import { useId } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Select } from '@/components/catalyst/select'
 import { HudSection } from '@/components/hud/HudCardShell'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
@@ -24,9 +24,9 @@ export function GameMusicControls() {
       {GAME_MUSIC_TRACKS.map(track => <option key={track.id} value={track.id}>{track.title}</option>)}
     </Select>
     <div className={styles.actions}>
-      <Button outline disabled={!music.ready} onClick={music.previous}>Previous</Button>
-      <Button outline disabled={!music.ready} onClick={music.playing ? music.pause : music.play} aria-label={music.playing ? 'Pause music' : 'Play music'}>{music.playing ? 'Pause' : 'Play'}</Button>
-      <Button outline disabled={!music.ready} onClick={music.next}>Next</Button>
+      <HudButton disabled={!music.ready} onClick={music.previous}>Previous</HudButton>
+      <HudButton disabled={!music.ready} onClick={music.playing ? music.pause : music.play} aria-label={music.playing ? 'Pause music' : 'Play music'}>{music.playing ? 'Pause' : 'Play'}</HudButton>
+      <HudButton disabled={!music.ready} onClick={music.next}>Next</HudButton>
     </div>
     <label className={styles.volume} htmlFor={`${id}-volume`}>
       <span className="hud-type-label">Music volume</span>

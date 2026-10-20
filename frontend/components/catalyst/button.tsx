@@ -194,11 +194,9 @@ type ButtonProps = (
     | Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>
   )
 
-export const Button = forwardRef(function Button(
-  { color, gradient, outline, plain, className, children, ...props }: ButtonProps,
-  ref: React.ForwardedRef<HTMLElement>
-) {
-  const classes = clsx(
+/** Shared recipe also serves disabled anchors whose href has been removed. */
+export function buttonClassName({ color, gradient, outline, plain, className }: Pick<ButtonProps, 'color' | 'gradient' | 'outline' | 'plain' | 'className'>) {
+  return clsx(
     className,
     styles.base,
     outline
@@ -209,6 +207,13 @@ export const Button = forwardRef(function Button(
           ? clsx(styles.solid, styles.gradients[gradient])
           : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
   )
+}
+
+export const Button = forwardRef(function Button(
+  { color, gradient, outline, plain, className, children, ...props }: ButtonProps,
+  ref: React.ForwardedRef<HTMLElement>
+) {
+  const classes = buttonClassName({ color, gradient, outline, plain, className })
 
   return 'href' in props ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
@@ -228,6 +233,7 @@ export function TouchTarget({ children }: { children: React.ReactNode }) {
   return (
     <>
       <span
+        data-slot="touch-target"
         className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden"
         aria-hidden="true"
       />

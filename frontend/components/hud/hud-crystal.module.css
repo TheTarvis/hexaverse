@@ -1,0 +1,116 @@
+/* Shared smoked-crystal material. Callers own button/band geometry and sizing. */
+.surface.surface {
+  position: relative;
+  isolation: isolate;
+  color: var(--hud-type-body);
+  background: linear-gradient(180deg, #a1c3d41c, transparent 14%, #0007 100%), var(--hud-crystal-surface);
+  box-shadow: inset 0 1px 0 #d7f4ff66, inset 0 -2px 0 #000a, inset 1px 0 0 #afdfef25, inset -1px 0 0 #afdfef25;
+  border-color: var(--hud-crystal-edge);
+  border-radius: 0;
+  clip-path: polygon(var(--hud-crystal-cut) 0, calc(100% - var(--hud-crystal-cut)) 0, 100% var(--hud-crystal-cut), 100% calc(100% - var(--hud-crystal-cut)), calc(100% - var(--hud-crystal-cut)) 100%, var(--hud-crystal-cut) 100%, 0 calc(100% - var(--hud-crystal-cut)), 0 var(--hud-crystal-cut));
+}
+.surface::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 2px;
+  pointer-events: none;
+  background: linear-gradient(126deg, #b9e5fa24 0 12%, transparent 12.4% 51%, #a0dfff0b 51.4% 74%, transparent 74.4%), linear-gradient(24deg, transparent 0 36%, #0005 36.4% 66%, transparent 66.4%);
+}
+.surface:nth-child(even)::before { transform: scaleX(-1); }
+.surface::after { content: ''; position: absolute; inset: 3px; pointer-events: none; border: 1px solid #a4d4e422; box-shadow: inset 0 0 14px #0005; }
+.standalone.standalone {
+  --lens-rim: var(--hud-crystal-edge);
+  --lens-face: var(--hud-crystal-surface);
+  font: var(--hud-crystal-button-font);
+  letter-spacing: var(--hud-crystal-button-tracking);
+  padding-inline: calc(var(--hud-control-padding-x) + var(--hud-crystal-button-end));
+  clip-path: polygon(var(--hud-crystal-button-end) 0, calc(100% - var(--hud-crystal-button-end)) 0, 100% 50%, calc(100% - var(--hud-crystal-button-end)) 100%, var(--hud-crystal-button-end) 100%, 0 50%);
+}
+.standalone.primary { --lens-rim: var(--hud-crystal-primary-edge); --lens-face: var(--hud-crystal-primary-surface); }
+.standalone.quiet { --lens-rim: #526f8066; }
+.standalone.standalone::before {
+  inset: 0;
+  opacity: 1;
+  transform: none;
+  clip-path: inherit;
+  background: linear-gradient(120deg, #e1f8ffb0, transparent 17% 80%, #c0f1ff70), linear-gradient(0deg, var(--lens-rim), #07121d 35% 65%, var(--lens-rim));
+}
+.standalone.standalone::after {
+  z-index: -1;
+  inset: 1px 3px;
+  border: 0;
+  clip-path: polygon(calc(var(--hud-crystal-button-end) - 2px) 0, calc(100% - var(--hud-crystal-button-end) + 2px) 0, 100% 50%, calc(100% - var(--hud-crystal-button-end) + 2px) 100%, calc(var(--hud-crystal-button-end) - 2px) 100%, 0 50%);
+  background: linear-gradient(120deg, #c5efff25, transparent 16% 83%, #8bddff20), radial-gradient(ellipse at 50% 110%, var(--hud-crystal-glow), transparent 65%), linear-gradient(180deg, #c1eaff20, transparent 22%, #0007), var(--lens-face);
+  box-shadow: inset 0 1px 0 #d4f4ff18, inset 0 -1px 0 #74c8e024;
+}
+.standalone:hover:not(:disabled):not([aria-disabled='true']) { --lens-face: var(--hud-crystal-hover-surface); }
+.standalone.primary:hover:not(:disabled):not([aria-disabled='true']) { --lens-face: var(--hud-crystal-primary-surface); }
+.surface.primary { color: var(--hud-crystal-primary-text); background: radial-gradient(ellipse at 50% 0%, var(--hud-crystal-glow), transparent 75%), linear-gradient(180deg, var(--hud-crystal-haze), transparent 25%, #0006 100%), var(--hud-crystal-primary-surface); box-shadow: inset 0 2px 0 var(--hud-crystal-primary-edge), inset 0 0 18px #26c6f51c, inset 0 -2px 0 #0009; }
+.primary::after { border-color: #67e3ff55; }
+.surface.quiet { background-color: transparent; box-shadow: inset 0 -1px 0 var(--hud-crystal-edge); border-color: transparent; }
+.quiet::before { opacity: 0.35; }
+.quiet::after { border-color: transparent; box-shadow: none; }
+.surface.surface:hover:not(:disabled):not([aria-disabled='true']) { background-color: var(--hud-crystal-hover-surface); filter: brightness(1.18); }
+.surface.primary:hover:not(:disabled):not([aria-disabled='true']) { background-color: var(--hud-crystal-primary-surface); }
+.surface.surface:focus-visible, .surface.surface[data-focus] { outline: none; box-shadow: inset 0 0 0 2px var(--hud-control-focus), inset 0 0 0 4px #03131a, inset 0 0 20px #4cdcff38; text-decoration: underline; text-underline-offset: 4px; }
+.surface.surface[aria-pressed='true'] { box-shadow: inset 0 0 0 1px var(--hud-crystal-primary-edge), inset 0 0 14px #26c6f530; }
+.surface.surface:active:not(:disabled):not([aria-disabled='true']), .surface.surface[data-active]:not(:disabled):not([aria-disabled='true']) { filter: brightness(0.82); box-shadow: inset 0 3px 10px #000c, inset 0 1px 0 var(--hud-crystal-primary-edge); }
+.surface.surface:disabled, .surface.surface[aria-disabled='true'] { opacity: 1; color: var(--hud-crystal-disabled-text); filter: saturate(0.2) brightness(0.8); cursor: not-allowed; }
+.surface.pending:disabled, .surface.pending[aria-disabled='true'] { color: var(--hud-type-body); filter: none; cursor: progress; }
+.surface.primary.pending:disabled, .surface.warning.pending:disabled, .surface.danger.pending:disabled, .surface.primary.pending[aria-disabled='true'], .surface.warning.pending[aria-disabled='true'], .surface.danger.pending[aria-disabled='true'] { color: var(--hud-crystal-primary-text); }
+.pendingContent { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--hud-control-gap); }
+/* The sweep is decorative; busy semantics and labels carry the working state. */
+.workingHighlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  clip-path: inherit;
+}
+.workingHighlight::before {
+  content: '';
+  position: absolute;
+  inset: -40% 0;
+  background: linear-gradient(90deg, transparent 39%, #e5f8ff08 43%, #e5f8ff50 50%, #e5f8ff08 57%, transparent 61%);
+  transform: translateX(-130%) skewX(-22deg);
+  animation: working-sweep var(--hud-working-sweep-duration) linear infinite;
+}
+@keyframes working-sweep {
+  from { transform: translateX(-130%) skewX(-22deg); }
+  to { transform: translateX(130%) skewX(-22deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workingHighlight::before { animation: none; transform: skewX(-22deg); opacity: 0.45; }
+}
+/* Tone is independent of emphasis, including the primary cell of an action band. */
+.surface.warning {
+  --hud-crystal-glow: #e4b66e30;
+  --hud-crystal-haze: #e4b66e18;
+  --hud-crystal-edge: var(--hud-crystal-warning-edge);
+  --hud-crystal-surface: var(--hud-crystal-warning-surface);
+  --hud-crystal-hover-surface: #483522;
+  --hud-crystal-primary-surface: var(--hud-crystal-warning-surface);
+  --hud-crystal-primary-edge: var(--hud-crystal-warning-edge);
+  --hud-crystal-primary-text: var(--hud-crystal-warning-text);
+  color: var(--hud-crystal-warning-text);
+}
+.surface.danger {
+  --hud-crystal-glow: #e98e9830;
+  --hud-crystal-haze: #e98e9818;
+  --hud-crystal-edge: var(--hud-crystal-danger-edge);
+  --hud-crystal-surface: var(--hud-crystal-danger-surface);
+  --hud-crystal-hover-surface: #4b2934;
+  --hud-crystal-primary-surface: var(--hud-crystal-danger-surface);
+  --hud-crystal-primary-edge: var(--hud-crystal-danger-edge);
+  --hud-crystal-primary-text: var(--hud-crystal-danger-text);
+  color: var(--hud-crystal-danger-text);
+}
+
+@media (forced-colors: active) {
+ .surface.surface { background: ButtonFace; color: ButtonText; box-shadow: none; border: 1px solid ButtonText; }
+ .surface.primary { border-top: 2px solid Highlight; }
+ .surface::before, .surface::after, .workingHighlight { display: none; }
+ .surface.surface:focus-visible { outline: 2px solid Highlight; outline-offset: -4px; }
+ .surface.surface:disabled, .surface.surface[aria-disabled='true'] { color: GrayText; filter: none; }
+}

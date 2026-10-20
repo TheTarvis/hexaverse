@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { HudCardShell } from './HudCardShell'
 import { HudIcon } from './HudIcon'
 import { MagnifyingGlassIcon, RocketLaunchIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
@@ -161,21 +161,21 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     const controls = <nav className={styles.cardNavigation} aria-label="HUD panels" data-testid="hud-icon-navigation">
       {known.map(entry => {
         const destination = panels.find(panel => panel.id === entry.id)!
-        return <Button plain key={entry.id} disabled={!ready} ref={floating && returnTo === entry.id ? recoveryRef : undefined}
+        return <HudButton presentation="chrome" key={entry.id} disabled={!ready} ref={floating && returnTo === entry.id ? recoveryRef : undefined}
           data-workspace-tab={entry.id} aria-label={destination.label} title={destination.label} aria-controls={`${panelPrefix}-${entry.id}`}
           aria-pressed={selected === entry.id} onClick={() => {
             if (floating) setReturnTo(entry.id)
             if (!entry.visible) toggle(entry.id)
             setSettings(false); setOpenedPanel(true); setActive(entry.id)
             onPanelActivate?.(entry.id)
-          }}><HudIcon icon={panelIcons[entry.id]} /></Button>
+          }}><HudIcon icon={panelIcons[entry.id]} /></HudButton>
       })}
       {navigationAction}
-      <Button plain disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
+      <HudButton presentation="chrome" disabled={!ready} ref={floating && returnTo === 'arrange' ? recoveryRef : undefined}
         data-workspace-tab="arrange" aria-label="Arrange HUD" title="Arrange HUD" aria-controls={settingsId}
         aria-pressed={selected === 'arrange'} onClick={() => { if (floating) setReturnTo('arrange'); setSettings(true) }}>
         <HudIcon icon={Cog6ToothIcon} />
-      </Button>
+      </HudButton>
     </nav>
     return floating ? controls : <NavigationFrame paused={!sheetOpen || (selected === 'arrange' ? !settings : settings || selected !== activeId)}>{controls}</NavigationFrame>
   }
@@ -198,10 +198,10 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       <nav className={clsx(styles.launchers, styles.cardNavigation)} aria-label="HUD panels" data-testid="hud-desktop-navigation">
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
-          return <Button key={item.id} plain aria-label={`${panel.label}${!item.visible ? ' (hidden)' : ''}`} title={panel.label} disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}><HudIcon icon={panelIcons[item.id]} /></Button>
+          return <HudButton key={item.id} presentation="chrome" aria-label={`${panel.label}${!item.visible ? ' (hidden)' : ''}`} title={panel.label} disabled={!ready} aria-pressed={item.visible && activeId === item.id} aria-controls={`${panelPrefix}-${item.id}`} onClick={() => { if (!item.visible) toggle(item.id); setOpenedPanel(true); setActive(item.visible && activeId === item.id ? null : item.id); if (!item.visible || activeId !== item.id) onPanelActivate?.(item.id) }}><HudIcon icon={panelIcons[item.id]} /></HudButton>
         })}
         {navigationAction}
-        <Button plain className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} aria-label="Arrange HUD" title="Arrange HUD" onClick={() => { setSettings(value => !value) }}><HudIcon icon={Cog6ToothIcon} /></Button>
+        <HudButton presentation="chrome" className={styles.arrangeControl} ref={recoveryRef} aria-expanded={settings} aria-controls={settingsId} aria-label="Arrange HUD" title="Arrange HUD" onClick={() => { setSettings(value => !value) }}><HudIcon icon={Cog6ToothIcon} /></HudButton>
       </nav>
       </>}
       </NavigationFrame>
@@ -215,17 +215,17 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           const index = lanePanels.findIndex(panel => panel.id === item.id)
           return <fieldset key={item.id} disabled={!ready} className={styles.settingRow}>
             <legend>{panel.label}</legend>
-            <Button plain aria-label={`Show ${panel.label}`} aria-pressed={item.visible} onClick={() => toggle(item.id)}>{item.visible ? 'Shown' : 'Hidden'}</Button>
+            <HudButton aria-label={`Show ${panel.label}`} aria-pressed={item.visible} onClick={() => toggle(item.id)}>{item.visible ? 'Shown' : 'Hidden'}</HudButton>
             <div role="group" aria-label={`${panel.label} dock`} className={styles.moves}>
-              {(['left', 'right', 'bottom'] as const).map(lane => <Button key={lane} plain aria-label={`Move ${panel.label} to ${lane}`} aria-pressed={item.lane === lane} onClick={() => move(item.id, lane)}>{lane}</Button>)}
+              {(['left', 'right', 'bottom'] as const).map(lane => <HudButton key={lane} aria-label={`Move ${panel.label} to ${lane}`} aria-pressed={item.lane === lane} onClick={() => move(item.id, lane)}>{lane}</HudButton>)}
             </div>
             <div className={styles.moves}>
-              <Button plain aria-label={`Move ${panel.label} up`} disabled={index === 0} onClick={() => reorder(item.id, -1)}>↑</Button>
-              <Button plain aria-label={`Move ${panel.label} down`} disabled={index === lanePanels.length - 1} onClick={() => reorder(item.id, 1)}>↓</Button>
+              <HudButton aria-label={`Move ${panel.label} up`} disabled={index === 0} onClick={() => reorder(item.id, -1)}>↑</HudButton>
+              <HudButton aria-label={`Move ${panel.label} down`} disabled={index === lanePanels.length - 1} onClick={() => reorder(item.id, 1)}>↓</HudButton>
             </div>
           </fieldset>
         })}
-        <Button outline disabled={!ready} onClick={reset}>Reset HUD layout</Button>
+        <HudButton disabled={!ready} onClick={reset}>Reset HUD layout</HudButton>
         {settingsContent}
       </HudCardShell>
     </div>}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Input } from '@/components/catalyst/input'
 import { HudText } from '@/components/hud/HudTypography'
 import type { GalaxyNode } from '@/lib/types/galaxy'
@@ -20,7 +20,7 @@ export function GalaxyObjectBrowser({ nodes, selectedId, onSelect, children }: {
   const [previous, setPrevious] = useState(selectedId)
   const rows = useRef(new Map<string, HTMLElement>())
   const searchRef = useRef<HTMLInputElement>(null)
-  const backRef = useRef<HTMLElement>(null)
+  const backRef = useRef<HTMLButtonElement>(null)
   const focusDetails = useRef(false)
   const detailsId = useId()
   if (previous !== selectedId) { setPrevious(selectedId); setBrowsing(!selectedId) }
@@ -44,14 +44,14 @@ export function GalaxyObjectBrowser({ nodes, selectedId, onSelect, children }: {
         <Input ref={searchRef} type="search" aria-label="Find a galaxy system" placeholder="Find a system, region, or star class…" autoComplete="off" spellCheck={false} enterKeyHint="search" value={search} onChange={event => setSearch(event.target.value)} />
       </div>
       <div className={styles.rows}>
-        {matches.map(node => <Button plain key={node.id} ref={element => { if (element) rows.current.set(node.id, element); else rows.current.delete(node.id) }} aria-controls={detailsId} aria-expanded={details && selectedId === node.id} data-testid={`galaxy-object-${node.id}`} onClick={() => { focusDetails.current = true; setBrowsing(false); onSelect(node.id) }}>
+        {matches.map(node => <HudButton presentation="row" key={node.id} ref={element => { if (element) rows.current.set(node.id, element); else rows.current.delete(node.id) }} aria-pressed={selectedId === node.id} aria-controls={detailsId} aria-expanded={details && selectedId === node.id} data-testid={`galaxy-object-${node.id}`} onClick={() => { focusDetails.current = true; setBrowsing(false); onSelect(node.id) }}>
           <span><span className={`hud-type-compact ${styles.name}`}>{node.name}</span><small>{REGION_PALETTE[node.region].label} · Class {node.skeleton.starClass}{node.catalogueRef ? ` · ${node.catalogueRef}` : ''}</small></span><span aria-hidden="true">›</span>
-        </Button>)}
+        </HudButton>)}
         {!matches.length && <HudText role="status">No known systems match. Try a name, region, or star class.</HudText>}
       </div>
     </div>
     <div id={detailsId} hidden={!!selectedId && !details}>
-      {details && <Button plain ref={backRef} onClick={back} aria-label="Back to galaxy systems">← Back to systems</Button>}
+      {details && <HudButton variant="quiet" ref={backRef} onClick={back} aria-label="Back to galaxy systems">← Back to systems</HudButton>}
       {children}
     </div>
   </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { WebGPUCanvas, type CanvasSceneFactory } from '@/components/graphics/WebGPUCanvas'
 import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
 import { createSpacecraftPreviewScene, type PreviewKind, type PreviewAssetStatus, type SpacecraftPreviewScene } from './webgl/spacecraft-preview'
@@ -70,7 +70,7 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
     <p role="status" aria-live="polite" className="hud-type-caption text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : ''}</p>
     <div className="flex items-center justify-between gap-2">
       <p id={instructions} className="hud-type-caption text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
-      <Button plain style={{ color: 'var(--command-ink)' }} data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</Button>
+      <HudButton variant="quiet" data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</HudButton>
     </div>
   </div>
 }

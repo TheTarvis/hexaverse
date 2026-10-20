@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
+import userEvent from '@testing-library/user-event'
 import { hydrateRoot } from 'react-dom/client'
 import LoginPage from './page'
 
@@ -166,9 +167,13 @@ describe('LoginPage', () => {
     render(<LoginPage />)
 
     fillCredentials()
-    fireEvent.click(screen.getByTestId('login-submit'))
+    const user = userEvent.setup()
+    screen.getByTestId('login-password').focus()
+    await user.keyboard('{Enter}')
 
     await waitFor(() => expect(screen.getByTestId('login-submit')).toBeDisabled())
+    expect(screen.getByTestId('login-submit')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByTestId('login-submit')).toHaveTextContent('Working...')
 
     resolveSignIn()
     await waitFor(() => expect(screen.getByTestId('login-submit')).not.toBeDisabled())

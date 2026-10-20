@@ -1,5 +1,8 @@
 'use client'
 
+import { ChevronDownIcon } from '@heroicons/react/24/outline'
+import { HudButton, HudIconButton } from '@/components/hud/HudControls'
+
 // VitalsStripFleetCell — the strip's leftmost cell: the acting fleet's
 // identity, its chevron (a menu of every fleet the requester owns,
 // delegating a chosen fleet back through the SAME callback the fleet
@@ -185,19 +188,18 @@ export function VitalsStripFleetCell({
         {acting ? acting.id : ABSENT_FIGURE}
       </span>
       <div className="relative">
-        <button
+        <HudIconButton
+          icon={ChevronDownIcon}
+          label={chevronLabel}
           type="button"
           ref={chevronRef}
           data-testid="vitals-fleet-chevron"
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label={chevronLabel}
-          className="rounded border border-zinc-300 px-1 py-0.5 hud-type-value text-zinc-600 hover:bg-zinc-200 dark:border-white/[0.12] dark:text-zinc-400 dark:hover:bg-white/[0.14]"
+          variant="quiet"
           onClick={() => { if (open) setOpen(false); else openMenu() }}
           onKeyDown={onChevronKeyDown}
-        >
-          ▾
-        </button>
+        />
         {open && createPortal(
           <HudPanel as="div"
             role="menu"
@@ -206,27 +208,30 @@ export function VitalsStripFleetCell({
             style={menuPosition}
           >
             {entries.map((fleet, index) => (
-              <button
+              <HudButton
                 key={fleet.id}
                 type="button"
+                presentation="row"
                 role="menuitem"
                 ref={(el) => {
                   itemRefs.current[index] = el
                 }}
                 data-testid={`vitals-fleet-menu-item-${fleet.id}`}
-                className="break-words px-2 py-1 text-left hud-type-value text-zinc-900 hover:bg-white/10"
+                className="break-words"
+              style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}
                 onClick={() => choose(fleet)}
                 onKeyDown={(event) => onItemKeyDown(event, index, fleet)}
               >
                 {fleetMenuLabel(fleet, systemNames)}
-              </button>
+              </HudButton>
             ))}
-            {inspectable && <button type="button" role="menuitem" data-testid="vitals-fleet-inspect"
+            {inspectable && <HudButton type="button" presentation="row" role="menuitem" data-testid="vitals-fleet-inspect"
               ref={element => { itemRefs.current[entries.length] = element }}
-              className="break-words border-t border-zinc-200 px-2 py-1 text-left hud-type-value text-zinc-900 hover:bg-white/10 dark:border-white/[0.12] dark:text-white"
+              className="break-words"
+              style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}
               onClick={inspect} onKeyDown={event => onItemKeyDown(event, entries.length)}>
               Inspect current fleet {inspectable.id}
-            </button>}
+            </HudButton>}
           </HudPanel>, document.body
         )}
       </div>

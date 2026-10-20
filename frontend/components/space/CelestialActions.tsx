@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudHeading } from '@/components/hud/HudTypography'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Input } from '@/components/catalyst/input'
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@/components/catalyst/dialog'
 import { useCelestialName, useSurvey, useSurveyOptions } from '@/hooks/use-discovery'
@@ -52,13 +52,13 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
         {running && <progress aria-label="Survey progress" max={Math.max(1, running.arriveMs - running.departMs)} value={Math.max(0, Math.min(running.arriveMs, options.data?.worldTime ?? running.departMs) - running.departMs)} />}
         {running && <p role="status">Surveying {running.bodyId === body.id ? body.name ?? body.id : 'another body'} · {Math.max(0, Math.ceil((running.arriveMs - (options.data?.worldTime ?? 0)) / 1000))} world seconds remaining</p>}
         {!fleetId && <p>Select a command fleet in this system to survey.</p>}
-        {fleetId && <Button data-testid="survey-body" disabled={!target?.eligible || survey.isPending} onClick={() => survey.mutate({ fleetId, bodyId: body.id })}>Survey</Button>}
+        {fleetId && <HudButton data-testid="survey-body" disabled={!target?.eligible} pending={survey.isPending} pendingLabel="Requesting survey…" onClick={() => survey.mutate({ fleetId, bodyId: body.id })}>Survey</HudButton>}
         {target?.reason && <p>{target.reason}</p>}
         {options.data?.inTransit && <p>Surveys require a fleet in this system.</p>}
         {options.isError && <p role="alert">Survey prerequisites are unavailable.</p>}
         {survey.isError && <p role="alert">{survey.error.message}</p>}
       </>}
-      {body.canName && <><p>Your naming right is reserved. You can choose a name from anywhere.</p><Button data-testid="name-body" onClick={() => { setOpen(true); setPreview(null); naming.reset() }}>Choose permanent name</Button></>}
+      {body.canName && <><p>Your naming right is reserved. You can choose a name from anywhere.</p><HudButton data-testid="name-body" onClick={() => { setOpen(true); setPreview(null); naming.reset() }}>Choose permanent name</HudButton></>}
       {history?.firstPlayerName && <p>This name is locked.</p>}
       {!body.canName && !history?.firstPlayerName && body.ownerCorpId && <p>{history?.firstSurvey ? "The owner’s naming right is reserved." : "The owner must complete a survey to earn naming eligibility."}</p>}
     </>}
@@ -67,8 +67,8 @@ export function CelestialActions({ systemId, body, fleetId, onSettled }: {
       <DialogDescription>The first confirmed name is permanent.</DialogDescription>
       <DialogBody>{preview === null ? <Field><Label>Name</Label><Input id="celestial-name" data-testid="celestial-name" invalid={draftLength > 0 && !validLength} value={draft} onChange={event => setDraft(event.target.value)} /><Description>{draftLength}/{MAX_PLAYER_NAME_LENGTH} characters. Use 3–{MAX_PLAYER_NAME_LENGTH} characters: Latin letters, numbers, spaces, apostrophes, and hyphens.</Description></Field> : <p data-testid="name-preview">Everyone will see: <strong>{preview}</strong></p>}{naming.isError && <p role="alert">{naming.error.message}</p>}</DialogBody>
       <DialogActions>
-        <Button plain onClick={() => setOpen(false)}>Cancel</Button>
-        {preview === null ? <Button data-testid="preview-name" disabled={!validLength} onClick={() => setPreview(normalizedDraft)}>Preview</Button> : <><Button plain onClick={() => setPreview(null)}>Edit</Button><Button data-testid="confirm-name" disabled={naming.isPending} onClick={() => naming.mutate({ systemId, bodyId: body.id, name: preview }, { onSuccess: () => setOpen(false) })}>Confirm permanent name</Button></>}
+        <HudButton variant="quiet" onClick={() => setOpen(false)}>Cancel</HudButton>
+        {preview === null ? <HudButton data-testid="preview-name" disabled={!validLength} onClick={() => setPreview(normalizedDraft)}>Preview</HudButton> : <><HudButton variant="quiet" onClick={() => setPreview(null)}>Edit</HudButton><HudButton data-testid="confirm-name" pending={naming.isPending} pendingLabel="Confirming name…" onClick={() => naming.mutate({ systemId, bodyId: body.id, name: preview }, { onSuccess: () => setOpen(false) })}>Confirm permanent name</HudButton></>}
       </DialogActions>
     </Dialog>
   </div>

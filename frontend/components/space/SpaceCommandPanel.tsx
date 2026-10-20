@@ -32,7 +32,7 @@
 
 import { HudPanel } from '@/components/hud/GameHud'
 import { useId, useState } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Figure } from '@/components/figure/Figure'
 import { useJump, useOrder } from '@/hooks/use-fleets'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
@@ -328,14 +328,14 @@ export function SpaceCommandPanel({
         </p>
       )}
       {(noQuote || stale) && (
-        <button
+        <HudButton
           type="button"
           data-testid="preview-retry"
-          className="mt-1 rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300"
+          className="mt-1"
           onClick={retry}
         >
           Retry quote
-        </button>
+        </HudButton>
       )}
       {burnAvailable && !currentQuote && (
         // Committable WITHOUT a quote — a transient preview failure must not
@@ -355,17 +355,19 @@ export function SpaceCommandPanel({
         </p>
       )}
 
-      <Button
+      <HudButton
         type="button"
         data-testid="burn-button"
-        color="dark/zinc"
+        pending={order.isPending}
+        pendingLabel="Committing burn…"
+        variant="primary"
         className="mt-2 w-full"
         disabled={!selection || !canvasAvailable || !fleet || mineRunning || selectionCommitted}
         aria-describedby={selectionCommitted ? statementId : undefined}
         onClick={commitBurn}
       >
         Burn
-      </Button>
+      </HudButton>
 
       {commitStrandingNotice && (
         <p data-testid="commit-stranding-notice" className="mt-2 hud-type-caption text-amber-400">
@@ -428,16 +430,18 @@ export function SpaceCommandPanel({
       )}
 
       {fleet?.laneId && (
-        <Button
+        <HudButton
           type="button"
           data-testid={`fleet-cmd-jump-${fleet.id}`}
-          color="dark/zinc"
+          pending={jump.isPending}
+          pendingLabel="Committing jump…"
+          variant="primary"
           className="mt-2 w-full"
           disabled={mineRunning}
           onClick={commitJump}
         >
           Jump
-        </Button>
+        </HudButton>
       )}
     </HudPanel>
   )

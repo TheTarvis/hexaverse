@@ -1,6 +1,10 @@
 .icon {
+  width: var(--hud-icon-size);
+  height: var(--hud-icon-size);
   display: inline-block;
   flex-shrink: 0;
   vertical-align: middle;
   color: inherit;
 }
+.small { width: var(--hud-icon-size-small); height: var(--hud-icon-size-small); }
+.large { width: var(--hud-icon-size-large); height: var(--hud-icon-size-large); }

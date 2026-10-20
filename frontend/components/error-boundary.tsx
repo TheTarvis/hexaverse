@@ -20,7 +20,7 @@
 
 import React, { Component, type ReactNode } from 'react'
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import { Button } from './catalyst/button'
+import { HudButton } from './hud/HudControls'
 
 interface Props {
   children: ReactNode
@@ -101,9 +101,9 @@ function DefaultErrorFallback({
         {error.message || 'An unexpected error occurred. Please try again.'}
       </p>
       <div className="mt-6 flex gap-3">
-        <Button color="red" onClick={reset}>
+        <HudButton appearance="standard" onClick={reset}>
           Try again
-        </Button>
+        </HudButton>
       </div>
       {process.env.NODE_ENV === 'development' && (
         <details className="mt-6 max-w-2xl">
@@ -137,9 +137,9 @@ export function CompactErrorFallback({
       <p className="mt-2 text-center text-sm text-zinc-600 dark:text-zinc-400">
         {error.message || 'Failed to load data'}
       </p>
-      <Button plain onClick={reset} className="mt-3 text-xs">
+      <HudButton appearance="standard" variant="quiet" onClick={reset} className="mt-3">
         Retry
-      </Button>
+      </HudButton>
     </div>
   )
 }
@@ -179,9 +179,9 @@ export function QueryErrorBoundary({ children }: { children: ReactNode }) {
             <p className="mt-2 max-w-md text-center text-sm text-zinc-600 dark:text-zinc-400">
               {message}
             </p>
-            <Button color="red" onClick={reset} className="mt-4">
+            <HudButton appearance="standard" onClick={reset} className="mt-4">
               Try again
-            </Button>
+            </HudButton>
           </div>
         )
       }}

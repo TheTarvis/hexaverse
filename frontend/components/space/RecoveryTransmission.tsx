@@ -3,7 +3,7 @@
 import { useRef } from 'react'
 import { usePhoneSheet } from '@/hooks/use-phone-sheet'
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import type { CommandGuide } from '@/lib/command-onboarding'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station } from '@/lib/types/market'
@@ -60,16 +60,16 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
     <ol className={styles.checks} aria-label="Startup checks"><li data-testid="live-motor-check">{motorDone ? '✓ Confirmed' : '01 Pending'} · Motor function</li><li data-testid="live-mining-check">{miningDone ? '✓ Confirmed' : '02 Pending'} · Mining function</li><li data-testid="live-fuel-check">{guide.phase === 'done' ? '✓ Confirmed' : '03 Pending'} · Refuelling</li></ol>
     </div>
     <div className={styles.transmissionActions}>
-    {guide.phase === 'wake' && <Button color="cyan" data-testid="begin-guide" onClick={() => onSave({ ...guide, phase: 'objects', targetId: null })}>Begin systems check</Button>}
-    {guide.phase === 'objects' && <Button color="cyan" data-testid="guide-objects" onClick={onObjects}>Open Objects panel</Button>}
-    {guide.phase === 'station' && <Button color="cyan" data-testid="guide-introduce-scan" onClick={() => onSave({ ...guide, phase: 'scan', stationId: station?.featureId ?? guide.stationId })}>Check sensors</Button>}
-    {['scan', 'contacts'].includes(guide.phase) && <Button color="cyan" data-testid="guide-open-scan" onClick={() => { if (guide.phase === 'contacts') onSave({ ...guide, phase: 'scan', scanActionId: null }); onScan() }}>Open Scan</Button>}
-    {guide.phase === 'scanning' && actionFailed && <Button color="cyan" data-testid="guide-retry-scan" onClick={onRetryAction}>Retry scan report</Button>}
-    {['target', 'travel', 'mine'].includes(guide.phase) && !unavailable && activeTarget && <Button color="cyan" data-testid="guide-target" onClick={() => { onSave({ ...guide, targetId: activeTarget }); onTarget(activeTarget) }}>{guide.phase === 'target' ? 'Open Objects panel' : `Open Objects · ${label ?? candidate?.id}`}</Button>}
-    {(guide.phase === 'target' && !activeTarget || guide.phase === 'mine' && !target?.resources?.length) && !interiorFailed && <Button color="cyan" data-testid="guide-scan" onClick={onScan}>Open Scan</Button>}
-    {guide.phase === 'extraction' && actionFailed && <Button color="cyan" data-testid="guide-retry" onClick={onRetryAction}>Retry extraction report</Button>}
-    {['return', 'returning', 'sell', 'refuel'].includes(guide.phase) && !stationUnavailable && station && <Button color="cyan" data-testid="guide-station" onClick={() => { onSave({ ...guide, stationId: station.featureId }); onTarget(station.featureId) }}>Select station {station.featureId}</Button>}
-    {guide.phase === 'done' && <Button color="cyan" data-testid="finish-guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>Command network online</Button>}
+    {guide.phase === 'wake' && <HudButton variant="primary" data-testid="begin-guide" onClick={() => onSave({ ...guide, phase: 'objects', targetId: null })}>Begin systems check</HudButton>}
+    {guide.phase === 'objects' && <HudButton variant="primary" data-testid="guide-objects" onClick={onObjects}>Open Objects panel</HudButton>}
+    {guide.phase === 'station' && <HudButton variant="primary" data-testid="guide-introduce-scan" onClick={() => onSave({ ...guide, phase: 'scan', stationId: station?.featureId ?? guide.stationId })}>Check sensors</HudButton>}
+    {['scan', 'contacts'].includes(guide.phase) && <HudButton variant="primary" data-testid="guide-open-scan" onClick={() => { if (guide.phase === 'contacts') onSave({ ...guide, phase: 'scan', scanActionId: null }); onScan() }}>Open Scan</HudButton>}
+    {guide.phase === 'scanning' && actionFailed && <HudButton variant="primary" data-testid="guide-retry-scan" onClick={onRetryAction}>Retry scan report</HudButton>}
+    {['target', 'travel', 'mine'].includes(guide.phase) && !unavailable && activeTarget && <HudButton variant="primary" data-testid="guide-target" onClick={() => { onSave({ ...guide, targetId: activeTarget }); onTarget(activeTarget) }}>{guide.phase === 'target' ? 'Open Objects panel' : `Open Objects · ${label ?? candidate?.id}`}</HudButton>}
+    {(guide.phase === 'target' && !activeTarget || guide.phase === 'mine' && !target?.resources?.length) && !interiorFailed && <HudButton variant="primary" data-testid="guide-scan" onClick={onScan}>Open Scan</HudButton>}
+    {guide.phase === 'extraction' && actionFailed && <HudButton variant="primary" data-testid="guide-retry" onClick={onRetryAction}>Retry extraction report</HudButton>}
+    {['return', 'returning', 'sell', 'refuel'].includes(guide.phase) && !stationUnavailable && station && <HudButton variant="primary" data-testid="guide-station" onClick={() => { onSave({ ...guide, stationId: station.featureId }); onTarget(station.featureId) }}>Select station {station.featureId}</HudButton>}
+    {guide.phase === 'done' && <HudButton variant="primary" data-testid="finish-guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>Command network online</HudButton>}
     </div>
     <small>Guide progress is saved in this browser.</small>
     </HudCardShell>

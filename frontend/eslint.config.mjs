@@ -14,9 +14,11 @@ const config = [
     ignores: [
       ".next/**",
       ".next-e2e/**",
+      ".next-phone-preview/**",
       "node_modules/**",
       "out/**",
       ".storybook/storybook-static/**",
+      ".storybook/phone-preview-static/**",
       "coverage/**",
       "next-env.d.ts",
       // Playwright artifacts (gitignored too) — a failed e2e run must not

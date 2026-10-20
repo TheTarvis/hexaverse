@@ -24,7 +24,7 @@
 
 import { useEffect, useState } from 'react'
 import { HudHeading } from '@/components/hud/HudTypography'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { figureAttrs, Figure } from '@/components/figure/Figure'
 import { HudLivePortal } from '@/components/hud/HudLiveAnnouncements'
 import { useCancelAction, useRunningScan, useAcknowledgeAction } from '@/hooks/use-actions'
@@ -198,9 +198,9 @@ export function ScanControl({
       {runningScan.isError ? (
         <div className="mt-2 hud-type-body text-zinc-400">
           <p>This sweep&apos;s state could not be read.</p>
-          <Button type="button" plain onClick={() => void runningScan.refetch()}>
+          <HudButton type="button" variant="quiet" onClick={() => void runningScan.refetch()}>
             Retry
-          </Button>
+          </HudButton>
         </div>
       ) : running ? (
         <div className="mt-2 flex flex-col gap-2">
@@ -223,14 +223,13 @@ export function ScanControl({
                 className="hud-type-value text-sky-400"
               />
             )}
-            <button
+            <HudButton
               type="button"
-              data-testid="scan-cancel"
-              className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+              data-testid="scan-cancel" tone="warning" pending={cancelAction.isPending} pendingLabel="Cancelling…"
               onClick={commitCancel}
             >
               Cancel
-            </button>
+            </HudButton>
           </div>
         </div>
       ) : committedPending ? (
@@ -245,9 +244,9 @@ export function ScanControl({
       ) : scanTargets.isError ? (
         <div className="mt-2 hud-type-body text-zinc-400">
           <p>The available scan targets could not be read.</p>
-          <Button type="button" plain onClick={() => void scanTargets.refetch()}>
+          <HudButton type="button" variant="quiet" onClick={() => void scanTargets.refetch()}>
             Retry
-          </Button>
+          </HudButton>
         </div>
       ) : scanTargets.isLoading ? (
         <p data-testid="scan-targets-loading" className="mt-2 hud-type-body text-zinc-400">
@@ -313,24 +312,23 @@ export function ScanControl({
             {fleet.attachedTo &&
               ' It also breaks this fleet’s masking at the attached host for that time.'}
           </p>
-          <button
+          <HudButton
             type="button"
-            data-testid="scan-commit-button"
-            className="rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            data-testid="scan-commit-button" variant="primary" pending={scan.isPending} pendingLabel="Committing…"
             disabled={!activeHostId}
             onClick={commit}
           >
             Sweep
-          </button>
+          </HudButton>
         </div>
       )}
 
       {settledScan.isError ? (
         <div className="mt-2 hud-type-body text-zinc-400">
           <p>This sweep&apos;s outcome could not be read.</p>
-          <Button type="button" plain onClick={() => void settledScan.refetch()}>
+          <HudButton type="button" variant="quiet" onClick={() => void settledScan.refetch()}>
             Retry
-          </Button>
+          </HudButton>
         </div>
       ) : settledScan.data ? (
         <div
@@ -343,22 +341,22 @@ export function ScanControl({
               : 'The sweep filed records.'}
           </p>
           {!settledScan.data.reasonCode && onOpenLog && (
-            <button
+            <HudButton
               type="button"
-              className="self-start hud-type-label text-sky-400 underline"
+              variant="quiet" className="self-start"
               onClick={onOpenLog}
             >
               Open the sighting log
-            </button>
+            </HudButton>
           )}
-          <button
+          <HudButton
             type="button"
-            data-testid="scan-report-dismiss"
-            className="self-start rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+            data-testid="scan-report-dismiss" pending={acknowledge.isPending} pendingLabel="Dismissing…"
+            className="self-start"
             onClick={dismissReport}
           >
             Dismiss
-          </button>
+          </HudButton>
         </div>
       ) : null}
     </aside>

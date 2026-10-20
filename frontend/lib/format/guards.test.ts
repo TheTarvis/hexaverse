@@ -83,8 +83,9 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // parent adjudicated relocation from [837, 838, 894, 895, 1055].
     // Vibrant-scene maintenance: unchanged bearing/speed sites relocated
     // after adding passive world annotations; verified against live source.
+    // Button migration: unchanged expressions re-anchored against live source.
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [928, 929, 985, 986, 1147],
+    lines: [767, 768, 826, 827, 1003],
     ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },
@@ -95,8 +96,9 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // landed. Anchor verified by grep against the live file; same single
     // reviewed site (the memo key, never rendered to a player).
     // Vibrant-scene maintenance: unchanged orbit memo key relocated.
+    // Button migration integration: baseline-identical memo key at live line 227.
     file: 'frontend/components/space/webgl/SpaceWorld.tsx',
-    lines: [218],
+    lines: [227],
     ruling: 'not a player-facing figure / D2',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
   },

@@ -2,7 +2,7 @@
 
 import { fleetLabel } from '@/lib/fleet-label'
 import type { ReactNode } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Select } from '@/components/catalyst/select'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudCardShell } from '@/components/hud/HudCardShell'
@@ -25,6 +25,8 @@ export interface CompactTravelCardProps {
   notice?: string | null
   error?: string | null
   pending?: boolean
+  /** Only the Stop request is busy; other travel requests still lock the control. */
+  stopPending?: boolean
   warning?: boolean
   additionalActions?: ReactNode
   onFleet: (id: string) => void
@@ -37,7 +39,7 @@ export interface CompactTravelCardProps {
 }
 
 /** Presentation only. Quotes, command ownership and mutations stay in the system view. */
-export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, quote, worldTime, scale, blocker, notice, error, pending, warning, onFleet, onChooseFleet, onStart, onStop, onBack, onClose, onRetry, additionalActions }: CompactTravelCardProps) {
+export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, quote, worldTime, scale, blocker, notice, error, pending, stopPending, warning, onFleet, onChooseFleet, onStart, onStop, onBack, onClose, onRetry, additionalActions }: CompactTravelCardProps) {
   const fuel = fleet?.roster?.cargo?.fuel
   const burn = fleet?.state?.Mode === 0 ? fleet.state.Burn : null
   const traveling = !!burn && burn.ArriveMs > worldTime
@@ -47,7 +49,7 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
   return <HudCardShell title={mode === 'review' ? 'Travel review' : 'Command fleet'} onClose={onClose} closeLabel="Close travel card" className={styles.card}>
     <div className={styles.content} data-testid="compact-travel-card">
       {mode === 'review' ? <>
-        {onChooseFleet ? <div><HudText>Command fleet · {fleet ? fleetLabel(fleet) : 'Choose a fleet'}</HudText><Button outline onClick={onChooseFleet} disabled={pending}>Choose command fleet</Button></div> : <label className={styles.picker}>Command fleet
+        {onChooseFleet ? <div><HudText>Command fleet · {fleet ? fleetLabel(fleet) : 'Choose a fleet'}</HudText><HudButton onClick={onChooseFleet} disabled={pending}>Choose command fleet</HudButton></div> : <label className={styles.picker}>Command fleet
           <Select aria-label="Travel command fleet" value={fleet?.id ?? ''} disabled={pending} onChange={event => onFleet(event.target.value)}>
             {!fleet && <option value="">Choose a fleet</option>}
             {fleets.map(item => <option key={item.id} value={item.id} disabled={!!item.jump || item.systemId !== systemId}>{fleetLabel(item)}{item.jump ? ' · In transit' : item.systemId !== systemId ? ' · Other system' : ''}</option>)}
@@ -66,10 +68,10 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         {blocker && quote && <p role="status" className={styles.warning}>{blocker}</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}
         <div className={styles.actions}>
-          <Button outline onClick={onBack} disabled={pending}>Back</Button>
-          <Button color="cyan" data-testid="travel-start" disabled={pending || !!blocker || !quote?.affordable} onClick={onStart}>{pending ? 'Starting…' : 'Start travel'}</Button>
+          <HudButton onClick={onBack} disabled={pending}>Back</HudButton>
+          <HudButton variant="primary" data-testid="travel-start" pending={pending} pendingLabel="Starting…" disabled={!!blocker || !quote?.affordable} onClick={onStart}>Start travel</HudButton>
         </div>
-        {!quote && <Button plain disabled={pending} onClick={onRetry}>Retry estimate</Button>}
+        {!quote && <HudButton variant="quiet" disabled={pending} onClick={onRetry}>Retry estimate</HudButton>}
       </> : <>
         <HudHeading size="compact">{fleet ? fleetLabel(fleet) : 'Fleet unavailable'}</HudHeading>
         <HudText>{fleet?.jump ? 'In inter-system transit' : traveling ? 'Travelling' : fleet?.state?.Mode === 2 ? 'Drifting' : 'Ready'} · {destination}</HudText>
@@ -77,9 +79,9 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         {notice && <p role="status">{notice}</p>}
         {warning && <p className={styles.warning}>This course leaves the fleet unable to reach a station or lane gate.</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}
-        {fleet && !fleet.jump && (traveling || fleet.state?.Mode === 2) && <Button outline data-testid="travel-stop" disabled={pending} onClick={onStop}>{pending ? 'Stopping…' : 'Stop travel'}</Button>}
+        {fleet && !fleet.jump && (traveling || fleet.state?.Mode === 2) && <HudButton tone="warning" data-testid="travel-stop" disabled={pending} pending={stopPending} pendingLabel="Stopping…" onClick={onStop}>Stop travel</HudButton>}
         {additionalActions}
-        <Button plain onClick={onBack}>Browse destinations</Button>
+        <HudButton variant="quiet" onClick={onBack}>Browse destinations</HudButton>
       </>}
     </div>
   </HudCardShell>

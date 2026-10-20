@@ -13,6 +13,8 @@
 .facts dt, .facts dd { min-width: 0; margin: 0; }
 .facts dd { text-align: right; }
 .samples { display: flex; flex-direction: column; gap: 20px; }
+.controlRow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.controlRow > [data-slot='control'] { width: auto; }
 .comparison { display: flex; flex-wrap: wrap; align-items: start; gap: 40px; }
 .option { display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 100%; }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

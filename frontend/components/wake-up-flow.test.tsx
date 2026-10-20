@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WakeUpFlow } from './wake-up-flow'
 import { corporationService } from '@/lib/services'
@@ -218,10 +219,14 @@ describe('WakeUpFlow', () => {
     renderWithClient()
 
     fireEvent.change(screen.getByTestId('wake-name-input'), { target: { value: 'Bob' } })
-    fireEvent.click(screen.getByTestId('wake-submit'))
+    const user = userEvent.setup()
+    screen.getByTestId('wake-name-input').focus()
+    await user.keyboard('{Enter}')
 
     await waitFor(() => expect(screen.getByTestId('wake-submit')).toBeDisabled())
     expect(screen.getByTestId('wake-name-input')).toBeDisabled()
+    expect(screen.getByTestId('wake-submit')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByTestId('wake-submit')).toHaveTextContent('Waking…')
 
     resolveSpawn(spawnResult)
 

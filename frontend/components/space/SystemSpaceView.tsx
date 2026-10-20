@@ -37,7 +37,7 @@ import { CelestialActions } from './CelestialActions'
 // that is then the only clock on screen.
 
 import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
 import { HudText } from '@/components/hud/HudTypography'
@@ -953,16 +953,15 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const travelCard = travelMode ? <CompactTravelCard mode={travelMode} fleet={travelMode === 'status' ? statusFleet : acting}
     onChooseFleet={() => requestHudPanel('command')} fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
     quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
-    pending={travelPending} warning={travelReceipt?.fleet.strandingWarning}
+    pending={travelPending} stopPending={travelStop.isPending} warning={travelReceipt?.fleet.strandingWarning}
     additionalActions={<>
-      {statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId && <Button outline data-testid="travel-cut-drive" disabled={travelPending || mineRunning || fleets.isError} onClick={cutTravelDrive}>Cut drive</Button>}
-      {statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId && <Button outline data-testid="travel-jump" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</Button>}
+      {statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton tone="warning" data-testid="travel-cut-drive" pending={travelCutDrive.isPending} pendingLabel="Cutting drive…" disabled={travelPending || mineRunning || fleets.isError} onClick={cutTravelDrive}>Cut drive</HudButton>}
+      {statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton data-testid="travel-jump" pending={travelJump.isPending} pendingLabel="Jumping…" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</HudButton>}
     </>}
     onFleet={id => { if (!travelGuard.held) { setActingFleetId(id); setTravelError(null) } }} onStart={startTravel} onStop={stopTravel}
     onBack={() => { if (!travelGuard.held) { setTravelMode(null); openObjectIndex(true) } }}
     onClose={() => { if (!travelGuard.held) setTravelMode(null) }} onRetry={burnPreview.retry} /> : null
   const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
-
 
   const stationActionsHost = acting && !actingRemote && (dockedFeature?.type === 'station' || acting.attachedTo === stationRead.data?.featureId) ? acting.attachedTo : null
   const marketNotices = <>
@@ -975,14 +974,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               The station read failed, so trading here is unavailable. Retry the read to sell or
               refuel.
             </p>
-            <button
+            <HudButton
               type="button"
               data-testid="station-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
+              className="mt-1"
               onClick={() => void stationRead.refetch()}
             >
               Retry
-            </button>
+            </HudButton>
           </div>
         )}
 
@@ -996,14 +995,14 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             <p className="text-zinc-600 dark:text-zinc-400">
               The price board could not be read, so selling is unavailable. Refuelling still works.
             </p>
-            <button
+            <HudButton
               type="button"
               data-testid="market-board-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
+              className="mt-1"
               onClick={() => void boardRead.refetch()}
             >
               Retry
-            </button>
+            </HudButton>
           </div>
         )}
   </>
@@ -1090,14 +1089,13 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             <p className="hud-type-body text-zinc-600 dark:text-zinc-400">
               The system could not be read. {interior.error?.message ?? ''}
             </p>
-            <button
+            <HudButton
               type="button"
               data-testid="space-interior-retry"
-              className="rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
               onClick={() => void interior.refetch()}
             >
               Retry
-            </button>
+            </HudButton>
           </div>
           </div>
         ) : (
@@ -1147,18 +1145,18 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             <p className="text-zinc-600 dark:text-zinc-400">
               This system&apos;s sightings could not be read.
             </p>
-            <button
+            <HudButton
               type="button"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
+              className="mt-1"
               onClick={ghostFeed.refetch}
             >
               Retry
-            </button>
+            </HudButton>
           </div>
         )}
       </GameViewScene>
 
-      {guiding && !guidePageVisible && <Button plain className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</Button>}
+      {guiding && !guidePageVisible && <HudButton variant="quiet" className={commandStyles.resumeGuide} onClick={() => setGuidePageVisible(true)}>Resume guide</HudButton>}
       <div className={commandStyles.guideLayer}>
       {guidePageVisible && guiding && guide && acting && !(discoveryStarted && !interiorFailed) && (
         <RecoveryTransmission
@@ -1252,8 +1250,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       </GameViewVitals>
         {!(travelMode === 'review' && objectIndexOpen && selection?.bodyId) && travelCard}
         {!travelMode && <div className={travelStyles.entry}>
-          {selection && <Button color="cyan" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</Button>}
-          {acting && <Button outline data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</Button>}
+          {selection && <HudButton variant="primary" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</HudButton>}
+          {acting && <HudButton data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</HudButton>}
         </div>}
       <HudColumn
         data-testid="space-command-column"
@@ -1268,19 +1266,19 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
             className="flex flex-col gap-3 hud-type-body"
           >
             <p className="text-zinc-600 dark:text-zinc-400">Your fleets could not be read.</p>
-            <button
+            <HudButton
               type="button"
               data-testid="space-fleets-retry"
-              className="mt-1 rounded-md border border-zinc-700/60 px-2 py-1 hud-type-label text-zinc-300"
+              className="mt-1"
               onClick={() => void fleets.refetch()}
             >
               Retry
-            </button>
+            </HudButton>
           </div>
         )}
 
         {/* TODO(HUD-HIDDEN-CLEANUP): Standalone Focus fleet is CSS-hidden; remove this render path when its replacement lands. */}
-        {acting && !actingRemote && <Button color="cyan" data-testid="system-focus-fleet" disabled={!canvasAvailable || fleets.isError} onClick={() => setFleetFocus(previous => ({ fleetId: acting.id, sequence: (previous?.sequence ?? 0) + 1 }))}>Focus fleet</Button>}
+        {acting && !actingRemote && <HudButton variant="primary" data-testid="system-focus-fleet" disabled={!canvasAvailable || fleets.isError} onClick={() => setFleetFocus(previous => ({ fleetId: acting.id, sequence: (previous?.sequence ?? 0) + 1 }))}>Focus fleet</HudButton>}
         {actingRemote && acting ? <FleetLocationPanel fleet={acting} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleets.isError} onOpen={id => router.push(`/systems/${id}`)} /> : <>
         {/* TODO(HUD-HIDDEN-CLEANUP): Legacy Course card is CSS-hidden; retire this wiring after the burn-flow rebuild. */}
         <SpaceCommandPanel
@@ -1302,7 +1300,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
 
         {!stationActionsHost && fleetActions}
-
 
         </>}
 

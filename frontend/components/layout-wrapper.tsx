@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 import { useAccountContext } from '@/components/account-provider'
 import { useCorporationContext } from '@/components/corporation-provider'
 import { WakeUpFlow } from '@/components/wake-up-flow'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Heading } from '@/components/catalyst/heading'
 import { Text } from '@/components/catalyst/text'
 
@@ -86,14 +86,15 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
                 ? corpError.message
                 : 'Something went wrong looking up your corporation. Please try again.'}
             </Text>
-            <Button
-              color="dark"
+            <HudButton appearance="standard"
+              type="button"
+              variant="primary" standardColor="dark"
               className="mt-6"
               data-testid="gate-corp-retry"
               onClick={() => refetchCorp?.()}
             >
               Retry
-            </Button>
+            </HudButton>
           </div>
         </div>
       )
@@ -133,23 +134,25 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
                 : 'Something went wrong loading your account. Please try again.'}
           </Text>
           {isStuckCreation ? (
-            <Button
-              color="dark"
+            <HudButton appearance="standard"
+              type="button"
+              variant="primary" standardColor="dark"
               className="mt-6"
               data-testid="gate-account-signout"
               onClick={() => signOut()}
             >
               Sign out
-            </Button>
+            </HudButton>
           ) : (
-            <Button
-              color="dark"
+            <HudButton appearance="standard"
+              type="button"
+              variant="primary" standardColor="dark"
               className="mt-6"
               data-testid="gate-account-retry"
               onClick={() => refetchAccount?.()}
             >
               Retry
-            </Button>
+            </HudButton>
           )}
         </div>
       </div>

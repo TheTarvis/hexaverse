@@ -3,11 +3,9 @@
 .commandView .systemColumn { top: 178px; left: 32px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 170px); }
 .transmission { position: absolute; left: 32px; bottom: calc(var(--console-dock-height, 56px) + 150px); width: min(400px, 36vw); padding: 12px; background: linear-gradient(90deg, #03070cd9, #03070c70); color: var(--command-ink); text-shadow: 0 2px 10px #000; }
 .signal { display: flex; align-items: center; justify-content: space-between; color: var(--command-signal); font: var(--hud-label-font); letter-spacing: var(--hud-label-tracking); }
-.signal button { color: var(--command-muted); }
 .transmissionBody > p { margin: 12px 0 18px; font: var(--hud-compact-font); line-height: 1.6; }
 .checks { display: flex; gap: 16px; margin: 0 0 18px; padding: 0; list-style: none; font: var(--hud-label-font); color: var(--command-signal); }
 .transmission small { display: block; margin-top: 10px; color: var(--command-muted); font: var(--hud-caption-font); }
-.transmission > button { border-radius: 3px; font: var(--hud-caption-font); letter-spacing: var(--hud-label-tracking); }
 @media (max-width: 760px) {
   .commandView .systemColumn { top: 165px; left: 12px; right: auto; width: min(260px, 65vw); }
   .transmission { left: 12px; bottom: calc(var(--console-dock-height, 56px) + 155px); width: calc(100% - 24px); max-height: 210px; overflow-y: auto; z-index: 20; border-top: 1px solid #76e3ef40; background: #08121df2; }
@@ -17,7 +15,6 @@
 .commandView [data-testid='console-dock-open'], .commandView [data-testid='console-dock-region'], .commandView [data-testid='vitals-fleet-menu'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }
 .commandView [data-testid='space-offscreen-reach'] { top: 140px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 480px); width: 190px; overflow-y: auto; pointer-events: auto; }
 .commandView [data-testid='space-offscreen-reach'][data-empty='true'] { display: none; }
-.commandView [data-testid='burn-button']:not(:disabled), .commandView [data-testid='mine-button']:not(:disabled) { background: #0c879b; color: white; }
 @media (max-width: 760px) {
   .commandView [data-testid='space-offscreen-reach'] { top: 120px; width: 100px; max-height: 160px; bottom: auto; height: 160px; }
   .commandView [data-testid='space-offscreen-reach'] button { max-width: 84px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -142,7 +139,7 @@
   .commandView:has(.transmission) .workspaceVitals { visibility: hidden; }
   .workspaceCommand { height: 100%; }
 }
-.resumeGuide { position: absolute; top: var(--phone-toolbar-top, 100px); right: max(12px, env(safe-area-inset-right)); z-index: 45; min-height: 44px; background: #08121d; color: #b1edff; }
+.resumeGuide { position: absolute; top: var(--phone-toolbar-top, 100px); right: max(12px, env(safe-area-inset-right)); z-index: 45; min-height: 44px; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .commandView [data-testid='space-camera-controls'] { bottom: calc(var(--phone-vitals-height) + 12px + env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; max-width: calc(100% - 24px); }
   .commandView [data-testid='space-camera-controls'] > * { width: 44px; height: 44px; box-sizing: border-box; }

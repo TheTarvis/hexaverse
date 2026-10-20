@@ -23,7 +23,7 @@ import { HudCardShell, HudSection } from '@/components/hud/HudCardShell'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/catalyst/badge'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Figure } from '@/components/figure/Figure'
 import { Select } from '@/components/catalyst/select'
 import { Input } from '@/components/catalyst/input'
@@ -77,7 +77,6 @@ export interface FleetActionsPanelProps {
   tutorialSample?: boolean
   onMineAccepted?: (accepted: { fleetId: string; featureId: string; actionId: string; kind: ResourceKind; tons: number; cargoBefore: number }) => void
 }
-
 
 function clampTons(raw: string, max: number): number {
   const parsed = Number(raw)
@@ -405,16 +404,16 @@ export function FleetActionsPanel({
             />{' '}
             at the served rate
           </p>
-          <Button
+          <HudButton
             type="button"
-            data-testid="mine-button"
-            color="cyan"
+            data-testid="mine-button" pending={mine.isPending} pendingLabel="Mining…"
+            variant="primary"
             className="mt-2 w-full"
             disabled={mineTons <= 0 || mineRunning}
             onClick={commitMine}
           >
             Mine
-          </Button>
+          </HudButton>
         </HudSection>
       )}
       {interiorFailed && (
@@ -432,10 +431,9 @@ export function FleetActionsPanel({
             data-testid="mine-countdown"
             className="hud-type-value text-sky-400"
           />
-          <button
+          <HudButton
             type="button"
-            data-testid="mine-cancel"
-            className="rounded-md border border-zinc-700/60 px-1.5 py-0.5 hud-type-label text-zinc-300"
+            data-testid="mine-cancel" pending={cancelAction.isPending} pendingLabel="Cancelling…" tone="warning"
             onClick={() =>
               cancelAction.mutate(
                 { actionId: mineEta.id, fleetId: fleet.id },
@@ -444,7 +442,7 @@ export function FleetActionsPanel({
             }
           >
             Cancel
-          </button>
+          </HudButton>
         </div>
       )}
 
@@ -504,16 +502,16 @@ export function FleetActionsPanel({
               data-testid="sell-proceeds-preview"
             />
           </p>
-          <Button
+          <HudButton
             type="button"
-            data-testid="sell-button"
-            color="cyan"
+            data-testid="sell-button" pending={sell.isPending} pendingLabel="Selling…"
+            variant="primary"
             className="mt-2 w-full"
             disabled={!activeSellKind || sellTons <= 0}
             onClick={commitSell}
           >
             Sell
-          </Button>
+          </HudButton>
         </HudSection>
       )}
 
@@ -541,31 +539,30 @@ export function FleetActionsPanel({
             />{' '}
             at the served price
           </p>
-          <Button
+          <HudButton
             type="button"
-            data-testid="refuel-button"
-            color="cyan"
+            data-testid="refuel-button" pending={refuel.isPending} pendingLabel="Refuelling…"
+            variant="primary"
             className="mt-2 w-full"
             disabled={refuelTons <= 0}
             onClick={commitRefuel}
           >
             Refuel
-          </Button>
+          </HudButton>
         </HudSection>
       )}
 
       {/* --------------------------------------------- station-keeping */}
       {parkMode && (
         <div className="flex flex-col gap-3 border-t border-white/15 pt-4">
-          <Button
+          <HudButton
             type="button"
-            outline
-            data-testid="stationkeep-control"
+            data-testid="stationkeep-control" pending={hold.isPending || release.isPending} pendingLabel={parkMode === 'orbit' ? 'Holding…' : 'Resuming…'}
             className="w-full"
             onClick={parkMode === 'orbit' ? submitHold : submitRelease}
           >
             {parkMode === 'orbit' ? 'Hold here' : 'Resume orbit'}
-          </Button>
+          </HudButton>
           {upkeepRate !== undefined && (
             // Rendered on BOTH park modes the field is served for: the live
             // drain while holding, and what holding WOULD cost before it is
@@ -585,10 +582,10 @@ export function FleetActionsPanel({
 
       {/* TODO(HUD-HIDDEN-CLEANUP): Cut drive / Stop and their otherwise empty panel shell are CSS-hidden in the live system HUD. Retire this row and unused hooks after replacement controls land; retain resource actions. */}
       <div data-testid="fleet-flight-controls" className="flex gap-2 border-t border-white/15 pt-4">
-        <Button
+        <HudButton
           type="button"
-          data-testid={`fleet-cmd-cut-drive-${fleet.id}`}
-          color="dark/zinc"
+          data-testid={`fleet-cmd-cut-drive-${fleet.id}`} pending={cutDrive.isPending} pendingLabel="Cutting drive…"
+          tone="warning"
           className="flex-1"
           disabled={mineRunning}
           onClick={() =>
@@ -598,11 +595,11 @@ export function FleetActionsPanel({
           }
         >
           Cut drive
-        </Button>
-        <Button
+        </HudButton>
+        <HudButton
           type="button"
-          data-testid={`fleet-cmd-stop-${fleet.id}`}
-          color="dark/zinc"
+          data-testid={`fleet-cmd-stop-${fleet.id}`} pending={stop.isPending} pendingLabel="Stopping…"
+          tone="warning"
           className="flex-1"
           disabled={mineRunning}
           onClick={() =>
@@ -612,7 +609,7 @@ export function FleetActionsPanel({
           }
         >
           Stop
-        </Button>
+        </HudButton>
       </div>
     </HudCardShell>
   )

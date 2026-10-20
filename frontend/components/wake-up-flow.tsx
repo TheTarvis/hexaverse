@@ -21,7 +21,7 @@ import { corporationService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
 import { newGuide, saveGuide, guideSnapshot, parseGuide } from '@/lib/command-onboarding'
 import { toast } from '@/lib/toast'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Input } from '@/components/catalyst/input'
 import type { SpawnResult } from '@/lib/types/corporation'
 
@@ -106,9 +106,9 @@ export function WakeUpFlow() {
               {nameLength}/{MAX_PLAYER_NAME_LENGTH} characters{nameTooLong ? ' — shorten your name to continue.' : ''}
             </Description>
           </Field>
-          <Button type="submit" color="cyan" disabled={!canSubmit} data-testid="wake-submit">
-            {spawn.isPending ? 'Waking…' : 'Wake'}
-          </Button>
+          <HudButton appearance="standard" type="submit" variant="primary" pending={spawn.isPending} pendingLabel="Waking…" disabled={!canSubmit} data-testid="wake-submit">
+            Wake
+          </HudButton>
         </form>
       </div>
     </div>

@@ -1,5 +1,7 @@
 'use client'
 
+import { HudButton } from '@/components/hud/HudControls'
+
 // VitalsStrip — the always-on instrument bar across the foot of the system
 // space view (openspec change `add-vitals-strip`, capability
 // `system-console`). Container + the fuel/hold/credits/clock cells; the
@@ -266,7 +268,7 @@ export function VitalsStrip({
       data-expanded={detailsOpen}
       className="pointer-events-auto flex h-14 items-center justify-between gap-4 border-t border-zinc-200 bg-zinc-50/95 px-4 backdrop-blur dark:border-white/[0.12] dark:bg-zinc-700/95"
     >
-      {mode === 'strip' && <button type="button" data-testid="vitals-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(value => !value)}>{detailsOpen ? 'Less telemetry' : 'Telemetry'}</button>}
+      {mode === 'strip' && <HudButton type="button" data-testid="vitals-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(value => !value)}>{detailsOpen ? 'Less telemetry' : 'Telemetry'}</HudButton>}
       {mode === 'strip' && <div data-testid="vitals-fleet-cell">
         <VitalsStripFleetCell
           acting={acting}

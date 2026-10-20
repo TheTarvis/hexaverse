@@ -4,7 +4,7 @@ import { livePhonePreviewConfig } from '@/lib/phone-preview-config'
 
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Field, Label } from '@/components/catalyst/fieldset'
 import { Heading } from '@/components/catalyst/heading'
 import { Input } from '@/components/catalyst/input'
@@ -174,9 +174,9 @@ function LoginForm() {
               {displayError}
             </Text>
           )}
-          <Button type="submit" color="dark" disabled={loading} data-testid="login-submit">
-            {loading ? 'Working...' : isSignUp ? 'Create account' : 'Sign in'}
-          </Button>
+          <HudButton appearance="standard" type="submit" variant="primary" standardColor="dark" pending={loading} pendingLabel="Working..." data-testid="login-submit">
+            {isSignUp ? 'Create account' : 'Sign in'}
+          </HudButton>
         </form>
 
         <div className="my-6 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
@@ -185,20 +185,20 @@ function LoginForm() {
           <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800/50" />
         </div>
 
-        <Button outline onClick={handleGoogle} disabled={loading} className="w-full">
+        <HudButton appearance="standard" type="button" onClick={handleGoogle} disabled={loading} className="w-full">
           <GoogleIcon className="size-5" /> Continue with Google
-        </Button>
+        </HudButton>
         {phonePreview && <Text className="mt-2 text-center text-xs">Google opens the simulated test identity picker.</Text>}
 
         <Text className="mt-6 text-center">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button
+          <HudButton appearance="standard" variant="quiet"
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-zinc-900 underline dark:text-white"
+            className="underline"
           >
             {isSignUp ? 'Sign in' : 'Sign up'}
-          </button>
+          </HudButton>
         </Text>
       </div>
     </div>

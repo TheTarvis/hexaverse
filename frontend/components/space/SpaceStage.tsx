@@ -1,5 +1,7 @@
 'use client'
 
+import { HudButton } from '@/components/hud/HudControls'
+
 // SpaceStage — the space view's interactive canvas region (openspec change
 // `build-production-space-view`, `system-space-view`: *Space View Picking
 // Resolves to the Body, Lane Gate, or Point Under the Pointer*, *Body,
@@ -665,18 +667,17 @@ function SpaceLayers({
   const hitButton = (entry: { mark: SceneMark }) => {
     const { mark } = entry
     return (
-      <button
+      <HudButton
+        presentation="map"
         key={mark.id}
         type="button"
         ref={registry.refFor(mark.id)}
+        style={{ position: 'absolute', borderRadius: '50%' }}
         data-testid={`body-hit-${mark.id}`}
         data-body-id={mark.id}
         aria-label={mark.name || mark.id}
         aria-pressed={mark.selected}
-        className={
-          'pointer-events-auto absolute left-0 top-0 rounded-full' +
-          ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
-        }
+        className="pointer-events-auto absolute left-0 top-0"
         onPointerOver={() => onHoverBody(mark.id)}
         onPointerOut={() => onHoverBody(null)}
         onFocus={() => onFocusMark(mark.id)}
@@ -693,7 +694,7 @@ function SpaceLayers({
             className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-sky-400"
           />
         )}
-      </button>
+      </HudButton>
     )
   }
 
@@ -778,25 +779,27 @@ function SpaceLayers({
               picking rule treats it as empty space. --- */}
       <div className="pointer-events-none absolute inset-0">
         {sightings.map(({ mark, screen }) => (
-          <button
+          <HudButton
+            presentation="map"
             key={mark.id}
             type="button"
             {...{ [AFFORDANCE_ATTR]: '' }}
             data-testid={`sighting-mark-${mark.recordId}`}
             data-highlighted={highlightedGhostId === mark.recordId ? 'true' : 'false'}
             aria-label={`Sighting at ${mark.recordId}`}
-            className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-fuchsia-400/70 bg-fuchsia-400/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-            style={{ left: `${screen.x || 0}px`, top: `${screen.y || 0}px` }}
+            className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ position: 'absolute', left: `${screen.x || 0}px`, top: `${screen.y || 0}px`, width: 12, height: 12, borderRadius: '50%' }}
             onPointerOver={() => onHoverGhost(mark.id)}
             onPointerOut={() => onHoverGhost(null)}
             onFocus={() => onHoverGhost(mark.id)}
             onBlur={() => onHoverGhost(null)}
             onClick={() => onHighlightGhost?.(mark.recordId ?? null)}
           >
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border border-fuchsia-400/70 bg-fuchsia-400/10" />
             {mark.asOf !== undefined && (
               <GhostAsOfLabel recordId={mark.recordId ?? mark.id} asOf={mark.asOf} scale={scale} />
             )}
-          </button>
+          </HudButton>
         ))}
       </div>
       {(() => {
@@ -837,27 +840,26 @@ function SpaceLayers({
           const acting = mark.id === actingFleetId
           const showActingRing = acting && !hasSelectedObject
           return (
-            <button
+            <HudButton
+              presentation="map"
               key={mark.id}
               type="button"
               ref={registry.refFor(mark.id)}
+              style={{ position: 'absolute', borderRadius: '50%' }}
               {...{ [AFFORDANCE_ATTR]: '' }}
               data-testid={`fleet-mark-${mark.id}`}
               data-acting={acting ? 'true' : 'false'}
               aria-label={`Fleet ${mark.id}`}
               aria-pressed={showActingRing}
-              className={
-                'pointer-events-auto absolute left-0 top-0 h-5 w-5 cursor-pointer rounded-full' +
-                ' border border-emerald-300/40 hover:border-emerald-200/90 hover:bg-emerald-300/10' +
-                ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400' +
-                (showActingRing ? ' ring-2 ring-emerald-400/70' : '')
-              }
+              className="pointer-events-auto absolute left-0 top-0"
               onPointerOver={() => onHoverFleet(mark.id)}
               onPointerOut={() => onHoverFleet(null)}
               onFocus={() => onHoverFleet(mark.id)}
               onBlur={() => onHoverFleet(null)}
               onClick={() => onActivateFleet?.(mark.id)}
-            />
+            >
+              <span aria-hidden="true" className={'pointer-events-none absolute inset-0 rounded-full border border-emerald-300/40' + (showActingRing ? ' ring-2 ring-emerald-400/70' : '')} />
+            </HudButton>
           )
         })}
       </div>
@@ -877,37 +879,37 @@ function SpaceLayers({
       {/* TODO(HUD-HIDDEN-CLEANUP): Off-screen pointers are CSS-hidden in the live system HUD due to label noise. Review other stage consumers before removing this renderer and its positioning logic. */}
       <div data-testid="space-offscreen-reach" data-empty={offScreen.length === 0} className="pointer-events-none absolute inset-0">
         {offScreen.map(({ mark }) => (
-          <button
+          <HudButton
+            presentation="map"
             key={mark.id}
             type="button"
             {...{ [AFFORDANCE_ATTR]: '' }}
             data-testid={`offscreen-${mark.id}`}
             aria-label={`Bring ${mark.name || mark.id} into view`}
-            className={
-              'pointer-events-auto absolute left-4 rounded-full border border-white/20 bg-black/60 px-2 py-1 hud-type-caption text-zinc-200' +
-              ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400'
-            }
-            style={{ top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px` }}
+            className="pointer-events-auto absolute left-4"
+            style={{ position: 'absolute', top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px`, padding: '4px 8px' }}
             onClick={() => {
               onReframe(mark.id, mark.position)
               onSelect({ bodyId: mark.id })
             }}
           >
-            {mark.name || mark.id}
-          </button>
+            <span className="hud-type-caption">{mark.name || mark.id}</span>
+          </HudButton>
         ))}
       </div>
 
       {/* The selected mark, drawn — including a bare point in vacuum, which
           has no body mark to highlight and no intrinsic outline. */}
       {selection?.point && marks.some(mark => mark.kind === 'point-selection') && (
-        <button
+        <HudButton
+          presentation="map"
           type="button"
           ref={registry.refFor('point-selection')}
+          style={{ position: 'absolute', borderRadius: '50%' }}
           data-testid="point-selection-mark"
           data-focus-mark-id="point-selection"
           aria-label="Selected location. Double-click to focus."
-          className="pointer-events-auto absolute left-0 top-0 grid place-items-center rounded-full text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-200"
+          className="pointer-events-auto absolute left-0 top-0 grid place-items-center"
           onKeyDown={event => {
             if (event.key !== 'Enter' && event.key !== ' ') return
             event.preventDefault()
@@ -915,11 +917,11 @@ function SpaceLayers({
             if (mark) onReframe(mark.id, mark.position)
           }}
         >
-          <svg aria-hidden="true" width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ filter: 'drop-shadow(0 1px 2px #000)' }}>
+          <svg aria-hidden="true" className="text-cyan-300" width="28" height="28" viewBox="0 0 28 28" fill="none" style={{ filter: 'drop-shadow(0 1px 2px #000)' }}>
             <path d="M10 3H6a3 3 0 0 0-3 3v4m15-7h4a3 3 0 0 1 3 3v4M3 18v4a3 3 0 0 0 3 3h4m8 0h4a3 3 0 0 0 3-3v-4M14 9v3m0 4v3M9 14h3m4 0h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             <circle cx="14" cy="14" r="1" fill="currentColor" />
           </svg>
-        </button>
+        </HudButton>
       )}
       </div>
     </>

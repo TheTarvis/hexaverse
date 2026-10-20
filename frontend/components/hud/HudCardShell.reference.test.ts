@@ -8,6 +8,9 @@ it('preserves the accepted 624c4ff title and close geometry with shared typograp
   const tokenizedOriginal = original.replace(
     /  font-family:.*\n  font-size:.*\n  font-weight:.*\n  line-height:.*\n  letter-spacing:.*\n/,
     '  font: var(--hud-chrome-font);\n  letter-spacing: var(--hud-label-tracking);\n',
+  ).replace('  min-height: 0;\n  padding: 4px;', '  min-width: 0;\n  min-height: 0;\n  padding: 4px;').replace(
+    /\.shell \.close:hover \{[^}]+\}\n\n\.shell \.close:focus-visible \{[^}]+\}\n\n/,
+    '', // Shared HudControls now owns hover and focus; retain the accepted glyph and box.
   )
   expect(css.slice(start, css.indexOf('.body {', start)).trim()).toBe(tokenizedOriginal.trim())
   expect(css).not.toContain('.mobileHeader')

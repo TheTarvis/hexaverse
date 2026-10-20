@@ -2,6 +2,6 @@
 .search { position: sticky; top: 0; z-index: 2; background: #0b1621; padding-bottom: 12px; }
 .search::before { content: ''; position: absolute; inset: -24px -16px 0; z-index: -1; background: inherit; pointer-events: none; }
 .rows { display: flex; flex-direction: column; gap: 4px; }
-.rows > button { width: 100%; min-height: 48px; justify-content: space-between; text-align: left; white-space: normal; }
+.rows > button[data-hud-button] { width: 100%; min-height: 48px; justify-content: space-between; text-align: left; white-space: normal; }
 .rows .name, .rows small { display: block; overflow-wrap: anywhere; }
 .rows small { color: #a1b3c6; font: var(--hud-caption-font); }

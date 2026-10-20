@@ -13,7 +13,7 @@
 // diagnostic is recorded (record-renderer-failure.ts), never displayed.
 
 import { useEffect, useRef } from 'react'
-import { Button } from '../catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import type { FailureCause, GuardStatus } from './guard-machine'
 
 export interface RendererStateNoticeProps {
@@ -50,7 +50,7 @@ export function RendererStateNotice({
   onRetry,
   claimFocus,
 }: RendererStateNoticeProps) {
-  const retryRef = useRef<HTMLElement>(null)
+  const retryRef = useRef<HTMLButtonElement>(null)
   const textRef = useRef<HTMLParagraphElement>(null)
 
   useEffect(
@@ -96,16 +96,16 @@ export function RendererStateNotice({
         {liveMessage}
       </span>
       {onRetry && (
-        <Button
+        <HudButton
           type="button"
-          color="dark/zinc"
           data-testid="renderer-retry"
           onClick={onRetry}
-          disabled={retrying}
+          pending={retrying}
+          pendingLabel="Retrying…"
           ref={retryRef}
         >
-          {retrying ? 'Retrying…' : 'Retry'}
-        </Button>
+          Retry
+        </HudButton>
       )}
     </div>
   )

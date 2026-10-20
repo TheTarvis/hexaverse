@@ -14,8 +14,8 @@ export function HudIcon({ icon: Icon, size = 20, className, style, ...props }: H
       aria-hidden="true"
       focusable="false"
       {...props}
-      className={clsx(styles.icon, className)}
-      style={{ width: size, height: size, ...style }}
+      className={clsx(styles.icon, size === 16 && styles.small, size === 24 && styles.large, className)}
+      style={style}
     />
   )
 }

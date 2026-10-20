@@ -30,6 +30,16 @@ it does not turn fixture estimates into production physics or authorize new rule
 
 ## Current implementation and working choices
 
+Travel-control visual direction, accepted 2026-10-19: the review header uses
+two compact, equally weighted identity columns for command fleet and destination.
+Each shows thumbnail/name and activity or object type, with a right-side dropdown
+chevron replacing a separate Change button. Each identity is a selection target.
+Trip facts use left-aligned labels and right-aligned values. This is accepted
+presentation direction in Storybook; production adoption and selection behavior
+for potentially large collections remain unresolved. The
+[travel controls design record](../.scratch/hud-travel-card/controls-design.md)
+preserves comparisons and review evidence.
+
 Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
 
 - [SystemSpaceView](../frontend/components/space/SystemSpaceView.tsx) retains
@@ -66,18 +76,139 @@ for art review, including route-state, progress, zoom and vision-preview control
 Gameplay settings placement and persistence remain unimplemented; exact palette
 values and alternative palettes still require visual acceptance.
 
-## Shared typography
+## Shared HUD foundations
 
-Game surfaces and `HUD/Typography` stories share
-`frontend/components/hud/hud-type.css`. Change font families, role font shorthands,
-tracking and role colors there. Michroma identities use the compact role in lists
+Game surfaces and `HUD/Typography` stories consume
+`frontend/components/hud/hud-tokens.css` through `hud-type.css`. Change font
+families, role font shorthands, tracking, role colors, icon sizes and HUD control
+defaults in **hud-tokens.css**. Michroma identities use the compact role in lists
 and narrow cards; section labels use cyan uppercase monospace, body/context use
 sans, and figures use tabular monospace. Use `HudHeading`, `HudText` and `HudValue`
 for content, or `hud-type-*` classes for inline names, controls and formatted
 `Figure` elements. Component CSS owns layout and references these tokens rather
 than defining private fonts or sizes. Preserve the shared 16px phone input minimum
-for Safari focus behavior. Admin/account forms outside the game keep Catalyst's
-application typography.
+for Safari focus behavior. Admin/account forms outside the game keep application typography through the
+shared action interface's explicit standard appearance during migration.
+
+Use `HudIcon` for utility Heroicons outlines. Its 16/20/24 size roles consume
+shared tokens; object artwork uses `HudObjectThumbnail`. Accepted shell-close
+and navigation geometry remain explicit variants.
+
+Use `HudButton`, `HudIconButton`, `HudSearchInput` and `HudSelect` from
+`HudControls.tsx` for new HUD controls. `HudButton` is the sole action implementation;
+`HudIconButton` delegates to it and `HudActionBand` composes it. These adapters retain Catalyst behavior
+and share font, height, padding, color, focus and touch defaults. Desktop compact
+controls currently use 30px height; phone/coarse-pointer targets retain 44px and
+inputs retain 16px text. Feature styles own arrangement, not copied control
+fonts or sizes. `HUD/Typography/Shared Foundations` demonstrates the same APIs.
+
+The travel selection prototype adopts these defaults. Older HUD controls still
+have local overrides and require deliberate migration; changing a token updates
+its consumers, not every legacy control. This section owns UI implementation
+guidance; `GLOSSARY.md` remains game vocabulary.
+
+### Smoked-crystal actions — accepted band and Lens buttons
+
+Travis selected full-width integrated footer cells, followed by smoked-crystal
+material C from the [appearance comparison](assets/hud/action-band-materials-reference.png).
+The [layout sketch](assets/hud/action-band-geometry-reference.png) establishes
+the band meeting the lower frame and following its clipped corners. Two actions
+split equally with the primary on the right; three use equal outer cells and a
+modestly wider center primary. The current preview uses 30/40/30 for three.
+
+Travis accepted the [coded band appearance](assets/hud/smoked-crystal-card-runtime.png)
+and requested a standalone-button preview before broader adoption.
+`HudActionBand` composes shared `HudButton` controls and static CSS facets. Shared
+`--hud-crystal-*` tokens own material colors and corner cuts; `--hud-band-height`
+owns band height. Hover, keyboard focus and
+press have visible treatments; disabled cells mute, and a pending action locks
+the band with a clock and pending label. Pending crystal controls show a narrow
+`/` highlight sweeping left to right, including neutral working buttons. The
+shared `--hud-working-sweep-duration` controls its 1.8s cycle; idle and merely
+disabled controls stay still. Reduced motion uses a static highlight; forced
+colors hides the decoration while retaining the busy label and clock. The standalone `HUD/Card Layout/Stationary Actions` story reviews
+two/three actions, short/overflowing content, natural/fixed sizing and states.
+`HudButton` and `HudIconButton` default to `appearance="crystal"` for standalone
+primary, secondary and quiet controls. Both forms use `hud-crystal.module.css`;
+band CSS owns only joined-cell geometry. Pending text/icon controls remain
+noninteractive and expose busy state; the sweep is decorative and never implies
+a measured percentage of completion. `HUD/Buttons/Smoked Crystal` compares a
+fictional Command panel with standard and crystal appearances plus shared variants.
+Travis selected **A · Lens** from the [standalone comparison](assets/hud/standalone-button-shapes-reference.png)
+on 2026-10-19: symmetrical elongated hexagons, faceted glass ends, a slender
+polished rim and a luminous lower facet. Labels retain compact Michroma via
+`--hud-crystal-button-font`; `--hud-crystal-button-end` controls the end depth.
+Travis accepted the coded Lens buttons after shortening the tips to 5px and
+thinning the horizontal bevels. The shared preview implements this direction;
+legacy controls still require deliberate migration. Ordinary shared actions default to Lens.
+Standard controls retain `--hud-control-font` (the secondary sans role). Integrated
+bands keep their accepted geometry/type treatment through the integrated shape.
+Button coverage includes primary, secondary, quiet, icon-only, selected toggle,
+long-label, disabled and pending states. `tone="neutral" | "warning" | "danger"`
+is independent of emphasis and is also available on `HudBandAction`. Cancel/Back
+that leave an uncommitted choice use neutral secondary (or quiet in compact
+contexts). Interrupting an active order, such as Stop travel, uses warning.
+Destructive actions use danger and explicit verb/object labels, such as Delete
+preset; red alone must not communicate the action. Tone supplies presentation,
+not confirmation or gameplay behavior. Features own consequence explanations and
+any confirmation required for irreversible loss. `HUD/Buttons/Smoked Crystal`
+shows these tones, pending/disabled examples and a destructive footer for review.
+Travis accepted the warning/danger and working-state preview on 2026-10-19.
+
+### Shared action interface and ownership
+
+Import action types and helpers from `frontend/components/hud/HudControls.tsx`.
+The same `HudButton` renders a native button without `href` and a Catalyst/Next
+anchor with a string `href`. Refs match the rendered element. Buttons default to
+`type="button"`; forms set `type="submit"` intentionally. Links preserve href,
+modifier-click, target and download semantics. Disabled/pending links render an
+anchor without href, with `aria-disabled` and `tabIndex=-1`; click activation callbacks are blocked.
+`pending` locks activation, sets `aria-busy` and replaces content with a clock and
+`pendingLabel`. Use actual request state; a running game order is not a pending UI
+request. Icon helpers require `label` for both button and link forms.
+
+| Choice | Use |
+| --- | --- |
+| `presentation="action"` (default) | Lens text or hexagonal icon action; `shape="integrated"` is reserved for joined footer cells |
+| `presentation="row"` | Full-width, unframed structured selection/menu/disclosure; preserves children, role, ARIA and refs |
+| `presentation="chrome"` | Unframed navigation/close/toolbar; 44px default, accepted close/nav geometry may refine dimensions |
+| `presentation="map"` | Transparent spatial target with no imposed dimensions or backend touch expansion; caller owns map placement, hit area and marker art |
+| `appearance="standard"` | Explicit comparison and account/auth application styling; ordinary game features use the default |
+
+Standard actions delegate their light/dark material, metrics and interaction states
+to Catalyst. Primary application actions retain cyan by default; `standardColor="dark"`
+preserves the existing dark login/gating primary. This option affects standard
+primary actions only. Lens and structured presentations retain their shared HUD
+owners. Disabled standard links reuse the same Catalyst class recipe and touch
+target as enabled links while removing their destination.
+
+Presentation selects geometry, not interaction logic: menu owners still manage
+roving focus, map owners still manage events/camera and forms still own validation.
+Existing accepted close, navigation and map glyphs/hit areas remain unchanged
+when their owners migrate. Use `HudButton` for rich children and `HudIconButton`
+for shared utility glyphs. Native anchors in paragraphs remain content links.
+
+Adjustable fonts, metrics, colors, tip depth and sweep duration belong in
+`hud-tokens.css`. Lens material, tone and working decoration have one implementation
+in `hud-crystal.module.css`; base metrics and unframed presentation states have one
+implementation in `hud-controls.module.css`. `HudControls.tsx` composes those owners.
+Feature CSS owns layout and spatial/chrome geometry, without redefining material,
+font, tones, disabled/pending states or button themes. An integrated band owns only
+cell proportions/geometry. A global visual change edits its shared owner once;
+no consumer should need a matching styling patch. Production action sites now use
+this interface, including hidden branches, auth/gates and renderer fallback UI.
+`node harness/utilities/check-hud-actions.cjs` enforces the production import/JSX
+boundary through static imports, re-exports and literal dynamic imports. It runs
+in `harness/check.sh`; its reviewed backend exemptions are Catalyst internals and
+HudControls itself. Tests/stories remain fixture owners. Dev routes, studies and
+currently unused modules are inventoried separately with `--inventory`; they are
+retained pending their own disposition and are not production exceptions.
+The [migration evidence](../.scratch/hud-card-layout/button-migration-evidence.md)
+records per-site accounting, fixture coverage and the separate retained-preview
+formatting-guard failure.
+
+Travel and production shell placement remain unchanged. A reusable production
+card-footer slot is still to be settled.
 
 ## Acceptance checks
 

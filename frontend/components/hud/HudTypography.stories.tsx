@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
+import { useState } from 'react'
+import { ArrowLeftIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { HudCardShell } from './HudCardShell'
+import { HudButton, HudIconButton, HudSearchInput, HudSelect } from './HudControls'
+import { HudIcon } from './HudIcon'
 import { HudFacts } from './HudFacts'
 import { HudHeading, HudText, HudValue } from './HudTypography'
 import styles from './hud-typography.stories.module.css'
@@ -9,7 +13,7 @@ const meta = {
   component: HudHeading,
   tags: ['autodocs'],
   parameters: {
-    docs: { description: { component: 'F — Navigator: geometric identity headings, sans body copy, cyan uppercase section labels and monospaced figures. Coded appearance awaiting visual acceptance.' } },
+    docs: { description: { component: 'Shared HUD foundation: geometric identity headings, sans body copy, cyan labels, tabular figures and outline icons. Edit hud-tokens.css for font roles, colors, icon sizes and compact control defaults. HudControls adapts Catalyst; the game and these examples consume the same defaults. Compact controls are under visual review.' } },
   },
   decorators: [(Story) => <div className={`dark ${styles.stage}`}><Story /></div>],
 } satisfies Meta<typeof HudHeading>
@@ -161,3 +165,22 @@ export const TextRoles: Story = {
     </HudCardShell>
   ),
 }
+
+function FoundationSample() {
+  const [scope, setScope] = useState('local')
+  return <HudCardShell title="Shared foundations" className={styles.card} lighting="none">
+    <div className={styles.samples}>
+      <HudHeading size="compact">Peregrine</HudHeading>
+      <HudText variant="secondary">One shared token source for typography, icons and HUD controls.</HudText>
+      <div className={styles.controlRow}><HudIcon icon={ArrowLeftIcon} size={16} /><HudIcon icon={MagnifyingGlassIcon} /><HudIcon icon={ChevronDownIcon} size={24} /></div>
+      <div className={styles.controlRow}><HudIconButton icon={ArrowLeftIcon} label="Back" /><HudText variant="secondary">Compact icon control</HudText></div>
+      <HudSearchInput aria-label="Foundation search" placeholder="Search by name…" />
+      <div className={styles.controlRow}><HudButton aria-pressed={scope === 'local'} onClick={() => setScope('local')}>This system</HudButton><HudButton aria-pressed={scope === 'all'} onClick={() => setScope('all')}>All known systems</HudButton></div>
+      <label className={styles.controlRow}><HudText variant="label">Activity</HudText><HudSelect aria-label="Foundation activity"><option>All</option><option>Ready</option></HudSelect></label>
+      <div className={styles.controlRow}><HudButton variant="primary">Start travel</HudButton><HudButton disabled>Unavailable</HudButton></div>
+      <HudText variant="caption">Touch layouts retain 44px targets and 16px input text.</HudText>
+    </div>
+  </HudCardShell>
+}
+
+export const SharedFoundations: Story = { render: () => <FoundationSample /> }

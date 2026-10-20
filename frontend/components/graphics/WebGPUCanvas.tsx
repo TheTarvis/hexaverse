@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import * as THREE from 'three'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { RendererStateNotice } from '@/components/render-guard/RendererStateNotice'
 import { createRendererOwner, type RendererOwner, type RendererSnapshot, type RendererSurface } from '@/components/render-guard/renderer-owner'
 import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
@@ -178,7 +178,7 @@ export function WebGPUCanvas({ label, createScene, animate = false, surface = 'p
       {pending && <p role="status" className={styles.notice}>Loading {label}…</p>}
       {sceneError ? <div role="status" className={styles.notice}>
         <p>Scene could not be loaded.</p>
-        <Button outline onClick={() => setAttempt(value => value + 1)}>Retry</Button>
+        <HudButton onClick={() => setAttempt(value => value + 1)}>Retry</HudButton>
       </div> : failed && <div className={styles.notice}>
         <RendererStateNotice status={snapshot.phase === 'interrupted' ? 'interrupted' : 'unsupported'}
           cause={snapshot.phase === 'interrupted' ? 'lost' : 'creation'} surface={surface === 'space' || surface === 'galaxy' ? surface : 'preview'}

@@ -126,6 +126,7 @@
   right: -10px;
   width: 28px;
   height: 28px;
+  min-width: 0;
   min-height: 0;
   padding: 4px;
   border: 0;
@@ -133,15 +134,6 @@
   background: transparent;
   color: #b1edff;
   cursor: pointer;
-}
-
-.shell .close:hover {
-  color: #e4f8ff;
-}
-
-.shell .close:focus-visible {
-  outline: 2px solid #a5e9ff;
-  outline-offset: 3px;
 }
 
 .shell .close svg {
@@ -200,13 +192,13 @@
 
 /* Game HUD cards keep their accepted dark controls in either OS color scheme. */
 .shell [data-slot='control']::before { display: none; }
-.shell input, .shell select, .shell textarea { color: #dce8f0; background: #0c1b28; border-color: #435d70; }
+.shell input, .shell select, .shell textarea { color: var(--hud-type-body); background: var(--hud-control-bg); border-color: var(--hud-control-border); }
 .shell input::placeholder, .shell textarea::placeholder { color: #91a3b7; }
 .shell option { color: #dce8f0; background: #0c1b28; }
 /* iOS focuses small text controls by magnifying the viewport. Keep readable
    control text while leaving browser pinch zoom and viewport scale unrestricted. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px), (pointer: coarse) {
-  .shell input, .shell select, .shell textarea { font-size: max(16px, 1rem); line-height: 1.5; }
+  .shell input, .shell select, .shell textarea { font-size: max(var(--hud-input-phone-font-size), 1rem); line-height: 1.5; }
 }
 
 /* Original 624c4ff chrome stays identical on every viewport. The existing

@@ -3,7 +3,7 @@
 import { createContext, lazy, Suspense, useContext, useId, useRef, type Ref, type ReactNode, type ComponentPropsWithoutRef } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import styles from './hud-card-shell.module.css'
 
 const CardFrameContext = createContext(false)
@@ -52,8 +52,8 @@ export function HudCardShell({
         </h2>
       )}
       {onClose && (
-        <Button
-          plain
+        <HudButton
+          presentation="chrome"
           type="button"
           ref={closeButtonRef}
           data-testid={closeTestId}
@@ -64,7 +64,7 @@ export function HudCardShell({
           className={styles.close}
         >
           <XMarkIcon aria-hidden="true" />
-        </Button>
+        </HudButton>
       )}
   </>
 

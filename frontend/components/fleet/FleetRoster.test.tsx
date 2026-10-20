@@ -152,10 +152,10 @@ describe('FleetRoster — the command surface (fleet-roster ADDED, board-view AD
         screen.getByTestId('fleet-row-f1'),
         'exactly one row is the commanding one',
       ).toHaveAttribute('data-active', 'false')
-      // ...and the distinction is visible, not attribute-only.
-      expect(screen.getByTestId('fleet-row-f2').className).not.toBe(
-        screen.getByTestId('fleet-row-f1').className,
-      )
+      // Shared row presentation owns the visible pressed-state treatment.
+      expect(screen.getByTestId('fleet-row-f2')).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByTestId('fleet-row-f1')).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByTestId('fleet-row-f2')).toHaveAttribute('data-hud-button', 'row')
     })
 
     // Scenario: A fleet in the currently open board is marked "here"

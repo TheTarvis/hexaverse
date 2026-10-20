@@ -1,0 +1,23 @@
+.stage { min-height: 100dvh; padding: 28px; color: var(--hud-type-body); background: #050e17; }
+.intro { display: grid; gap: 8px; max-width: 78ch; }
+.tools { display: flex; gap: 12px; margin: 24px 0 32px; }
+.tools label { display: grid; gap: 8px; width: 220px; max-width: 100%; }
+.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 360px)); gap: 32px; align-items: start; }
+.variant { min-width: 0; }
+.example { display: grid; gap: 20px; }
+.exampleTitle { display: grid; gap: 8px; min-height: 80px; }
+.card { width: 100%; }
+.command { display: flex; flex-direction: column; gap: 20px; }
+.telemetry { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.samples { display: grid; gap: 20px; margin-top: 40px; max-width: 752px; }
+.tabs { display: none; }
+@media (max-width: 760px) {
+ .stage { padding: 16px; }
+ .comparison { display: block; }
+ .variant:not([data-active='true']) { display: none; }
+ .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+ .exampleTitle { min-height: 0; }
+ .samples { margin-top: 28px; }
+ .row > button { max-width: 100%; }
+}

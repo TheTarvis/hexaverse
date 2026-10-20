@@ -1,7 +1,7 @@
 'use client'
 
 import { useAccountOptional } from '@/components/account-provider'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { HudSection } from './HudCardShell'
 import { HudHeading, HudText } from './HudTypography'
 
@@ -16,6 +16,6 @@ export function AccountSettingsContent({ email, onSignOut }: { email: string | n
   return <HudSection aria-label="Account settings">
     <HudHeading variant="section" level={3}>Account</HudHeading>
     {email && <HudText className="break-all">{email}</HudText>}
-    <Button outline onClick={onSignOut} data-testid="sign-out-button">Sign out</Button>
+    <HudButton onClick={onSignOut} data-testid="sign-out-button">Sign out</HudButton>
   </HudSection>
 }

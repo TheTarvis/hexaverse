@@ -35,7 +35,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { HudHeading } from '@/components/hud/HudTypography'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { Text } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
 import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
@@ -407,7 +407,7 @@ export function GalaxyView() {
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
       ]} />
-      {isStartArea && <GameViewVitals><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><Button href="/login" color="cyan">Sign in</Button></div></GameViewVitals>}
+      {isStartArea && <GameViewVitals><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><HudButton href="/login" variant="primary">Sign in</HudButton></div></GameViewVitals>}
 
     </GameViewShell>
   )

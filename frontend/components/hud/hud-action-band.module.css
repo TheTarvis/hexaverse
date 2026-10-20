@@ -1,0 +1,25 @@
+.band {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  flex: 0 0 auto;
+  min-width: 0;
+  background: var(--hud-crystal-edge);
+  border-top: 1px solid var(--hud-crystal-edge);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--hud-inner-cut, 16px)), calc(100% - var(--hud-inner-cut, 16px)) 100%, var(--hud-inner-cut, 16px) 100%, 0 calc(100% - var(--hud-inner-cut, 16px)));
+}
+.band[data-count='3'] { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr); }
+.band .cell.cell {
+  min-width: 0;
+  min-height: max(var(--hud-band-height), var(--hud-control-touch-size));
+  padding: 10px 12px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  font: var(--hud-body-font);
+  clip-path: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+@media (max-width: 760px) { .band .cell { padding-inline: 8px; } }
+@media (forced-colors: active) { .band { background: ButtonText; border-color: ButtonText; } }

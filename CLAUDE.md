@@ -17,9 +17,11 @@ before model/material/effect work, read `docs/art-direction.md`.
 `docs/history/` and `docs/plans/` preserve history, not an active backlog.
 Before creating or relocating documentation, use the placement rules in
 `docs/README.md`. Save work in progress, design rounds, prompts, review evidence
-and local specs/tickets under `.scratch/<effort>/`. `docs/agents/` holds reusable
-agent instructions and workflow configuration only. Preserve accepted canonical
-decisions and referenced evidence before pruning completed implementation work.
+and local specs/tickets under `.scratch/<effort>/`, which is local-only and
+gitignored. Move anything developers or agents need to share or retain into
+`docs/` using its placement rules. `docs/agents/` holds reusable agent instructions
+and workflow configuration only. Preserve accepted canonical decisions and
+referenced evidence in `docs/` before pruning completed implementation work.
 The old implementation is archived
 at `archive/pre-volt-reset` and commit `bf9c637`.
 
