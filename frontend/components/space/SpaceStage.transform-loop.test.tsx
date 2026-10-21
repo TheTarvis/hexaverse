@@ -252,59 +252,6 @@ describe('SpaceStage + the transform loop — task 4.3b', () => {
   })
 })
 
-describe('SpaceStage + the transform loop — task 4.6', () => {
-  function sceneWithBodyAt(x: number, worldTimeMs: number): SceneModel {
-    return buildSceneModel({
-      interior: {
-        systemId: 'sys_1',
-        extent: EXTENT,
-        character: 'normal',
-        starClass: 'M',
-        worldTime: worldTimeMs,
-        scale: 1,
-        features: [
-          { id: 'feat-star', type: 'star', space: { X: 0, Y: 0, Z: 0 }, size: 5 },
-          { id: 'feat-body-0', type: 'rocky', space: { X: x, Y: 0, Z: 0 }, size: 1 },
-        ],
-        laneGates: [],
-        contacts: [],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-      fleets: [],
-      worldTimeMs,
-      reducedMotion: false,
-      selection: null,
-      log: vi.fn(),
-    })
-  }
-
-  // Scenario: A mark crossing the viewport edge gains or loses its
-  // off-screen affordance within a second
-  it('Scenario: A mark crossing the viewport edge gains or loses its off-screen affordance within a second', async () => {
-    const near = sceneWithBodyAt(20, T0)
-    const { rerender } = render(
-      <SpaceStage systemId="sys_1" scene={near} extent={EXTENT} worldTime={T0} scale={1} selection={null} frameSource={null} />,
-    )
-    await ready()
-    expect(screen.queryByTestId('offscreen-feat-body-0'), 'the body starts on-screen').toBeNull()
-
-    // A coarse tick lands a new scene with the body now far outside the
-    // viewport — membership recomputes on the coarse render, no camera
-    // change needed.
-    const far = sceneWithBodyAt(EXTENT * 200, T0 + 1_000)
-    rerender(
-      <SpaceStage systemId="sys_1" scene={far} extent={EXTENT} worldTime={T0 + 1_000} scale={1} selection={null} frameSource={null} />,
-    )
-    expect(screen.getByTestId('offscreen-feat-body-0')).toBeInTheDocument()
-
-    // ...and back the other way.
-    rerender(
-      <SpaceStage systemId="sys_1" scene={near} extent={EXTENT} worldTime={T0 + 2_000} scale={1} selection={null} frameSource={null} />,
-    )
-    expect(screen.queryByTestId('offscreen-feat-body-0')).toBeNull()
-  })
-})
-
 describe('SpaceStage + the transform loop — task 4.8', () => {
   // Scenario (SDET, task 4.8's own test): a point pick after a simulated
   // resize resolves against the post-resize basis, the sole basis authority.
@@ -342,9 +289,8 @@ describe('SpaceStage + the transform loop — task 4.8', () => {
 })
 
 describe('SpaceStage + the transform loop — task 4.9', () => {
-  // `onFocusMark`/`reframeOn` and the off-screen chip both read the
-  // transform loop's live mark ref, not the coarse-rendered scene.marks.
-  it('the off-screen chip reframes to the LIVE mark position published by the loop, not the stale coarse one', async () => {
+  // Keyboard focus reframes off-screen marks using the transform loop’s live position.
+  it('keyboard focus reframes to the live mark position, not the stale coarse one', async () => {
     vi.useFakeTimers()
     let simTime = T0
     const elements = { parentId: 'feat-star', radius: 5_000, periodMs: 100_000, phase: 0, inclination: 0, node: 0 }
@@ -382,12 +328,11 @@ describe('SpaceStage + the transform loop — task 4.9', () => {
       />,
     )
     await ready()
-    expect(screen.getByTestId('offscreen-feat-far'), 'a body 5000 units out must start off-screen').toBeInTheDocument()
 
     simTime = T0 + 25_000
     act(() => vi.advanceTimersToNextFrame())
 
-    fireEvent.click(screen.getByTestId('offscreen-feat-far'))
+    fireEvent.focus(screen.getByTestId('body-hit-feat-far'))
 
     const camera = JSON.parse(screen.getByTestId('space-canvas-region').getAttribute('data-camera')!)
     const livePosition = drawOrbitPosition(elements, simTime)

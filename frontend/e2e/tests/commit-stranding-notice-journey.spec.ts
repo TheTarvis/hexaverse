@@ -18,7 +18,7 @@ test('inspecting and plotting does not submit an order or invent a committed str
   await details.getByTestId('details-plot').click({ timeout: 10_000 })
   await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', target.id)
   await expect(page.getByTestId('burn-button')).toBeHidden()
-  await expect(page.getByTestId('fleet-flight-controls')).toBeHidden()
+  await expect(page.getByTestId('fleet-flight-controls')).toHaveCount(0)
   await expect(page.getByText('This burn will strand your fleet.', { exact: true })).toHaveCount(0)
   expect(commits).toEqual([])
 })

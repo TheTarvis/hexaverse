@@ -23,13 +23,11 @@ import { SceneNavigationAction } from '@/components/hud/SceneNavigationAction'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
-import { VitalsStrip } from '@/components/space/VitalsStrip'
-import { rosterRowStatus } from '@/components/fleet/roster-status'
 import { useCorporationSessionOptional } from '@/components/corporation-provider'
 import { BOARD_POLL_MS } from '@/lib/realtime'
 
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
+import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewFooter } from '@/components/hud/GameViewShell'
 import { GalaxyObjectBrowser } from './GalaxyObjectBrowser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -373,7 +371,7 @@ export function GalaxyView() {
             hasOwnFleet={ownFleets.length > 0}
           />
         </GalaxyObjectBrowser> },
-        { id: 'command', label: 'Command', children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
+        { id: 'fleets', label: 'Fleets', children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
           <FleetRoster
             worldTime={worldTime}
             scale={servedScale}
@@ -390,13 +388,7 @@ export function GalaxyView() {
             onJump={handleJump}
             enabled={!isStartArea}
           />
-      {!isStartArea && <GameViewVitals placement="panel" aria-label="Command fleet telemetry" data-testid="galaxy-vitals">
-        <VitalsStrip mode="panel" acting={activeFleet} ownedFleets={ownFleets} fleetsFailed={!!fleetsFailed}
-          status={!fleetsFailed && activeFleet ? rosterRowStatus(activeFleet, worldTime, id => systemNames[id] ?? id) : null}
-          onSelectFleet={f => { setActiveFleetId(f.id); handleShowFleet(f) }} systemNames={systemNames}
-          credits={session.isError ? null : session.corporation?.credits ?? null} scale={servedScale}
-          worldTime={worldTime} serverWorldTime={servedWorldTime} />
-      </GameViewVitals>}
+
           {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={handleSelectSystemId} />}
           {/* This view mounts no command panel of its own, so the roster
               rows ARE the fleet command surface here — declared explicitly
@@ -407,7 +399,7 @@ export function GalaxyView() {
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
       ]} />
-      {isStartArea && <GameViewVitals><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><HudButton href="/login" variant="primary">Sign in</HudButton></div></GameViewVitals>}
+      {isStartArea && <GameViewFooter><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><HudButton href="/login" variant="primary">Sign in</HudButton></div></GameViewFooter>}
 
     </GameViewShell>
   )

@@ -3,50 +3,17 @@
 import { SceneNavigationAction } from '@/components/hud/SceneNavigationAction'
 import { CelestialActions } from './CelestialActions'
 
-// SystemSpaceView — the continuous-R³ per-system view (openspec change
-// `build-production-space-view`, `system-space-view`: *System Space View
-// Route and Data Fan-In*, *Realtime Refetch Rules While the Space View Is
-// Open*, *Departure Hand-Off to the Galaxy View*, *Fleet Roster
-// Cross-Navigation*, *A Landed Resolution Is Announced to Assistive
-// Technology*).
-//
-// FOUR INDEPENDENTLY-FAILING READS PLUS THE AMBIENT SESSION. The interior
-// (`useSystemSpace`) draws the world; the requester's own fleets
-// (`useMyFleets` — the CORPORATION-scoped read, filtered to this system on
-// the client) drive every command; the open system's station
-// (`useStation`) and the market price board (`useMarketBoard`) anchor the
-// sell and refuel offers; and the credit balance comes from the ambient
-// corporation session (`useCorporationOptional`), NOT a fifth read.
-//
-// No read's failure disables another's surface: a failed interior read
-// leaves every fleet-state-anchored command invokable, a failed fleet read
-// leaves the canvas rendering bodies, gates and contacts, a failed station
-// read withdraws only the station-anchored offers, a failed board read
-// withdraws only sell, and an unresolved balance withdraws only the readout.
-//
-// A STATION READ THAT RESOLVES TO NO STATION IS NOT A FAILURE. The server
-// 404s a system with no visible station — the ordinary answer — so that case
-// shows no error and no retry, while any other failure does.
-//
-// THE STATION READ SUPPLIES ONLY `systemId` AND `featureId`. A station's
-// position is never taken from the station document; it comes from the
-// interior read's body table, exactly as every other body's does.
-//
-// THE CLOCK IS PROJECTED AT THE SERVED SCALE, never an assumed 1 — and when
-// the interior read has failed, at the FLEET read's served scale, because
-// that is then the only clock on screen.
+// System scene, disclosed object browsing and live travel coordination.
+// The combined Command/telemetry composition has been retired. Sensor settlement
+// and world-read ownership remain here while focused action cards are rebuilt.
 
-import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace, GameViewVitals } from '@/components/hud/GameViewShell'
+import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace } from '@/components/hud/GameViewShell'
 import { HudButton } from '@/components/hud/HudControls'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
-import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
-import { HudText } from '@/components/hud/HudTypography'
 import { type HudPanelId } from '@/components/hud/HudWorkspace'
-import { HudColumn } from '@/components/hud/GameHud'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FleetRoster } from '@/components/fleet/FleetRoster'
 import { rosterRowStatus, type ResolvedBody } from '@/components/fleet/roster-status'
 import { useCorporationOptional, useCorporationSessionOptional } from '@/components/corporation-provider'
 import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
@@ -63,7 +30,6 @@ import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
 import { jumpErrorCopy } from '@/lib/jump-copy'
 import { CompactTravelCard } from './CompactTravelCard'
-import travelStyles from './compact-travel-card.module.css'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useScanTargets, useSettledScan, type ScanCommitMarker } from '@/hooks/use-scan'
@@ -75,16 +41,20 @@ import { BOARD_POLL_MS, ETA_CUSHION_MS } from '@/lib/realtime'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station, VenueQuotes } from '@/lib/types/market'
 import type { Sighting } from '@/lib/types/sighting'
-import { HudAnnouncementScope } from '@/components/hud/HudLiveAnnouncements'
 import { FleetActionsPanel } from './FleetActionsPanel'
-import { ScanControl } from './ScanControl'
-import { SpaceCommandPanel, type AcceptedBurnCommit } from './SpaceCommandPanel'
+
 import { SpaceStage } from './SpaceStage'
 import { SYSTEM_ORBIT_APPEARANCE, SYSTEM_LABEL_APPEARANCE } from './space-appearance'
 import { buildSceneModel } from './space-scene'
 import { selectionKey, selectionWireRequest, toggleSelection, type SpaceSelection } from './space-selection'
 import type { SceneFrameInputs, SpaceFrameSource } from './space-transform-loop'
-import { VitalsStrip } from './VitalsStrip'
+
+interface AcceptedTravelCommit {
+  fleetId: string
+  departMs: number | null
+  arriveMs: number | null
+  selectionKey: string
+}
 
 export interface SystemSpaceViewProps {
   systemId: string
@@ -271,7 +241,6 @@ interface CommittedOrder {
   readsAtAcceptance: number | null | undefined
   /** selectionKey of the selection the command was invoked for */
   selectionKey: string
-  warned: boolean
 }
 
 export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
@@ -280,17 +249,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const fleets = useMyFleets()
   const stationRead = useStation(systemId || null)
   const boardRead = useMarketBoard()
-  // The balance is ambient session data, not a read of this view's own
-  // (`docked-fleet-actions`: *Credit Balance Readout*). The OPTIONAL
-  // accessor: a missing provider withdraws a readout, never the view.
+  // Station transaction affordability and onboarding use the ambient corporation.
   const corporation = useCorporationOptional()
-  // add-vitals-strip, impl contract §6.3: the SESSION accessor, which also
-  // exposes `isError` — a session that resolved once and has since failed to
-  // refresh must read Unavailable on the strip, never the stale cached
-  // balance. `useCorporationOptional` above stays exactly as it is; nothing
-  // else on this view reads the session accessor.
-  const { corporation: sessionCorporation, isError: sessionFailed } = useCorporationSessionOptional()
-  const creditsShown: number | null = sessionFailed ? null : (sessionCorporation?.credits ?? null)
+  // Corporation identity remains available while station services use ambient credits.
+  const { corporation: sessionCorporation } = useCorporationSessionOptional()
 
   const travelOrder = useOrder()
   const travelStop = useStop()
@@ -335,12 +297,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const refetchGhostFeed = useCallback(() => ghostFeedRefetchRef.current(), [])
   const [highlightedGhostId, setHighlightedGhostId] = useState<string | null>(null)
   const [hudRequest, setHudRequest] = useState<{ id: HudPanelId; sequence: number }>()
-  const [announcementOutlet, setAnnouncementOutlet] = useState<HTMLDivElement | null>(null)
   const requestHudPanel = useCallback((id: HudPanelId) => {
     setGuidePageVisible(false)
     setHudRequest(previous => ({ id, sequence: (previous?.sequence ?? 0) + 1 }))
   }, [])
-  const openScan = useCallback(() => requestHudPanel('command'), [requestHudPanel])
+  const openScan = useCallback(() => setAnnouncement('Sensor controls are unavailable during the HUD rebuild.'), [])
   const galaxy = useGalaxy()
   const systemNames = useMemo(() => {
     const m: Record<string, string> = {}
@@ -447,7 +408,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     void qc.invalidateQueries({ queryKey: queryKeys.sightings.pile(null) })
   }, [refetchGhostFeed, qc])
   const handleCommitAccepted = useCallback(
-    (commit: AcceptedBurnCommit) => {
+    (commit: AcceptedTravelCommit) => {
       if (guide && guiding && guide.targetId && commit.fleetId === guide.fleetId && commit.selectionKey === selectionKey({ bodyId: guide.targetId }) && commit.departMs !== null && ['target', 'travel'].includes(guide.phase)) {
         saveCommandGuide({ ...guide, phase: 'travel', acceptedAt: commit.departMs })
       }
@@ -464,7 +425,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           arriveMs: commit.arriveMs,
           readsAtAcceptance,
           selectionKey: commit.selectionKey,
-          warned: commit.strandingWarning,
         },
       }))
     },
@@ -502,54 +462,17 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // (`actingSettledScanRefetchRef`), and the scan-target invalidation
   // scoped to the acting fleet.
   const completedScanMarkers = useRef(new WeakSet<ScanCommitMarker>())
-  // F11-2 (orchestrator ruling 2026-09-03, defect found during the F11-1
-  // build): the empty-set copy this transition withholds below must be
-  // withheld only for the report THIS transition explains, never for any
-  // unacknowledged settled report in general — a blanket
-  // `settledScan.data` gate suppresses "No host is in range" forever
-  // against a long-unacknowledged report from an ORDINARY, unrelated
-  // ETA-path settle. `earlySettleMarkerRef` is set only here, at the
-  // instant the window ends this way; once the acting fleet's own
-  // settled-status read lands FRESH relative to it (the refetch just
-  // below), whatever id it carries (if any) is captured as the report
-  // this handoff explains.
-  const earlySettleMarkerRef = useRef<ScanCommitMarker | null>(null)
-  const earlySettleExplainedIdRef = useRef<string | null>(null)
   useEffect(() => {
     const marker = commitPendingMarker.data
     if (!marker || committedPending || completedScanMarkers.current.has(marker)) return
     completedScanMarkers.current.add(marker)
     if (actingRunningScan.isError || actingRunningScan.data) return
-    const settled = qc.getQueryState(queryKeys.actions.settled(acting?.id ?? ''))
-    earlySettleMarkerRef.current = { dataUpdates: settled?.dataUpdateCount ?? 0, errorUpdates: settled?.errorUpdateCount ?? 0 }
-    earlySettleExplainedIdRef.current = null
     rereadPilesAfterSettle()
     void actingSettledScanRefetchRef.current()
     if (actingIdRef.current) {
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.scanTargets(actingIdRef.current) })
     }
   }, [commitPendingMarker.data, committedPending, actingRunningScan.isError, actingRunningScan.data, acting?.id, rereadPilesAfterSettle, qc])
-
-  // Derived every render, never imperatively cleared (mirrors
-  // `committedPending`'s own derivation just above): while waiting for the
-  // marked transition's own settled-status refetch to land, the handoff is
-  // active unconditionally; once it lands, the handoff stays active only
-  // while the id it carried is still the unacknowledged report on screen —
-  // never for an older or later, unrelated one.
-  if (earlySettleMarkerRef.current != null) {
-    const settled = qc.getQueryState(queryKeys.actions.settled(acting?.id ?? ''))
-    const landedFresh =
-      (settled?.dataUpdateCount ?? 0) > earlySettleMarkerRef.current.dataUpdates ||
-      (settled?.errorUpdateCount ?? 0) > earlySettleMarkerRef.current.errorUpdates
-    if (landedFresh) {
-      earlySettleExplainedIdRef.current = actingSettledScan.data?.id ?? null
-      earlySettleMarkerRef.current = null
-    }
-  }
-  const earlySettleHandoff =
-    earlySettleMarkerRef.current != null ||
-    (earlySettleExplainedIdRef.current != null &&
-      actingSettledScan.data?.id === earlySettleExplainedIdRef.current)
 
   const runningMine = useRunningMine(acting?.id ?? null).data ?? null
 
@@ -781,7 +704,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       if (travelGuard.held || fleets.isError) return
       setTravelError(null)
       setActingFleetId(fleet.id)
-      requestHudPanel('command')
+      requestHudPanel('objects')
       setTravelReceipt(receipt => receipt?.fleet.id === fleet.id ? receipt : null)
       setTravelNotice(null)
       setFleetFocus(previous => ({ fleetId: fleet.id, sequence: (previous?.sequence ?? 0) + 1 }))
@@ -804,11 +727,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     return interior.data.features.find((f) => f.id === acting.attachedTo) ?? null
   }, [interior.data, acting?.attachedTo])
 
-  const gateFacts = useMemo(() => {
-    const gate = (interior.data?.laneGates ?? []).find((g) => g.id === selection?.bodyId)
-    return gate ? { bodyId: gate.id, destSystemId: gate.destSystemId } : null
-  }, [interior.data, selection?.bodyId])
-
   // add-vitals-strip, impl contract §2.3/§6.3: the shared roster derivation's
   // fifth argument — checks BOTH interior collections, keyed by a docked
   // host's `attachedTo` or a burn's served target body id. A failed interior
@@ -825,14 +743,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     [interior.data],
   )
   const nameOf = useCallback((id: string) => interior.data?.features.find(body => body.id === id)?.name ?? systemNames[id] ?? id, [systemNames, interior.data])
-  // The strip's pill: null whenever the own-fleets read's most recent
-  // attempt has failed, or there is no acting fleet to derive from — the
-  // SAME projection the roster row runs through (`system-console`'s *The
-  // Fleet Cell's State Pill Is a Projection of the Shared Roster
-  // Derivation*).
-  const vitalsStatus =
-    fleets.isError || !acting ? null : rosterRowStatus(acting, worldTime, nameOf, runningMine, actingRemote ? undefined : resolveBody)
-
   // --- the station-anchored inputs ----------------------------------------
   //
   // A 404 is "this system has no visible station" — the ordinary answer, and
@@ -872,7 +782,6 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     actingBurn.DepartMs === order.departMs &&
     actingBurn.ArriveMs === order.arriveMs
   const orderLive = awaitingRead || stillRunning
-  const commitStrandingNotice = orderLive && !!order && order.warned
   const selectionCommitted = orderLive && !!order && selectionKey(selection) === order.selectionKey
   const previewWanted = !!acting && !acting.jump && !mineRunning && !dockedAtTarget && !selectionCommitted
   const burnPreview = useBurnPreview({
@@ -899,11 +808,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       onSuccess: fleet => {
         const burn = fleet.state?.Burn
         setTravelNotice(burn && burn.ArriveMs !== agreedArrival ? 'The accepted arrival differs from the estimate. Status reflects the accepted order.' : null)
-        handleCommitAccepted({ fleetId, departMs: burn?.DepartMs ?? null, arriveMs: burn?.ArriveMs ?? null, selectionKey: targetKey, strandingWarning: fleet.strandingWarning === true })
+        handleCommitAccepted({ fleetId, departMs: burn?.DepartMs ?? null, arriveMs: burn?.ArriveMs ?? null, selectionKey: targetKey })
         setTravelReceipt({ fleet, destination: label, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
         setTravelMode('status')
-        setObjectIndexOpen(false)
-        requestHudPanel('command')
+        setObjectIndexOpen(true)
+        requestHudPanel('objects')
       },
       onError: error => {
         const reason = commandErrorReason(error)
@@ -949,16 +858,16 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     })
   }
   const statusDestination = travelReceipt?.destination ?? (statusFleet?.state?.Burn?.Target.BodyId ? nameOf(statusFleet.state.Burn.Target.BodyId) : statusFleet?.state?.Burn?.Target.Point ? 'Point in space' : statusFleet?.attachedTo ? nameOf(statusFleet.attachedTo) : 'In this system')
-  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelMode('review'); requestHudPanel(selection?.bodyId && objectIndexOpen ? 'objects' : 'command') }
+  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelMode('review'); requestHudPanel('objects') }
   const travelCard = travelMode ? <CompactTravelCard mode={travelMode} fleet={travelMode === 'status' ? statusFleet : acting}
-    onChooseFleet={() => requestHudPanel('command')} fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
+    fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
     quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
-    pending={travelPending} stopPending={travelStop.isPending} warning={travelReceipt?.fleet.strandingWarning}
+    pending={travelPending} stopPending={travelStop.isPending} warning={statusFleet?.strandingWarning}
     additionalActions={<>
       {statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton tone="warning" data-testid="travel-cut-drive" pending={travelCutDrive.isPending} pendingLabel="Cutting drive…" disabled={travelPending || mineRunning || fleets.isError} onClick={cutTravelDrive}>Cut drive</HudButton>}
       {statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton data-testid="travel-jump" pending={travelJump.isPending} pendingLabel="Jumping…" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</HudButton>}
     </>}
-    onFleet={id => { if (!travelGuard.held) { setActingFleetId(id); setTravelError(null) } }} onStart={startTravel} onStop={stopTravel}
+    onFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }} onStart={startTravel} onStop={stopTravel}
     onBack={() => { if (!travelGuard.held) { setTravelMode(null); openObjectIndex(true) } }}
     onClose={() => { if (!travelGuard.held) setTravelMode(null) }} onRetry={burnPreview.retry} /> : null
   const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
@@ -1118,7 +1027,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               worldTime={worldTime}
               scale={servedScale}
               selection={selection}
-              onSelect={(picked) => { if (travelGuard.held) return; setTravelMode(null); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('command') }}
+              onSelect={(picked) => { if (travelGuard.held) return; setTravelMode(null); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('objects') }}
               onAvailabilityChange={setCanvasAvailable}
               onPendingChange={setRendererPending}
               onFirstFrame={handleFirstFrame}
@@ -1128,7 +1037,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               initialFocusFleetId={!actingRemote && !fleets.isError ? acting?.id : null}
               focusFleetRequest={canvasAvailable && !interiorFailed && !interior.isLoading && fleetFocus && indexedFleets.some(fleet => fleet.id === fleetFocus.fleetId) && scene.marks.some(mark => mark.kind === 'fleet' && mark.id === fleetFocus.fleetId) ? fleetFocus : null}
               actingFleetId={acting?.id ?? null}
-              onActivateFleet={setActingFleetId}
+              onActivateFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }}
               frameSource={frameSource}
             />
           </>
@@ -1186,6 +1095,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           { id: 'objects', label: 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), children: (
       <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%' }}>
         <SystemObjectIndex
+          listActions={!travelMode && <div className={commandStyles.objectActions}>
+          {selection?.point && <HudButton variant="primary" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</HudButton>}
+          {acting && <HudButton variant="quiet" data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); setObjectIndexOpen(true) }}>Fleet status</HudButton>}
+        </div>}
           compact
           servicesWithoutDetails={interiorFailed && !!stationActionsHost}
           key={systemId}
@@ -1201,7 +1114,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               ...(fleet.roster ? { shipCount: fleet.roster.ships.length } : {}),
             } })),
           ]}
-          inspectorBody={travelMode === 'review' && objectIndexOpen && !!selection?.bodyId ? travelCard : undefined}
+          inspectorBody={travelCard ?? undefined}
           detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId && !interiorFailed ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{!interiorFailed && objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
           detailContentFor={selection?.bodyId ?? stationActionsHost ?? undefined}
           selected={selection?.bodyId ?? null}
@@ -1228,116 +1141,9 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       </div>
           ) },
-          { id: 'command', label: 'Command', children: (<>
-<div className={commandStyles.workspaceCommand}>
-        <FleetRoster worldTime={worldTime} scale={servedScale} commandOwner="view" activeFleetId={acting?.id ?? null} currentSystemId={systemId} onSelect={selectFleet} selectionDisabled={travelPending || fleets.isError} />
-      <GameViewVitals placement="panel" aria-label="Command fleet telemetry">
-<VitalsStrip mode="panel"
-          acting={acting}
-          ownedFleets={allFleets}
-          fleetsFailed={fleets.isError}
-          status={vitalsStatus}
-          onSelectFleet={selectFleet}
-          systemNames={systemNames}
-          credits={creditsShown}
-          scale={servedScale}
-          worldTime={worldTime}
-          serverWorldTime={serverWorldTime}
-          {...(currentQuote
-            ? { burnCost: { tons: currentQuote.fuelCostTons, affordable: currentQuote.affordable } }
-            : {})}
-        />
-      </GameViewVitals>
-        {!(travelMode === 'review' && objectIndexOpen && selection?.bodyId) && travelCard}
-        {!travelMode && <div className={travelStyles.entry}>
-          {selection && <HudButton variant="primary" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</HudButton>}
-          {acting && <HudButton data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); requestHudPanel('command') }}>Command fleet</HudButton>}
-        </div>}
-      <HudColumn
-        data-testid="space-command-column"
-        side="left"
-        style={{ position: 'relative', inset: 'auto', width: '100%', maxHeight: 'none' }}
-        dockAware
-        className={commandStyles.systemColumn}
-      >
-        {fleets.isError && (
-          <div
-            data-testid="space-fleets-error"
-            className="flex flex-col gap-3 hud-type-body"
-          >
-            <p className="text-zinc-600 dark:text-zinc-400">Your fleets could not be read.</p>
-            <HudButton
-              type="button"
-              data-testid="space-fleets-retry"
-              className="mt-1"
-              onClick={() => void fleets.refetch()}
-            >
-              Retry
-            </HudButton>
-          </div>
-        )}
 
-        {/* TODO(HUD-HIDDEN-CLEANUP): Standalone Focus fleet is CSS-hidden; remove this render path when its replacement lands. */}
-        {acting && !actingRemote && <HudButton variant="primary" data-testid="system-focus-fleet" disabled={!canvasAvailable || fleets.isError} onClick={() => setFleetFocus(previous => ({ fleetId: acting.id, sequence: (previous?.sequence ?? 0) + 1 }))}>Focus fleet</HudButton>}
-        {actingRemote && acting ? <FleetLocationPanel fleet={acting} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleets.isError} onOpen={id => router.push(`/systems/${id}`)} /> : <>
-        {/* TODO(HUD-HIDDEN-CLEANUP): Legacy Course card is CSS-hidden; retire this wiring after the burn-flow rebuild. */}
-        <SpaceCommandPanel
-          fleet={acting}
-          selection={selection}
-          gateFacts={gateFacts}
-          canvasAvailable={canvasAvailable}
-          mineRunning={mineRunning}
-          worldTime={worldTime}
-          scale={servedScale}
-          preview={burnPreview.preview}
-          currentQuote={currentQuote}
-          previewStale={burnPreview.stale}
-          previewNoQuote={burnPreview.noQuote}
-          onRequote={burnPreview.retry}
-          onCommitAccepted={handleCommitAccepted}
-          commitStrandingNotice={commitStrandingNotice}
-          selectionCommitted={selectionCommitted}
-        />
-
-        {!stationActionsHost && fleetActions}
-
-        </>}
-
-        {/* The station read failed — the offers it anchors are withdrawn,
-            and their absence is attributed to THAT, never to the system
-            having nothing to trade with. A system with no station at all
-            (the 404 above) shows nothing here. */}
-        {!stationActionsHost && marketNotices}
-
-        {/* This view owns the fleet commands — they live on the two panels
-            above — so the roster here renders selection and status only
-            (`fleet-roster`: "The roster renders no commands on a view that
-            owns them itself"). No `isChartedGate` stub: withholding jump by
-            asserting a falsehood is what the live requirement forbids. */}
-
-      </HudColumn>
-      </div>
-      <HudAnnouncementScope outlet={announcementOutlet}>
-        <section aria-label="Sensors" data-testid="command-sensors">
-          <HudText variant="label">Sensors</HudText>
-              <ScanControl
-                fleet={acting}
-                worldTime={worldTime}
-                scale={servedScale}
-                committedPending={committedPending}
-                onCommitAccepted={(accepted) => {
-                  if (guiding && guide?.phase === 'scan' && accepted?.id === guide.fleetId && accepted.activeScanId) {
-                    saveCommandGuide({ ...guide, phase: 'scanning', scanActionId: accepted.activeScanId })
-                  }
-                }}
-                earlySettleHandoff={earlySettleHandoff}
-              />
-        </section>
-      </HudAnnouncementScope>
-          </>) },
         ]}
       />
-      <div ref={setAnnouncementOutlet} data-testid="workspace-announcements" />
 
     </GameViewShell>
   )

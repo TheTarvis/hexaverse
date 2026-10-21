@@ -16,16 +16,16 @@ export type HudBandAction = {
 }
 
 type HudActionBandProps = {
-  actions: readonly [HudBandAction, HudBandAction] | readonly [HudBandAction, HudBandAction, HudBandAction]
+  actions: readonly [HudBandAction] | readonly [HudBandAction, HudBandAction] | readonly [HudBandAction, HudBandAction, HudBandAction]
   label?: string
   className?: string
 }
 
-/** Integrated footer: two equal cells, or a wider center primary among three. */
+/** Integrated footer: one full-width action, two equal cells, or a wider center primary among three. */
 export function HudActionBand({ actions, label = 'Card actions', className }: HudActionBandProps) {
   const busy = actions.some(action => action.pending)
   return <div role="group" aria-label={label} aria-busy={busy} data-slot="hud-action-band" data-count={actions.length} className={clsx(styles.band, className)}>
-    {actions.map((action, index) => <HudButton key={action.id} appearance="crystal" shape="integrated" tone={action.tone} variant={index === 1 ? 'primary' : 'secondary'} data-primary={index === 1} pending={action.pending} pendingLabel={action.pendingLabel ?? `${action.label}…`} disabled={busy || action.disabled} onClick={action.onClick} className={styles.cell}>
+    {actions.map((action, index) => <HudButton key={action.id} appearance="crystal" shape="integrated" tone={action.tone} variant={index === (actions.length === 1 ? 0 : 1) ? 'primary' : 'secondary'} data-primary={index === (actions.length === 1 ? 0 : 1)} pending={action.pending} pendingLabel={action.pendingLabel ?? `${action.label}…`} disabled={busy || action.disabled} onClick={action.onClick} className={styles.cell}>
       {action.label}
     </HudButton>)}
   </div>

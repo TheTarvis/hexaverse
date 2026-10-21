@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { ArrowLeftIcon, MagnifyingGlassIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { HudCardShell, HudSection } from './HudCardShell'
-import { HudButton, HudIconButton, HudSelect } from './HudControls'
+import { HudBackButton, HudButton, HudIconButton, HudSelect } from './HudControls'
 import { HudActionBand } from './HudActionBand'
 import { HudHeading, HudText, HudValue } from './HudTypography'
 import styles from './hud-buttons.stories.module.css'
@@ -49,7 +49,7 @@ function ButtonStudy() {
     <div className={styles.comparison}><div className={styles.variant} data-active={active === 'standard'}><CommandExample crystal={false} state={state} /></div><div className={styles.variant} data-active={active === 'crystal'}><CommandExample crystal state={state} /></div></div>
     <section className={styles.samples} aria-label="Crystal control variants"><HudHeading size="compact">Shared variants</HudHeading>
       <div className={styles.row}><HudButton appearance="crystal" variant="primary" onClick={() => setNotice('Primary action')}>Primary action</HudButton><HudButton appearance="crystal" onClick={() => setNotice('Secondary action')}>Secondary action</HudButton><HudButton appearance="crystal" variant="quiet" onClick={() => setNotice('Quiet action')}>Quiet action</HudButton></div>
-      <div className={styles.row}><HudIconButton appearance="crystal" variant="secondary" icon={ArrowLeftIcon} label="Back" onClick={() => setNotice('Back')} /><HudIconButton appearance="crystal" variant="secondary" icon={MagnifyingGlassIcon} label="Search" onClick={() => setNotice('Search')} /><HudIconButton appearance="crystal" variant="secondary" icon={Cog6ToothIcon} label="Settings" onClick={() => setNotice('Settings')} /><HudButton appearance="crystal" aria-pressed={chosen} onClick={() => setChosen(value => !value)}>Selected toggle</HudButton></div>
+      <div className={styles.row}><HudBackButton destination="objects" onClick={() => setNotice('Back')} /><HudIconButton appearance="crystal" variant="secondary" icon={MagnifyingGlassIcon} label="Search" onClick={() => setNotice('Search')} /><HudIconButton appearance="crystal" variant="secondary" icon={Cog6ToothIcon} label="Settings" onClick={() => setNotice('Settings')} /><HudButton appearance="crystal" aria-pressed={chosen} onClick={() => setChosen(value => !value)}>Selected toggle</HudButton></div>
       <div className={styles.row}><HudButton appearance="crystal" disabled>Unavailable</HudButton><HudButton appearance="crystal" variant="primary" pending pendingLabel="Applying…">Apply changes</HudButton><HudIconButton appearance="crystal" variant="secondary" icon={MagnifyingGlassIcon} label="Searching" pending /><HudButton appearance="crystal" variant="primary" onClick={() => setNotice('Long label activated')}>Open outer-system expedition fleet</HudButton></div>
       <HudHeading size="compact">One shared action interface</HudHeading>
       <div className={styles.row}>

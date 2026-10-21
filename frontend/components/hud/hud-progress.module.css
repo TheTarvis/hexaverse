@@ -1,0 +1,19 @@
+.bar {
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: var(--hud-progress-height);
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: var(--hud-progress-track);
+  clip-path: polygon(var(--hud-progress-cut) 0, 100% 0, calc(100% - var(--hud-progress-cut)) 100%, 0 100%);
+}
+.bar::-webkit-progress-bar { background: var(--hud-progress-track); box-shadow: inset 0 1px 0 #9cddec20, inset 0 -1px 0 #9cddec16; }
+.bar::-webkit-progress-value { background: var(--hud-progress-fill); }
+.bar::-moz-progress-bar { background: var(--hud-progress-fill); }
+@media (forced-colors: active) {
+  .bar { appearance: auto; -webkit-appearance: auto; clip-path: none; }
+}

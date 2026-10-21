@@ -261,13 +261,7 @@ vi.mock('./SpaceStage', async () => {
 })
 
 import { SystemSpaceView } from './SystemSpaceView'
-import { assertFiguresMatchModule } from '@/lib/format/assert-figures'
 
-// MIGRATION NOTE (task 9.4, openspec change `add-figure-formatting`): the
-// credit-balance integration assertion below moves off a loose text regex
-// (which happens to still match the formatted `₡ 1,250` text and would
-// therefore be a tautological non-migration) onto `balance-figure`'s
-// data-raw, the strong assertion task 9.4 calls for.
 
 const T0 = 21_175_110_953
 const SYSTEM_ID = 'sys_-7_17'
@@ -466,136 +460,6 @@ describe('SystemSpaceView — the data fan-in', () => {
     expect(screen.queryByTestId('space-loading')).toBeNull()
   })
 
-  // Scenario: A failed interior read leaves the fleet-state-anchored
-  // commands usable
-  //
-  // REVISED 2026-09-03 (SDET, post-handoff — cause: this test as handed off
-  // was self-contradictory and no honest implementation could satisfy it).
-  // It asserted `fleet-cmd-jump-fleet_1` for a fleet attached to an ORDINARY
-  // body — a fleet with no lane to jump down — while the SDET-added case at
-  // the bottom of this file asserts that exactly such a fleet is NOT offered
-  // jump. Jump is anchored to the acting fleet's own served `laneId` (it is
-  // present iff the fleet is attached to a gate body), so the gate-attached
-  // fixture is what the scenario's "attached to a body" means for its jump
-  // clause.
-  //
-  // The assertion is STRENGTHENED rather than relaxed: instead of listing
-  // ids that happen to be present when the read fails, it renders the SAME
-  // fleet twice — once with a healthy interior read, once with a failed one
-  // — and demands the command set be IDENTICAL. That is the requirement's
-  // actual claim ("the interior failure withdraws nothing that fleet state
-  // alone grants"), and unlike a bare presence list it fails against an
-  // implementation that offers a command in neither state.
-  it('Scenario: A failed interior read leaves the fleet-state-anchored commands usable', () => {
-    // No single fleet can be docked at a station AND attached to a gate AND
-    // mid-burn at once, so the seven commands the scenario lists are
-    // exercised across the three states that make each of them meaningful.
-    // Each state is rendered TWICE — once with a healthy interior read, once
-    // with a failed one — and the command set must be identical, which is
-    // the requirement's actual claim.
-    const cases: { what: string; fleet: Record<string, unknown>; expect: string[] }[] = [
-      {
-        what: 'docked at the station, cargo aboard',
-        fleet: dockedFleet({ attachedTo: STATION.featureId }),
-        expect: ['sell-section', 'refuel-section', 'stationkeep-control'],
-      },
-      {
-        what: 'attached to a lane-gate body, carrying its served laneId',
-        fleet: dockedFleet({ attachedTo: 'gate-sys_-6_16', laneId: 'lane_-7_17_-6_16' }),
-        expect: ['fleet-cmd-jump-fleet_1'],
-      },
-      {
-        what: 'under way',
-        fleet: burningFleet(),
-        expect: ['fleet-cmd-cut-drive-fleet_1', 'fleet-cmd-stop-fleet_1'],
-      },
-    ]
-    const ALWAYS = ['fleet-roster', 'space-fleet-panel']
-    const ALL = [
-      ...ALWAYS,
-      'sell-section',
-      'refuel-section',
-      'stationkeep-control',
-      'fleet-cmd-cut-drive-fleet_1',
-      'fleet-cmd-stop-fleet_1',
-      'fleet-cmd-jump-fleet_1',
-    ]
-    // `queryAllByTestId`, not `queryByTestId`: the composed view currently
-    // renders cut-drive/stop/jump on BOTH the roster row and the actions
-    // panel, so the singular query raises "found multiple elements" and
-    // masks the parity question this test is asking. The duplication itself
-    // is reported separately (see the SDET-added case below).
-    const present = () => ALL.filter((id) => screen.queryAllByTestId(id).length > 0)
-
-    for (const c of cases) {
-      setReads({}, { data: [c.fleet] })
-      const healthy = render(<SystemSpaceView systemId={SYSTEM_ID} />)
-      const whenHealthy = present()
-      healthy.unmount()
-
-      setReads({ data: undefined, isError: true, error: new Error('nope') }, { data: [c.fleet] })
-      const failed = render(<SystemSpaceView systemId={SYSTEM_ID} />)
-      const whenFailed = present()
-      failed.unmount()
-
-      // Vacuity guard: this state must actually offer the commands it is
-      // here to exercise, or "identical" is satisfied by offering none.
-      for (const id of [...ALWAYS, ...c.expect]) {
-        expect(whenHealthy, `${c.what}: ${id} must be offered with a healthy read`).toContain(id)
-      }
-      expect(
-        whenFailed,
-        `${c.what}: a failed interior read must withdraw no command anchored to the fleet's own served state`,
-      ).toEqual(whenHealthy)
-    }
-  })
-
-  it('SDET-added: each fleet command resolves to exactly one control in the composed view', () => {
-    // NOT an adjudication of WHICH surface should own these verbs — that is a
-    // spec question, reported to the orchestrator: `fleet-roster`'s *The
-    // Roster Row Is the Fleet Command Surface, Jump Gated by Attachment
-    // Alone* is still in force and unmodified by this change, while
-    // `system-space-view`/`docked-fleet-actions` place the same verbs on the
-    // command and actions panels. Both readings can satisfy THIS assertion:
-    // drop one surface, or give the two surfaces distinct test ids.
-    //
-    // What it pins is the property every e2e selector in this change depends
-    // on, and which a player also depends on: one visible control per verb.
-    // Two live "Cut drive" buttons for one fleet is a UI defect regardless of
-    // which spec wins, and it makes `getByTestId` ambiguous in Playwright's
-    // strict mode — where it is a hard error, not a warning.
-    setReads({}, { data: [burningFleet()] })
-    view()
-    for (const id of ['fleet-cmd-cut-drive-fleet_1', 'fleet-cmd-stop-fleet_1']) {
-      expect(screen.queryAllByTestId(id).length, `${id} is rendered by two surfaces at once`).toBe(1)
-    }
-  })
-
-  // The composition seam nothing else can see: `FleetActionsPanel.test.tsx`
-  // proves the panel offers sell and shows a balance GIVEN a station and a
-  // credit figure; only this file can prove the VIEW actually goes and gets
-  // them. A view that hands the panel `station={null}` / `credits={null}`
-  // renders a sell control that silently does nothing when clicked and a
-  // balance readout that is a permanent em dash — both of which pass every
-  // panel-level test.
-  //
-  // Scenario: Sell is offered while docked at a station with cargo aboard
-  // Scenario: The panel shows the current credit balance
-  it('Scenario: The panel shows the current credit balance (the view sources it, not the panel)', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    const { container } = view()
-    // `balance-value` (case c) keeps its wrapper id; `balance-figure` is the
-    // credits <Figure> — the view has to have read the balance for the
-    // panel to have one at all.
-    const figure = screen.getByTestId('balance-figure')
-    expect(
-      figure.getAttribute('data-raw'),
-      "the balance readout must show the corporation's served credit balance, not a placeholder — " +
-        'the view has to read it for the panel to have one',
-    ).toBe('1250')
-    assertFiguresMatchModule(container, { scale: 1 })
-  })
-
   it('SDET-added: sell is offered against the station the view read, not against any docked body', () => {
     // `docked-fleet-actions`: the sell verb is offered "whenever the acting
     // fleet's effective state is `docked` to a station", and the commit is
@@ -620,57 +484,18 @@ describe('SystemSpaceView — the data fan-in', () => {
     ).toBeNull()
   })
 
-  // Scenario: A failed interior read withdraws the mine offer without
-  // misreporting the body
-  it('Scenario: A failed interior read withdraws the mine offer without misreporting the body', async () => {
-    setReads({ data: undefined, isError: true, error: new Error('nope') })
-    view()
-    // The offer is absent — resource kinds reach this view only on the
-    // interior read (design.md Decision 12).
-    expect(screen.queryByTestId('mine-section')).toBeNull()
-    // ...and its absence is attributed to the failed read, NEVER to an empty
-    // body. This is the sentence the decision was written to forbid.
-    const notice = screen.getByTestId('mine-unavailable')
-    expect(notice.textContent!.toLowerCase()).not.toMatch(
-      /nothing to mine|no resources|carries no resources|has nothing/,
-    )
-    // ...and it offers the same retry.
-    const retries = screen.getAllByTestId(/retry/)
-    expect(retries.length).toBeGreaterThan(0)
-    await userEvent.click(screen.getByTestId('space-interior-retry'))
-    expect(interiorRefetch).toHaveBeenCalled()
-  })
-
   // Scenario: A failed own-fleets read shows a retriable error in the fleet
   // panel
   it('Scenario: A failed own-fleets read shows a retriable error in the fleet panel', async () => {
     setReads({}, { data: undefined, isError: true })
     view()
-    expect(screen.getByTestId('space-fleets-error')).toBeInTheDocument()
-    await userEvent.click(screen.getByTestId('space-fleets-retry'))
+    expect(screen.getByTestId('index-fleets-retry')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('index-fleets-retry'))
     expect(fleetsRefetch).toHaveBeenCalled()
     // The canvas keeps rendering the interior — only the own-fleet marks are
     // absent.
     expect(screen.getByTestId('space-canvas-region')).toBeInTheDocument()
     expect(screen.queryByTestId('space-interior-error')).toBeNull()
-  })
-
-  // Scenario: An arrived fleet reads as arrived on both the canvas and the
-  // roster
-  it('Scenario: An arrived fleet reads as arrived on both the canvas and the roster', () => {
-    // The corporation-scoped read settles a due arrival per system through
-    // the shared `settleIfDue` seam; the system-scoped one does NOT. Both
-    // panels therefore read one fleet from ONE source, and there is no state
-    // in which the canvas shows it burning while the roster shows it docked —
-    // a disagreement that is not cosmetic, since the docked commands live on
-    // the roster's panel.
-    const settled = dockedFleet({ id: 'fleet_1', attachedTo: 'feat-body-0' })
-    setReads({}, { data: [settled] })
-    view()
-    expect(screen.getByTestId('fleet-row-fleet_1')).toHaveTextContent(/docked|attached/i)
-    expect(screen.getByTestId('space-canvas-region').getAttribute('data-fleet-states')).toContain(
-      'fleet_1',
-    )
   })
 
   // Scenario: Loading persists through first frame after data arrives
@@ -721,8 +546,8 @@ describe('SystemSpaceView — the data fan-in', () => {
     expect(screen.getByTestId('space-interior-error')).toHaveTextContent(/interior down/i)
     expect(screen.getByTestId('space-interior-retry')).toBeInTheDocument()
     expect(screen.queryByTestId('renderer-unsupported')).toBeNull()
-    expect(screen.getByTestId('fleet-roster')).toBeInTheDocument()
-    expect(screen.getByTestId('space-fleet-panel')).toBeInTheDocument()
+    expect(screen.queryByTestId('fleet-roster')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('space-command-column')).not.toBeInTheDocument()
   })
 
   // Scenario: A failed own-fleets read does not suppress the unsupported
@@ -732,27 +557,16 @@ describe('SystemSpaceView — the data fan-in', () => {
     setReads({}, { data: undefined, isError: true })
     view()
     await waitFor(() => expect(screen.getByTestId('renderer-unsupported')).toBeInTheDocument())
-    expect(screen.getByTestId('space-fleets-error')).toBeInTheDocument()
+    expect(screen.getByTestId('index-fleets-retry')).toBeInTheDocument()
   })
 
   it('SDET-added: fleets in other systems are filtered out on the client', () => {
     setReads({}, { data: [dockedFleet(), dockedFleet({ id: 'fleet_elsewhere', systemId: 'sys_other' })] })
     view()
-    // Both are in the ROSTER (the roster is corp-wide)...
-    expect(screen.getByTestId('fleet-row-fleet_elsewhere')).toBeInTheDocument()
-    // ...but the acting-fleet panel is anchored to this system's fleet.
-    expect(screen.getByTestId('fleet-row-fleet_1')).toBeInTheDocument()
-  })
+    // The local Objects browser only discloses own fleets in this system.
+    expect(screen.queryByTestId('index-fleet-fleet_elsewhere')).not.toBeInTheDocument()
 
-  it('retains a transit fleet in vitals and replaces local commands with destination guidance', () => {
-    setReads({}, { data: [dockedFleet({ jump: { laneId: 'lane', destSystemId: 'destination', departMs: T0, arriveMs: T0 + 60000 } })] })
-    view()
-    expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('In transit')
-    expect(screen.getByTestId('fleet-row-fleet_1')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByTestId('preview-panel')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('space-fleet-panel')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('open-fleet-system'))
-    expect(push).toHaveBeenCalledWith('/systems/destination')
+    expect(screen.getByTestId('index-fleet-fleet_1')).toBeInTheDocument()
   })
 
   // Scenario: The view reads the open system's station and the market
@@ -811,17 +625,6 @@ describe('SystemSpaceView — the data fan-in', () => {
     // never the board.
     expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
     expect(screen.getByTestId('refuel-cost-preview')).toBeInTheDocument()
-  })
-
-  // Scenario: An unresolved credit balance withdraws the readout, not the
-  // verbs
-  it('Scenario: An unresolved credit balance withdraws the readout, not the verbs', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    market.corporationSessionFailed = true
-    view()
-    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
-    expect(screen.getByTestId('sell-section')).toBeInTheDocument()
-    expect(screen.getByTestId('refuel-section')).toBeInTheDocument()
   })
 })
 
@@ -997,14 +800,14 @@ describe('SystemSpaceView — departure hand-off, scoped to the acting fleet', (
     setReads({}, { data: [dockedFleet({ id: 'A' }), dockedFleet({ id: 'B' })] })
     const { rerender } = render(<SystemSpaceView systemId={SYSTEM_ID} />)
     // Command fleet A.
-    await userEvent.click(screen.getByTestId('fleet-row-A'))
+    // The first own in-system fleet is the initial command fleet.
     // Fleet B departs on its own schedule.
     setReads({}, { data: [dockedFleet({ id: 'A' }), departing('B')] })
     rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
     await new Promise((r) => setTimeout(r, 20))
     expect(push, 'a player mid-input must not be yanked off the screen').not.toHaveBeenCalled()
     // ...and the acting fleet is still the one they chose.
-    expect(screen.getByTestId('fleet-row-A')).toBeInTheDocument()
+    expect(screen.getByTestId('index-fleet-A')).toBeInTheDocument()
   })
 
   // Scenario: Opening the view with an already-departed fleet does not
@@ -1013,73 +816,6 @@ describe('SystemSpaceView — departure hand-off, scoped to the acting fleet', (
     setReads({}, { data: [departing('fleet_1')] })
     view()
     await new Promise((r) => setTimeout(r, 20))
-    expect(push).not.toHaveBeenCalled()
-  })
-})
-
-describe('SystemSpaceView — a gate-targeted burn ends in a jumpable attachment', () => {
-  // Scenario: Attachment from a gate-targeted burn makes the jump command
-  // available
-  it('Scenario: Attachment from a gate-targeted burn makes the jump command available', () => {
-    // The fleet has arrived attached to the gate body it burned toward, and
-    // its own read now carries that gate's laneId. Jump becomes available on
-    // its roster row — gated by attachment alone, with no charted-lane
-    // precondition and no canvas selection.
-    const atGate = dockedFleet({
-      attachedTo: 'gate-sys_-6_16',
-      laneId: 'lane_-7_17_-6_16',
-    })
-    setReads({}, { data: [atGate] })
-    view()
-    const jump = screen.getByTestId('fleet-cmd-jump-fleet_1') as HTMLButtonElement
-    expect(jump).toBeInTheDocument()
-    expect(jump.disabled).toBe(false)
-  })
-
-  it('SDET-added: a fleet attached to an ordinary body is not offered jump', () => {
-    setReads({}, { data: [dockedFleet()] })
-    view()
-    const jump = screen.queryByTestId('fleet-cmd-jump-fleet_1') as HTMLButtonElement | null
-    if (jump) expect(jump.disabled).toBe(true)
-  })
-})
-
-describe('SystemSpaceView — roster cross-navigation', () => {
-  // Scenario: Selecting a fleet in another system navigates there
-  //
-  // Spec: 0011/S3 — "A row takes you to its fleet, whatever tier it's on".
-  // The marker moved here from the deleted
-  // `components/board/SystemBoardView.test.tsx` (openspec change
-  // `build-production-space-view`, tasks.md 10.1): the docs/specs scenario
-  // names "that system's board opens", and this view is the board's
-  // successor, so the cross-navigation assertion below IS 0011/S3's
-  // coverage under the new view's name.
-  it('Scenario: Selecting a fleet in another system navigates there', async () => {
-    setReads({}, { data: [dockedFleet(), dockedFleet({ id: 'far', systemId: 'sys_-6_16' })] })
-    view()
-    await userEvent.click(screen.getByTestId('fleet-row-far'))
-    expect(push).toHaveBeenCalledWith('/systems/sys_-6_16')
-  })
-
-  // Scenario: Selecting a fleet with no position navigates to the galaxy
-  it('Scenario: Selecting a fleet with no position navigates to the galaxy', async () => {
-    const onLane = dockedFleet({
-      id: 'lane',
-      systemId: '',
-      position: undefined,
-      attachedTo: undefined,
-      jump: { laneId: 'l', destSystemId: 'sys_x', departMs: T0, arriveMs: T0 + 1000 },
-    })
-    setReads({}, { data: [dockedFleet(), onLane] })
-    view()
-    await userEvent.click(screen.getByTestId('fleet-row-lane'))
-    expect(push).toHaveBeenCalledWith('/')
-  })
-
-  it('SDET-added: selecting a fleet in THIS system sets it acting and does not navigate', async () => {
-    setReads({}, { data: [dockedFleet({ id: 'A' }), dockedFleet({ id: 'B' })] })
-    view()
-    await userEvent.click(screen.getByTestId('fleet-row-B'))
     expect(push).not.toHaveBeenCalled()
   })
 })
@@ -1158,181 +894,13 @@ describe('SystemSpaceView — landed resolutions are announced', () => {
   })
 })
 
-// =============================================================================
-// add-vitals-strip — the seams only THIS file can prove: that
-// `system-console`'s `VitalsStrip` is actually MOUNTED, fed from the view's
-// OWN reads (never a second read of its own), and that the wiring survives
-// exactly the failure states `VitalsStrip.test.tsx` cannot exercise because
-// they are not inputs on `VitalsStripProps` at all (impl contract §7.2)
-// — the interior read and the renderer's availability. RED-PHASE,
-// COMPILE-clean today (SystemSpaceView.tsx exists) but ASSERTION-RED: the
-// strip is not mounted yet, so every `vitals-*`/`fuel-gauge`/`hold-gauge`
-// query below throws "unable to find an element".
-// =============================================================================
-
-describe('SystemSpaceView — the vitals strip is mounted and fed from the view\'s own reads (system-console)', () => {
-  // Scenario: The strip renders with every read resolved (task 8.5's own
-  // "mounts the strip fed from its own reads" — the composition seam
-  // nothing else can see, same shape as the credit-balance seam above:
-  // `VitalsStrip.test.tsx` proves the strip renders correctly GIVEN props;
-  // only this file proves `SystemSpaceView` actually SUPPLIES them).
-  it('Scenario: The strip renders with every read resolved — fed from the view\'s own interior/fleets/session/galaxy reads, never a second read of its own', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    const { container } = view()
-    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-row-fleet_1')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
-    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', String(40 - 25))
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
-    assertFiguresMatchModule(container.querySelector('[data-testid="vitals-strip"]') as HTMLElement, { scale: 1 })
-  })
-
-  // Scenario: The strip survives a failed interior read — the cells fed by
-  // the fleet read and the session are unchanged. VitalsStrip has no
-  // interior prop of its own (contract §7.2), so this is provable only
-  // here: the view must keep mounting the strip, fed from the reads that
-  // did NOT fail.
-  it('Scenario: The strip survives a failed interior read', () => {
-    setReads(
-      { data: undefined, isError: true, error: new Error('interior down') },
-      { data: [dockedFleet({ attachedTo: STATION.featureId })] },
-    )
-    view()
-    expect(screen.getByTestId('space-interior-error')).toBeInTheDocument()
-    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('fleet-row-fleet_1')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
-  })
-
-  // Scenario: The strip survives an unavailable renderer. Same reasoning:
-  // renderer availability reaches VitalsStrip through no prop it has.
-  it('Scenario: The strip survives an unavailable renderer', () => {
-    stage.available = false
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    view()
-    expect(screen.getByTestId('renderer-unsupported')).toBeInTheDocument()
-    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
-  })
-
-  // Scenario: The strip survives a failed own-fleets read — mounted here to
-  // confirm the VIEW routes `fleets.isError` into the strip's
-  // `fleetsFailed` prop (never confusing it with `fleets.data` simply being
-  // empty); `VitalsStrip.test.tsx` covers the strip's OWN response to
-  // `fleetsFailed=true` given directly.
-  it('Scenario: The strip survives a failed own-fleets read, with no error or retry of its own', () => {
-    setReads({}, { data: undefined, isError: true })
-    view()
-    expect(screen.getByTestId('space-fleets-error')).toBeInTheDocument()
-    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
-    expect(screen.queryByTestId('vitals-fleet-chevron')).not.toBeInTheDocument()
-  })
-
-  // The credits cell's staleness rule (system-console: "A stale session
-  // read is never presented as a current balance") has NO reachable
-  // implementation path through `useCorporationOptional` — this is the
-  // seam `useCorporationSessionOptional` (contract §6) exists to close, and
-  // the derivation (`sessionFailed ? null : (corporation?.credits ?? null)`)
-  // lives in THIS component, not in VitalsStrip. Only this file can
-  // exercise it.
-  it('SDET-added: a session that resolved once and has since failed to refresh reads Unavailable on the strip, never the cached figure (contract §6.3)', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    const { rerender } = view()
-    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'true')
-
-    market.corporationSessionFailed = true
-    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
-    expect(screen.getByTestId('balance-value')).toHaveAttribute('data-available', 'false')
-    expect(screen.queryByTestId('balance-figure')).toBeNull()
-  })
-
-  // Scenario: Clicking a strip cell leaves the selection unchanged /
-  // Scenario: Switching the acting fleet leaves the selection unchanged.
-  // `selection` is THIS component's own state — VitalsStrip has no setter
-  // for it at all (contract §7.2), so this is provable only at this level.
-  it('Scenario: Clicking a strip cell leaves the selection unchanged', async () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    view()
-    await userEvent.click(screen.getByTestId('mock-select-body'))
-    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
-    await userEvent.click(screen.getByTestId('vitals-clock-cell'))
-    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
-  })
-
-  it('Scenario: Switching the acting fleet leaves the selection unchanged', async () => {
-    setReads(
-      {},
-      { data: [dockedFleet({ id: 'fleet_1' }), dockedFleet({ id: 'fleet_2', systemId: SYSTEM_ID, attachedTo: undefined })] },
-    )
-    view()
-    await userEvent.click(screen.getByTestId('mock-select-body'))
-    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
-    await userEvent.click(screen.getByTestId('fleet-row-fleet_2'))
-    expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
-  })
-
-  // docked-fleet-actions MODIFIED "Sell Commit"/"Refuel Commit": "the
-  // strip's hold and credits cells... reflect the sale's/refuel's effect
-  // without a page navigation". `VitalsStrip.test.tsx` proves the strip
-  // reacts correctly to new props; this proves the VIEW keeps supplying
-  // them from the SAME `useMyFleets()`/session reads a settled mutation's
-  // query invalidation (`hooks/use-market.ts`'s real `onSuccess`,
-  // unmodified by this change) would refetch — no navigation anywhere in
-  // either test.
-  it('Scenario: A successful sale refreshes hold and balance — landing on the strip, without navigation', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    const { rerender } = view()
-    // `hold-capacity-used`/`balance-figure` are RULING 17's inherited
-    // testids — they would still pass against today's PANEL-rendered
-    // readout even before the strip exists, which would make this
-    // assertion tautological on its own (README lesson two's shape). The
-    // `vitals-strip` presence check is what actually pins the new surface.
-    expect(screen.getByTestId('vitals-strip')).toBeInTheDocument()
-    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', String(40 - 25))
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
-
-    // What a settled sale's query invalidation would land: less cargo, more
-    // credits, same fleet, same route.
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId, roster: { ...dockedFleet().roster, cargo: { fuel: 12 }, freeHold: 40 } })] })
-    market.corporation = { id: 'corp-1', name: 'SDET Corp', credits: 1300 }
-    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
-
-    expect(screen.getByTestId('hold-capacity-used')).toHaveAttribute('data-raw', '0')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1300')
-    expect(push, 'no navigation on a settled sale').not.toHaveBeenCalled()
-  })
-
-  it('Scenario: A successful refuel refreshes hold, range, and balance — landing on the strip and the roster row, without navigation', () => {
-    setReads({}, { data: [dockedFleet({ attachedTo: STATION.featureId })] })
-    const { rerender } = view()
-    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '12')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1250')
-
-    setReads(
-      {},
-      { data: [dockedFleet({ attachedTo: STATION.featureId, roster: { ...dockedFleet().roster, cargo: { fuel: 22, metals: 3 }, freeHold: 15, estimatedRange: 9000 } })] },
-    )
-    market.corporation = { id: 'corp-1', name: 'SDET Corp', credits: 1150 }
-    rerender(<SystemSpaceView systemId={SYSTEM_ID} />)
-
-    expect(screen.getByTestId('vitals-fuel-tons')).toHaveAttribute('data-raw', '22')
-    // The estimated range on the fleet ROSTER row (unchanged surface,
-    // docked-fleet-actions' own clause) updates from the SAME read.
-    expect(screen.getByTestId('fleet-range-fleet_1')).toHaveAttribute('data-raw', '9000')
-    expect(screen.getByTestId('balance-figure')).toHaveAttribute('data-raw', '1150')
-    expect(push, 'no navigation on a settled refuel').not.toHaveBeenCalled()
-  })
-})
-
 
 it('opens real object details without an order and replaces them with travel review', async () => {
   view()
   await userEvent.click(screen.getByTestId('index-feat-body-0'))
   expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', 'feat-body-0')
   expect(screen.getByRole('complementary', { name: 'Details for feat-body-0' })).toHaveTextContent('metals')
-  expect(screen.getByTestId('space-command-column')).toBeVisible()
+  expect(screen.queryByTestId('space-command-column')).not.toBeInTheDocument()
   expect(mutations.order.mutate).not.toHaveBeenCalled()
   await userEvent.click(screen.getByTestId('index-focus'))
   expect(mutations.order.mutate).not.toHaveBeenCalled()
@@ -1340,7 +908,7 @@ it('opens real object details without an order and replaces them with travel rev
   expect(screen.getByTestId('compact-travel-card')).toBeVisible()
   expect(screen.getByTestId('details-plot')).not.toBeVisible()
   expect(screen.getByTestId('system-index-search')).not.toBeVisible()
-  expect(screen.getByTestId('space-command-column')).toBeVisible()
+  expect(screen.queryByTestId('space-command-column')).not.toBeInTheDocument()
   expect(mutations.order.mutate).not.toHaveBeenCalled()
 })
 
@@ -1567,4 +1135,19 @@ it('hands phone onboarding to one full-page panel and resumes the guide only whe
     vi.mocked(localStorage.getItem).mockReturnValue(null)
     vi.mocked(localStorage.setItem).mockImplementation(() => {})
   }
+})
+
+
+it('removes the combined Command and telemetry compositions while retaining Objects and contextual travel', async () => {
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+  view()
+  expect(screen.queryByRole('button', { name: 'Command' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Command panel' })).not.toBeInTheDocument()
+  for (const id of ['preview-panel', 'fleet-flight-controls', 'system-focus-fleet', 'vitals-strip']) {
+    expect(screen.queryByTestId(id)).not.toBeInTheDocument()
+  }
+  expect(screen.getByRole('button', { name: 'Objects' })).toBeVisible()
+  await userEvent.click(screen.getByTestId('travel-status-entry'))
+  expect(screen.getByTestId('compact-travel-card')).toBeVisible()
+  expect(mutations.order.mutate).not.toHaveBeenCalled()
 })

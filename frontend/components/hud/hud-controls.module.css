@@ -50,3 +50,8 @@
 .button.selectionIndicator[aria-pressed='true']::after { content: ''; display: block; position: absolute; left: 9px; right: 9px; height: 3px; background: var(--hud-control-indicator-color); clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 4px 100%); pointer-events: none; }
 .button.selectionIndicator[aria-pressed='true']::before { top: 0; }
 .button.selectionIndicator[aria-pressed='true']::after { bottom: 0; transform: rotate(180deg); }
+
+/* One navigation treatment for inspectors, choosers and task views. */
+.button.unframed.backButton { align-self: flex-start; justify-self: start; justify-content: flex-start; width: fit-content; max-width: 100%; min-height: var(--hud-control-touch-size); padding: 0 var(--hud-control-padding-x); gap: 8px; font: var(--hud-control-font); text-align: left; }
+.backButton > svg { flex-shrink: 0; }
+.backButton > span { overflow-wrap: anywhere; }

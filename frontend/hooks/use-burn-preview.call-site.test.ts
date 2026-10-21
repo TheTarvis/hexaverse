@@ -7,9 +7,7 @@ import { fileURLToPath } from 'node:url'
 // impl contract §5.1. A static guard in the `lib/realtime.test.ts` walk idiom:
 // the preview hook has exactly ONE call site in production source — the view —
 // so the panel and the view cannot each run their own preview query.
-//
-// Red today: the sole importer is `SpaceCommandPanel.tsx`, and the view has no
-// call.
+
 
 const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 

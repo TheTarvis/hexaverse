@@ -2,6 +2,7 @@
 
 import { forwardRef, type ComponentPropsWithoutRef, type ComponentType, type ReactElement, type ReactNode, type Ref, type RefAttributes, type SVGProps } from 'react'
 import clsx from 'clsx'
+import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { Button, buttonClassName, TouchTarget } from '@/components/catalyst/button'
 import { Input } from '@/components/catalyst/input'
 import { Select } from '@/components/catalyst/select'
@@ -93,4 +94,14 @@ export const HudSearchInput = forwardRef<HTMLInputElement, Omit<ComponentPropsWi
 
 export const HudSelect = forwardRef<HTMLSelectElement, ComponentPropsWithoutRef<typeof Select>>(function HudSelect({ className, ...props }, ref) {
   return <Select {...props} ref={ref} className={clsx(styles.field, className)} />
+})
+
+
+type HudBackButtonProps = Omit<HudButtonProps, 'children' | 'presentation' | 'appearance' | 'shape' | 'variant' | 'tone' | 'className'> & { destination: string }
+
+/** Place first at the top-left of the view being left; Back never occupies an action band. */
+export const HudBackButton = forwardRef<HTMLButtonElement, HudBackButtonProps>(function HudBackButton({ destination, ...props }, ref) {
+  return <HudButton {...props} ref={ref} presentation="chrome" className={styles.backButton} data-hud-back>
+    <HudIcon icon={ArrowLeftIcon} size={20} /><span>Back to {destination}</span>
+  </HudButton>
 })

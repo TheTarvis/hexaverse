@@ -379,60 +379,6 @@ describe('SpaceStage — recenter', () => {
   })
 })
 
-describe('SpaceStage — off-screen reach', () => {
-  it('Scenario: An off-screen lane gate is selectable by pointer', async () => {
-    await stage()
-    const aff = screen.getByTestId('offscreen-gate-sys_-7_18')
-    const cameraBefore = region().getAttribute('data-camera')
-    expect(cameraBefore).not.toBeNull()
-    await userEvent.click(aff)
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'gate-sys_-7_18' })
-    expect(region().getAttribute('data-camera'), 'the camera must reframe so the mark is visible').not.toBe(
-      cameraBefore,
-    )
-  })
-
-  it('Scenario: An off-screen lane gate is selectable by touch', async () => {
-    await stage()
-    const aff = screen.getByTestId('offscreen-gate-sys_-7_18')
-    fireEvent.touchStart(aff, { touches: [{ target: aff, clientX: 10, clientY: 10 }] })
-    fireEvent.touchEnd(aff, { touches: [], changedTouches: [{ target: aff, clientX: 10, clientY: 10 }] })
-    fireEvent.click(aff) // Browser-owned native click, not a pointer-derived synthetic activation.
-    await waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith({ bodyId: 'gate-sys_-7_18' }))
-  })
-
-  it('Scenario: The affordance covers only off-screen marks', async () => {
-    await stage()
-    expect(screen.queryByTestId('offscreen-feat-body-0')).toBeNull()
-    expect(screen.getByTestId('offscreen-gate-sys_-6_16')).toBeInTheDocument()
-    expect(screen.getByTestId('offscreen-gate-sys_-7_18')).toBeInTheDocument()
-  })
-
-  it('Scenario: An off-screen selection is indistinguishable from a direct one', async () => {
-    await stage()
-    await userEvent.click(screen.getByTestId('offscreen-gate-sys_-6_16'))
-    const viaAffordance = onSelect.mock.calls.at(-1)![0]
-
-    onSelect.mockClear()
-    screen.getByTestId('body-hit-gate-sys_-6_16').focus()
-    await userEvent.keyboard('{Enter}')
-    const direct = onSelect.mock.calls.at(-1)![0]
-
-    expect(viaAffordance).toEqual(direct)
-  })
-
-  it('Scenario: An off-screen body is selectable the same way', async () => {
-    await stage()
-    for (let i = 0; i < 200; i++) cameraKey('+')
-    const orbit = region()
-    orbit.focus()
-    for (let i = 0; i < 200; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
-    await waitFor(() => expect(screen.queryByTestId('offscreen-feat-body-1')).not.toBeNull())
-    await userEvent.click(screen.getByTestId('offscreen-feat-body-1'))
-    expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-1' })
-  })
-})
-
 describe('SpaceStage — pointer picking through the DOM', () => {
   it('Scenario: A gesture that begins over a mark still moves the camera', async () => {
     await stage({ selection: { bodyId: 'feat-body-0' } })

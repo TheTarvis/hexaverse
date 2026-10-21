@@ -14,8 +14,7 @@
 .rowCopy > span, .indexRow small { display: block; overflow-wrap: anywhere; }
 .indexRow small { font: var(--hud-caption-font); }
 .objectDetails { flex: 0 0 290px; display: flex; flex-direction: column; border-left: 0; overflow: hidden; }
-.detailsHeader { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-shrink: 0; padding-bottom: 10px; }
-.detailsClose { flex-shrink: 0; }
+.detailsHeader { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; flex-shrink: 0; padding-bottom: 10px; }
 .detailsBody { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .inspectorTitle { display: flex; align-items: center; gap: 12px; margin: 8px 0 24px; }
 .inspectorTitle p { font: var(--hud-secondary-font); }

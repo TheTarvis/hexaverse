@@ -269,7 +269,7 @@ test.describe('space view — synchronous double-submit guards', () => {
     await details.getByTestId('details-plot').click({ timeout: 10_000 })
     await expect(page.getByTestId('burn-button')).toBeHidden()
     expect(orders).toEqual([])
-    // Same-tick Burn guard remains in SpaceCommandPanel.test.tsx and
+    // Same-tick travel guards remain in SystemSpaceView.burn-preview.test.tsx and
     // use-submit-guard.test.tsx; no claim of a current UI Burn path.
   })
 

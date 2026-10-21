@@ -643,7 +643,6 @@ function SpaceLayers({
   // each group in the scene's own stable order.
   const bodies = pickables.filter((p) => p.mark.kind !== 'gate')
   const gates = pickables.filter((p) => p.mark.kind === 'gate')
-  const offScreen = viewBasis ? pickables.filter((p) => !p.screen.onScreen) : []
   const contacts = projected.filter((p) => p.mark.kind === 'contact')
   const sightings = projected.filter((p) => p.mark.kind === 'sighting')
   const fleets = projected.filter((p) => p.mark.kind === 'fleet')
@@ -876,27 +875,7 @@ function SpaceLayers({
         )
       })()}
 
-      {/* TODO(HUD-HIDDEN-CLEANUP): Off-screen pointers are CSS-hidden in the live system HUD due to label noise. Review other stage consumers before removing this renderer and its positioning logic. */}
-      <div data-testid="space-offscreen-reach" data-empty={offScreen.length === 0} className="pointer-events-none absolute inset-0">
-        {offScreen.map(({ mark }) => (
-          <HudButton
-            presentation="map"
-            key={mark.id}
-            type="button"
-            {...{ [AFFORDANCE_ATTR]: '' }}
-            data-testid={`offscreen-${mark.id}`}
-            aria-label={`Bring ${mark.name || mark.id} into view`}
-            className="pointer-events-auto absolute left-4"
-            style={{ position: 'absolute', top: `${16 + offScreen.findIndex((o) => o.mark.id === mark.id) * 26}px`, padding: '4px 8px' }}
-            onClick={() => {
-              onReframe(mark.id, mark.position)
-              onSelect({ bodyId: mark.id })
-            }}
-          >
-            <span className="hud-type-caption">{mark.name || mark.id}</span>
-          </HudButton>
-        ))}
-      </div>
+
 
       {/* The selected mark, drawn — including a bare point in vacuum, which
           has no body mark to highlight and no intrinsic outline. */}

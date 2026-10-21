@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
-import { HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
+import { ChevronDownIcon, ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
+import { HudBackButton, HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
 import { HudIcon } from '@/components/hud/HudIcon'
 import { HudCardShell } from '@/components/hud/HudCardShell'
 import { HudActionBand } from '@/components/hud/HudActionBand'
+import { HudProgress } from '@/components/hud/HudProgress'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudHeading, HudText, HudValue } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
+import { formatTons } from '@/lib/format'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { destinations, fleets, systems, type Concept, type SelectionKind, type StudyItem } from './fixtures'
 import styles from './travel-study.module.css'
@@ -44,7 +46,7 @@ function Chooser({ kind, concept, selected, onChoose, onBack, objective, searchR
   </HudButton>
   return <div className={styles.chooser}>
     <div className={styles.tools}>
-      <div className={styles.backRow}><HudIconButton icon={ArrowLeftIcon} label="Back to trip" presentation="chrome" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
+      <div className={styles.backRow}><HudBackButton destination="trip" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
       <div className={styles.searchRow}>
         <HudSearchInput ref={searchRef} aria-label={`Search ${kind === 'fleet' ? 'fleets' : 'destinations'}`} placeholder={concept === 'A' ? 'Search by name…' : 'Search all known systems…'} value={query} onChange={event => { setQuery(event.target.value); setLimit(20) }} />
         {concept === 'A' && <div className={styles.scopeToggle} role="group" aria-label="Search scope">
@@ -123,16 +125,17 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
       {(['fleet', 'destination'] as const).map(kind => <div key={kind} hidden={selecting !== kind} className={styles.chooserHost}><Chooser kind={kind} concept={concept} selected={kind === 'fleet' ? fleet : destination} counterpart={kind === 'fleet' ? destination : fleet} onChoose={item => choose(kind, item)} onBack={() => back(kind)} objective={objective} searchRef={kind === 'fleet' ? searchFleet : searchDestination} /></div>)}
       <div hidden={!!selecting} className={styles.reviewHost}>
         <div className={styles.review} ref={contentRef} tabIndex={-1}>
+          <HudBackButton destination={status ? 'trip' : 'map'} disabled={pending} onClick={() => status ? setStatus(false) : setOpen(false)} />
           {status && journey ? <>
             <HudHeading size="compact">{fieldName(fleet)}</HudHeading><HudText role="status">{journey.stopped ? 'Stopped · Parked in place' : running ? `Travelling · ${destination.name}` : `Arrived · ${destination.name}`}</HudText>
-            {!journey.stopped && <><progress aria-label="Travel progress" className={styles.progress} value={journey.elapsed} max={180} /><HudText>{Math.floor(journey.elapsed / 180 * 100)}% · {180 - journey.elapsed}s remaining</HudText></>}
+            {!journey.stopped && <div className={styles.travelProgress}><HudProgress label="Travel progress" value={journey.elapsed} max={180} /><div className={styles.progressFigures}><HudValue>{Math.floor(journey.elapsed / 180 * 100)}%</HudValue><HudText variant="secondary">{running ? <><HudValue>{180 - journey.elapsed}s</HudValue> remaining</> : 'Arrived'}</HudText></div></div>}
           </> : <>
             <div className={styles.identities}>{([['fleet', fleet], ['destination', destination]] as const).map(([kind, item]) => <HudButton key={kind} presentation="row" ref={kind === 'fleet' ? fleetTrigger : destinationTrigger} className={styles.identity} aria-label={`Change ${kind}`} disabled={pending || recalculating || running} onClick={() => openChooser(kind)}>
               <span className={`hud-type-label ${styles.identityLabel}`}>{kind === 'fleet' ? 'Fleet' : 'Destination'}</span><HudObjectThumbnail kind={itemArt(item)} className={styles.identityArt} /><span className={styles.identityText}><span className="hud-type-compact">{fieldName(item)}</span><span className="hud-type-secondary">{kind === 'fleet' ? item.mining ? 'Mining' : 'Ready' : item.type}{item.system !== 'Solace' ? ` · ${item.system}` : ''}</span></span><HudIcon icon={ChevronDownIcon} size={16} className={styles.identityChevron} />
             </HudButton>)}</div>
             {recalculating ? <HudText role="status">Recalculating trip…</HudText> : <HudFacts layout="rows" className={styles.facts} items={[
               { label: 'Travel time', value: <HudValue>{remote ? '—' : '3m 00s'}</HudValue> }, { label: 'Fuel cost', value: <HudValue>{remote ? '—' : '18 t'}</HudValue> }, { label: 'Fuel aboard', value: <HudValue>{fleet.fuel} t</HudValue> },
-              { label: shortfall ? 'Fuel shortfall' : 'Fuel remaining', value: <HudValue>{remote ? '—' : `${shortfall || (fleet.fuel ?? 0) - 18} t`}</HudValue> }, { label: 'Fuel ceiling', value: <HudValue>{remote ? '—' : `${Number((18 * BURN_FUEL_ALLOWANCE).toFixed(2))} t`}</HudValue> },
+              { label: shortfall ? 'Fuel shortfall' : 'Fuel remaining', value: <HudValue>{remote ? '—' : `${shortfall || (fleet.fuel ?? 0) - 18} t`}</HudValue> }, { label: 'Fuel ceiling', value: <HudValue>{remote ? '—' : formatTons(18 * BURN_FUEL_ALLOWANCE)}</HudValue> },
             ]} />}
             {remote && <HudText className={styles.warning} role="status">Inter-system journey · route required.</HudText>}
             {fleet.mining && <HudText className={styles.warning}>Stop mining before travelling.</HudText>}
@@ -141,10 +144,8 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
           </>}
         </div>
         <HudActionBand label={status ? 'Fleet travel actions' : 'Trip actions'} actions={status ? [
-          { id: 'back', label: 'Back to trip', onClick: () => setStatus(false) },
           { id: 'stop', label: 'Stop travel', tone: 'danger', disabled: !running, onClick: stop },
         ] : [
-          { id: 'back', label: 'Back', onClick: () => setOpen(false) },
           { id: 'start', label: 'Start travel', pending, pendingLabel: 'Starting…', disabled: blocked || recalculating, onClick: start },
         ]} />
       </div>

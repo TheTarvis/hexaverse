@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
 import clsx from 'clsx'
-import { Button } from '@/components/catalyst/button'
+import { HudBackButton } from './HudControls'
 import { HudHeading, HudText } from './HudTypography'
 import { HudCardShell, type HudCardShellProps } from './HudCardShell'
 import styles from './hud-card-shell.stories.module.css'
@@ -181,7 +181,7 @@ export const OriginalChromeAlignment: Story = {
   args: {
     title: 'Objects',
     lighting: 'none',
-    children: <><Button outline>Back to object list</Button><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
+    children: <><HudBackButton destination="objects" /><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)

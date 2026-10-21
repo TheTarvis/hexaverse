@@ -1,10 +1,10 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, within, fireEvent, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
-// The live view has no Console destination. Scan remains in Command and the
-// system-filtered historical ghost read stays independent of HUD visibility.
+// Historical ghost reads remain independent of HUD visibility after removing
+// the obsolete Command and Console compositions.
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
@@ -161,13 +161,6 @@ function record(id: string, over: Record<string, unknown> = {}) {
   }
 }
 
-/** A settled scan that filed records: no reasonCode, so the real ScanControl offers its report link. */
-const SETTLED_SCAN = {
-  id: 'act-scan-1', type: 'scan', actor: 'fleet_1', scope: SYSTEM_ID,
-  committedAt: T0 - 6_000, eta: T0 - 1_000, status: 'done', resolvedAt: T0 - 1_000, worldTime: T0,
-  params: { systemId: SYSTEM_ID },
-}
-
 function hookResult(over: Record<string, unknown> = {}) {
   return {
     data: { pages: [{ sightings: [] as unknown[], nextCursor: '' }] },
@@ -218,25 +211,6 @@ function expectNoConsole() {
   expect(screen.queryByRole('button', { name: 'Open the sighting log' })).not.toBeInTheDocument()
 }
 
-it('keeps the real Scan command and settled report in Command without a dead log link', () => {
-  scanState.settled = SETTLED_SCAN
-  mount()
-  expectNoConsole()
-  const command = screen.getByRole('region', { name: 'Command panel' })
-  expect(within(command).getByTestId('command-sensors')).toBeInTheDocument()
-  expect(within(command).getByTestId('scan-report')).toBeInTheDocument()
-  expect(sightings.calls.every(id => id === SYSTEM_ID)).toBe(true)
-})
-
-it.each(['interior', 'fleets', 'canvas'])('keeps Sensors reachable when %s is unavailable', failure => {
-  if (failure === 'interior') useSystemSpace.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: new Error('x'), refetch: vi.fn() })
-  if (failure === 'fleets') useMyFleets.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch: vi.fn() })
-  if (failure === 'canvas') stage.available = false
-  mount()
-  expectNoConsole()
-  expect(screen.getByTestId('command-sensors')).toBeInTheDocument()
-})
-
 it('delays historical ghost reads until the interior answers; never mounts the removed unfiltered log', () => {
   useSystemSpace.mockReturnValue({ data: undefined, isLoading: true, isFetching: true, isError: false, refetch: vi.fn() })
   const view = mount()
@@ -251,7 +225,7 @@ it('delays historical ghost reads until the interior answers; never mounts the r
 it('preserves disclosed historical ghosts and highlight interaction while panels are hidden', () => {
   sightings.byArg.set(SYSTEM_ID, pileOf([record('retained')]))
   mount()
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Command' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
   const ghost = screen.getByTestId('mock-ghost-retained')
   fireEvent.click(ghost)
   expect(ghost).toHaveAttribute('data-highlighted', 'true')
@@ -264,12 +238,4 @@ it('starts another system without a Console destination or an unfiltered log rea
   expectNoConsole()
   expect(sightings.calls).toContain(OTHER_SYSTEM_ID)
   expect(sightings.calls).not.toContain(null)
-})
-
-it('keeps Scan announcements outside the hidden Command panel', () => {
-  mount()
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Command' }))
-  const announcement = screen.getByTestId('scan-error-live-region')
-  expect(screen.getByTestId('workspace-announcements')).toContainElement(announcement)
-  expect(announcement.closest('[hidden], [inert]')).toBeNull()
 })

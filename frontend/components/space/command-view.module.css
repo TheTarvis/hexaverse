@@ -1,28 +1,18 @@
 /* Approved command-view art direction, scoped to the live system. */
 .commandView { isolation: isolate; }
-.commandView .systemColumn { top: 178px; left: 32px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 170px); }
-.transmission { position: absolute; left: 32px; bottom: calc(var(--console-dock-height, 56px) + 150px); width: min(400px, 36vw); padding: 12px; background: linear-gradient(90deg, #03070cd9, #03070c70); color: var(--command-ink); text-shadow: 0 2px 10px #000; }
+.transmission { position: absolute; left: 32px; bottom: calc(56px + 150px); width: min(400px, 36vw); padding: 12px; background: linear-gradient(90deg, #03070cd9, #03070c70); color: var(--command-ink); text-shadow: 0 2px 10px #000; }
 .signal { display: flex; align-items: center; justify-content: space-between; color: var(--command-signal); font: var(--hud-label-font); letter-spacing: var(--hud-label-tracking); }
 .transmissionBody > p { margin: 12px 0 18px; font: var(--hud-compact-font); line-height: 1.6; }
 .checks { display: flex; gap: 16px; margin: 0 0 18px; padding: 0; list-style: none; font: var(--hud-label-font); color: var(--command-signal); }
 .transmission small { display: block; margin-top: 10px; color: var(--command-muted); font: var(--hud-caption-font); }
 @media (max-width: 760px) {
-  .commandView .systemColumn { top: 165px; left: 12px; right: auto; width: min(260px, 65vw); }
-  .transmission { left: 12px; bottom: calc(var(--console-dock-height, 56px) + 155px); width: calc(100% - 24px); max-height: 210px; overflow-y: auto; z-index: 20; border-top: 1px solid #76e3ef40; background: #08121df2; }
+  .transmission { left: 12px; bottom: calc(56px + 155px); width: calc(100% - 24px); max-height: 210px; overflow-y: auto; z-index: 20; border-top: 1px solid #76e3ef40; background: #08121df2; }
   .transmissionBody > p { font: var(--hud-body-font); }
 }
 
-.commandView [data-testid='console-dock-open'], .commandView [data-testid='console-dock-region'], .commandView [data-testid='vitals-fleet-menu'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }
-.commandView [data-testid='space-offscreen-reach'] { top: 140px; right: auto; bottom: calc(var(--console-dock-height, 56px) + 480px); width: 190px; overflow-y: auto; pointer-events: auto; }
-.commandView [data-testid='space-offscreen-reach'][data-empty='true'] { display: none; }
-@media (max-width: 760px) {
-  .commandView [data-testid='space-offscreen-reach'] { top: 120px; width: 100px; max-height: 160px; bottom: auto; height: 160px; }
-  .commandView [data-testid='space-offscreen-reach'] button { max-width: 84px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-}
 
-.objectBrowser { position: absolute; z-index: 25; top: 125px; left: 32px; bottom: calc(var(--console-dock-height, 56px) + 180px); width: 280px; pointer-events: none; display: flex; flex-direction: column; }
+.objectBrowser { position: absolute; z-index: 25; top: 125px; left: 32px; bottom: calc(56px + 180px); width: 280px; pointer-events: none; display: flex; flex-direction: column; }
 .objectBrowser > * { pointer-events: auto; }
-.commandView [data-testid='space-offscreen-reach'] { left: auto; right: 16px; }
 @media (max-width: 760px) {
   .objectBrowser { top: 112px; left: 12px; width: min(280px, calc(100vw - 24px)); }
 }
@@ -33,7 +23,6 @@
 .transmission .checks { justify-content: center; flex-wrap: wrap; }
 .transmission[data-phase='wake'] .checks, .transmission[data-phase='wake'] small { display: none; }
 .transmission[data-phase='wake'] .transmissionBody > p { font: var(--hud-identity-font); line-height: 1.6; }
-.commandView:has(.transmission[data-phase='wake']) [data-testid='space-offscreen-reach'] { display: none; }
 @media (max-width: 760px) {
   .commandView .transmission { padding: 18px; max-height: calc(100% - 270px); }
   .transmission[data-phase='wake'] .transmissionBody > p { font: var(--hud-compact-font); }
@@ -64,30 +53,10 @@
   .objectBrowser[data-attention='true'] [data-testid='system-index-search'] { animation: none; }
 }
 
-/*
- * TODO(HUD-HIDDEN-CLEANUP): Retired live system HUD surfaces, hidden during
- * the guided-flow redesign. Remove obsolete render paths, styles, and unused
- * wiring when replacements land; check shared/storyboard consumers first.
- * These are removal candidates, not ordinary conditional visibility.
- */
-/* HUD-HIDDEN-CLEANUP: Off-screen object pointers — noisy stacked labels. */
-.commandView [data-testid='space-offscreen-reach'],
-/* HUD-HIDDEN-CLEANUP: Standalone Focus fleet button — retired HUD action. */
-.commandView [data-testid='system-focus-fleet'],
-/* HUD-HIDDEN-CLEANUP: Legacy Course card — awaiting replacement burn flow. */
-.commandView [data-testid='preview-panel'],
-/* HUD-HIDDEN-CLEANUP: Cut drive / Stop row — awaiting replacement controls. */
-.commandView [data-testid='fleet-flight-controls'],
-/* HUD-HIDDEN-CLEANUP: Empty shell left by the retired flight controls. */
-.commandView [data-testid='space-fleet-panel'][data-has-actions='false'] {
-  display: none;
-}
 
 
-/* Configurable content leaves the vitals/navigation lane permanently reachable. */
+/* Configurable content leaves navigation permanently reachable. */
 
-.workspaceCommand { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.workspace .systemColumn { gap: 12px; }
 
 /* Mobile geometry shares one viewport budget instead of independent offsets. */
 .guideLayer { display: contents; }
@@ -125,23 +94,20 @@
   .transmissionBody { align-self: stretch; }
 }
 
-/* An open phone card owns the page viewport; background telemetry is map mode. */
+/* An open phone card owns the page viewport. */
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .commandView:has(.workspace[data-mobile-open='true']) .identity,
-  .commandView:has(.workspace[data-mobile-open='true']) .workspaceVitals,
   .commandView:has(.workspace[data-mobile-open='true']) .guideLayer { visibility: hidden; }
   .commandView:has(.workspace[data-mobile-open='true']) .workspace [aria-label='HUD workspace'] { visibility: visible; }
   .commandView .guideLayer:has(.transmission) { position: fixed; inset: 0; top: var(--system-viewport-top, 0px); bottom: auto; height: var(--system-viewport-height, 100dvh); z-index: 65; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #08121d; }
   .commandView .guideLayer .transmission { display: flex; flex: 1; height: auto; min-height: 0; max-height: none; padding: 12px; }
   .guideLayer .transmissionBody { flex: 1; }
   .guideLayer .transmissionActions { max-width: none; align-self: stretch; }
-  .commandView:has(.transmission) .identity,
-  .commandView:has(.transmission) .workspaceVitals { visibility: hidden; }
-  .workspaceCommand { height: 100%; }
+  .commandView:has(.transmission) .identity { visibility: hidden; }
 }
 .resumeGuide { position: absolute; top: var(--phone-toolbar-top, 100px); right: max(12px, env(safe-area-inset-right)); z-index: 45; min-height: 44px; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .commandView [data-testid='space-camera-controls'] { bottom: calc(var(--phone-vitals-height) + 12px + env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; max-width: calc(100% - 24px); }
+  .commandView [data-testid='space-camera-controls'] { bottom: calc(12px + env(safe-area-inset-bottom)); right: max(12px, env(safe-area-inset-right)); display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; max-width: calc(100% - 24px); }
   .commandView [data-testid='space-camera-controls'] > * { width: 44px; height: 44px; box-sizing: border-box; }
   .commandView [data-testid='camera-orbit'] { display: none; }
 }
@@ -150,12 +116,8 @@
   .commandView [data-testid='select-pan-target-point'] { display: none; }
 }
 
-/* Shared workspace cards own decoration; command content is an unpositioned section. */
-.workspaceCommand { height: auto; flex-shrink: 0; }
+/* Shared workspace cards own decoration and content framing. */
 /* Shared type roles can grow; the card scrolls instead of compressing sections. */
-.workspaceCommand > * { flex-shrink: 0; }
-.workspace [data-testid='space-command-column'] { position: static; width: 100%; max-width: none; gap: 16px; overflow: visible; }
-.workspace [data-testid='space-command-column'] > * { flex-shrink: 0; }
 .workspace [data-testid='space-fleet-panel'] { max-width: none; width: 100%; }
 
 /* Recovery keeps its existing modal owner; the accepted shell supplies chrome. */
@@ -178,7 +140,6 @@
   .commandView:has(> .resumeGuide) .guideLayer { top: calc(var(--game-navigation-bottom, 64px) + 60px + env(safe-area-inset-top)); }
 }
 
-.workspaceCommand > [data-testid="fleet-roster"] { width: 100%; }
 
 /* Recovery uses the shared illuminated frame; this wrapper owns geometry only. */
 .commandView .guideLayer .transmission { z-index: 80; max-height: calc(100% - 64px); }
@@ -199,3 +160,5 @@
   .commandView .guideLayer:has(.transmission) { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px; box-sizing: border-box; z-index: 80; pointer-events: none; }
   .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; flex: 0 1 auto; min-height: 0; max-height: 100%; pointer-events: auto; }
 }
+
+.objectActions { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }

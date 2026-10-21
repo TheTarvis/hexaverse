@@ -270,8 +270,8 @@ describe('SystemSpaceView + the transform loop — task 2.1', () => {
 })
 
 describe('SystemSpaceView + the transform loop — task 2.2', () => {
-  // Scenario: A counting figure advances without a per-frame render
-  it('Scenario: A counting figure advances without a per-frame render', async () => {
+  // the projected world clock advances without a per-frame render
+  it('the projected world clock advances without a per-frame render', async () => {
     vi.useFakeTimers()
     try {
       const onRender = vi.fn()
@@ -279,7 +279,7 @@ describe('SystemSpaceView + the transform loop — task 2.2', () => {
       await settle()
       onRender.mockClear()
 
-      const R0 = Number(screen.getByTestId('fleet-row-eta-fleet_1').getAttribute('data-raw'))
+      const R0 = Number(screen.getByTestId('space-world-clock').getAttribute('data-world-time'))
       // Driven as 125 discrete 16ms advances, each its OWN `act()` — a
       // single `advanceTimersByTimeAsync(2000)` call lets React's automatic
       // batching coalesce every state update queued before the next real
@@ -291,9 +291,9 @@ describe('SystemSpaceView + the transform loop — task 2.2', () => {
           await vi.advanceTimersByTimeAsync(16)
         })
       }
-      const R1 = Number(screen.getByTestId('fleet-row-eta-fleet_1').getAttribute('data-raw'))
+      const R1 = Number(screen.getByTestId('space-world-clock').getAttribute('data-world-time'))
 
-      expect(R0 - R1, 'the elapsed world-ms span at scale 1').toBe(2_000)
+      expect(R1 - R0, 'the elapsed world-ms span at scale 1').toBe(2_000)
       expect(onRender.mock.calls.length, 'no more than 3 renders in 2 seconds').toBeLessThanOrEqual(3)
     } finally {
       vi.useRealTimers()

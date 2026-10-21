@@ -8,6 +8,7 @@
   border-top: 1px solid var(--hud-crystal-edge);
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--hud-inner-cut, 16px)), calc(100% - var(--hud-inner-cut, 16px)) 100%, var(--hud-inner-cut, 16px) 100%, 0 calc(100% - var(--hud-inner-cut, 16px)));
 }
+.band[data-count='1'] { grid-template-columns: minmax(0, 1fr); }
 .band[data-count='3'] { grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) minmax(0, 3fr); }
 .band .cell.cell {
   min-width: 0;

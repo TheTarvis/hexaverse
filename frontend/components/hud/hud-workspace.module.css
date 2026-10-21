@@ -146,3 +146,11 @@
 .workspace [data-slot='hud-toolbar']:has(> .navigationShell) { margin-inline: 0; padding-inline: 0; justify-content: center; }
 
 .cardNavigation > :is(button, a):not(:last-child) { border-right-color: #435d7050; }
+
+/* A panel with stationary actions fills its dock and delegates scrolling to the shell. */
+.panel:has(> .panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout']) { align-self: stretch; }
+.panelCard:has(> [data-slot='hud-body'] > [data-slot='hud-footer-layout']) { height: 100%; }
+.panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; }
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout'] > .panelContent { padding: 24px 12px 12px; }
+}

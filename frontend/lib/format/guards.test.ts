@@ -83,9 +83,9 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // parent adjudicated relocation from [837, 838, 894, 895, 1055].
     // Vibrant-scene maintenance: unchanged bearing/speed sites relocated
     // after adding passive world annotations; verified against live source.
-    // Button migration: unchanged expressions re-anchored against live source.
+    // HUD cleanup: unchanged bearing/speed expressions re-anchored after removing offscreen chips.
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [767, 768, 826, 827, 1003],
+    lines: [766, 767, 825, 826, 982],
     ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },

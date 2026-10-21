@@ -52,7 +52,7 @@ test.describe('the continuous-space view through the current HUD', () => {
     await expect(page.getByTestId('system-index-search')).toBeHidden()
     await expect(page.getByTestId('space-canvas-region')).toHaveAttribute('data-selection', lodeId!)
     await expect(page.getByTestId('burn-button'), 'Plot course currently does not expose a burn commit').toBeHidden()
-    await expect(page.getByTestId('fleet-flight-controls')).toBeHidden()
+    await expect(page.getByTestId('fleet-flight-controls')).toHaveCount(0)
     await expect(page.getByTestId('vitals-state-pill'), 'plotting alone does not move the hull').toContainText(/docked at station/i)
 
     const station = await openObjectDetails(page, stationId!)

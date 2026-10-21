@@ -5,10 +5,6 @@
 .inset { border: 1px solid #76e3ef20; background: #030a1299; border-radius: 2px; backdrop-filter: none; }
 .warning { border-left-color: #f59e0b; background: #30220deb; }
 .navigation { border-left: 0; border-top: 1px solid #76e3ef30; background: #08121ddd; }
-.column { pointer-events: none; position: absolute; top: 16px; display: flex; flex-direction: column; gap: 18px; width: 288px; max-width: calc(100vw - 24px); overflow-y: auto; }
-.column > * { pointer-events: auto; width: 100%; min-width: 0; flex-shrink: 0; }
-.left { left: 16px; }
-.right { right: 16px; }
 .heading { min-width: 0; text-shadow: 0 2px 12px #000; }
 .heading p { margin: 0; }
 .heading h1 { margin: 8px 0; }
@@ -17,12 +13,7 @@
 .panel option { background: #08121d; }
 .theme :global(.text-zinc-900) { color: var(--command-ink); }
 .theme :global(.text-zinc-500), .theme :global(.text-zinc-600) { color: var(--command-muted); }
-@media (max-width: 760px) {
-  .paired { width: calc(50vw - 24px); }
-}
 
-.root [data-testid='vitals-strip'] { background: #08121df2; color: var(--command-ink); border-color: #76e3ef30; }
-.root [data-testid='vitals-strip'] [data-testid='vitals-fleet-cell'] { color: var(--command-ink); }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .theme[role='menu'] button { min-height: 44px; }
 }

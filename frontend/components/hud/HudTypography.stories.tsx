@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { useState } from 'react'
 import { ArrowLeftIcon, ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { HudCardShell } from './HudCardShell'
-import { HudButton, HudIconButton, HudSearchInput, HudSelect } from './HudControls'
+import { HudBackButton, HudButton, HudSearchInput, HudSelect } from './HudControls'
 import { HudIcon } from './HudIcon'
 import { HudFacts } from './HudFacts'
 import { HudHeading, HudText, HudValue } from './HudTypography'
@@ -173,7 +173,7 @@ function FoundationSample() {
       <HudHeading size="compact">Peregrine</HudHeading>
       <HudText variant="secondary">One shared token source for typography, icons and HUD controls.</HudText>
       <div className={styles.controlRow}><HudIcon icon={ArrowLeftIcon} size={16} /><HudIcon icon={MagnifyingGlassIcon} /><HudIcon icon={ChevronDownIcon} size={24} /></div>
-      <div className={styles.controlRow}><HudIconButton icon={ArrowLeftIcon} label="Back" /><HudText variant="secondary">Compact icon control</HudText></div>
+      <div className={styles.controlRow}><HudBackButton destination="objects" /><HudText variant="secondary">Shared Back navigation</HudText></div>
       <HudSearchInput aria-label="Foundation search" placeholder="Search by name…" />
       <div className={styles.controlRow}><HudButton aria-pressed={scope === 'local'} onClick={() => setScope('local')}>This system</HudButton><HudButton aria-pressed={scope === 'all'} onClick={() => setScope('all')}>All known systems</HudButton></div>
       <label className={styles.controlRow}><HudText variant="label">Activity</HudText><HudSelect aria-label="Foundation activity"><option>All</option><option>Ready</option></HudSelect></label>

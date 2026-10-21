@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { HudButton } from '@/components/hud/HudControls'
+import { HudBackButton, HudButton } from '@/components/hud/HudControls'
 import { Input } from '@/components/catalyst/input'
 import { HudText } from '@/components/hud/HudTypography'
 import type { GalaxyNode } from '@/lib/types/galaxy'
@@ -51,7 +51,7 @@ export function GalaxyObjectBrowser({ nodes, selectedId, onSelect, children }: {
       </div>
     </div>
     <div id={detailsId} hidden={!!selectedId && !details}>
-      {details && <HudButton variant="quiet" ref={backRef} onClick={back} aria-label="Back to galaxy systems">← Back to systems</HudButton>}
+      {details && <HudBackButton destination="systems" ref={backRef} onClick={back} aria-label="Back to galaxy systems" />}
       {children}
     </div>
   </div>

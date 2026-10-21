@@ -28,6 +28,54 @@ prototype. Its historical exclusions remain accurate for that slice. Travis's
 2026-10-16 authorization expands the current assignment to production integration;
 it does not turn fixture estimates into production physics or authorize new rules.
 
+## Card rebuild direction — 2026-10-20
+
+Travis considers the reviewed travel-card direction sufficient for integration,
+with the current HUD inventoried first. Existing card compositions include
+temporary experiment UI; their arrangement and action inventory are not accepted
+design requirements. Rebuild around individual player tasks using the existing
+shared visual foundations and real service behavior.
+
+The combined **Command composition and telemetry strip were deleted in the first
+removal pass**. System view now supplies only Objects; Galaxy supplies Objects
+and Fleets, retaining its actively used fleet roster/locator. Stored Command
+layout preferences migrate to Fleets; obsolete console entries are discarded.
+The Objects list and selected-object inspector remain two states of one browser
+and need focused review. The [baseline inventory](../.scratch/hud-card-rebuild/current-state.md)
+and [removal record](../.scratch/hud-card-rebuild/removal-pass.md) distinguish the
+old composition from the current checkout.
+
+Travel review/status temporarily replace the Objects body, with contextual
+entries in its list header. Real estimates, Start/Stop, Cut drive, eligible Jump,
+accepted-receipt handoff and native fleet selection remain. Station services,
+inspection, discovery and world/settlement reads remain. Sensors and general
+nonstation mining setup have no HUD entry during this staged rebuild; sensor
+onboarding cannot complete until its replacement exists. Their services and
+reusable task components remain for deliberate reintegration. The removal pass
+is not completion of the full card rework.
+
+The accepted full travel study has not yet replaced production's older card
+composition; adopting the shared luminous progress rail alone does not establish
+that integration. Fleet status is the first design task: Travis selected a
+**compact fleet/activity summary with expandable cargo and ship details**.
+Travis selected **activity first** in the first comparison: identity, current
+activity/progress, then compact fuel/hold facts, with cargo and ships independently
+expandable below. Travis subsequently selected **its own Fleet status card and
+launcher**, separate from Objects. Entry/return behavior and detailed fact/action
+placement remain for review. This accepts hierarchy and hosting; full interaction,
+production integration and in-game acceptance remain outstanding.
+
+Completion requirement, confirmed by Travis on 2026-10-20: once the HUD/card
+rework is integrated, delete the superseded legacy and deprecated implementation.
+Do not leave CSS-hidden controls, duplicate render paths, obsolete components,
+unused hooks/imports/styles, abandoned prototype branches or outdated tests/stories
+as a permanent fallback. Migrate still-needed behavior and shared consumers first,
+then remove their obsolete predecessors and update documentation/references.
+Preserve accepted decisions and necessary review evidence outside executable
+legacy code. Cleanup and relevant verification are part of finishing the rework,
+not a deferred follow-up. This applies to the HUD/card rework and its dependencies;
+actively used shared foundations and unrelated systems are not legacy by association.
+
 ## Current implementation and working choices
 
 Travel-control visual direction, accepted 2026-10-19: the review header uses
@@ -40,7 +88,7 @@ for potentially large collections remain unresolved. The
 [travel controls design record](../.scratch/hud-travel-card/controls-design.md)
 preserves comparisons and review evidence.
 
-Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
+Current ownership after the 2026-10-20 removal pass:
 
 - [SystemSpaceView](../frontend/components/space/SystemSpaceView.tsx) retains
   gameplay state, server preview/quote/order/Stop hooks and command ownership.
@@ -48,14 +96,15 @@ Audit snapshot, 2026-10-16; these components are being integrated and reviewed.
   review/status using served figures. [Selection](../frontend/components/space/space-selection.ts)
   already supports bodies, gates and bounded points in empty space.
 - [HudWorkspace](../frontend/components/hud/HudWorkspace.tsx) is presentation
-  only: objects, command and console panels use ordered left/right/bottom docks.
+  only: panel IDs are Objects and Fleets, using ordered left/right/bottom docks.
+  System supplies Objects; Galaxy also supplies Fleets.
   Phones use a launcher and one full-page active panel. Dock buttons support
   touch/keyboard arrangement without dragging. This is the current reversible
   implementation choice, not an accepted final freeform editor.
 - Layout preferences are validated, versioned, per-corporation and local to the
   browser. Reset restores defaults. Settings/recovery stay reachable with every
-  configurable panel hidden; navigation/vitals remain outside the workspace.
-  Panel containers remain mounted to preserve browsing, log and scan context.
+  configurable panel hidden; navigation remains outside the workspace.
+  Panel containers remain mounted to preserve browsing context.
 - [HudCardShell](../frontend/components/hud/HudCardShell.tsx) and existing
   typography/icons provide the reviewed frame and materials. Reuse this component
   foundation. [Art direction](art-direction.md) governs object assets; decorative
@@ -94,7 +143,7 @@ Use `HudIcon` for utility Heroicons outlines. Its 16/20/24 size roles consume
 shared tokens; object artwork uses `HudObjectThumbnail`. Accepted shell-close
 and navigation geometry remain explicit variants.
 
-Use `HudButton`, `HudIconButton`, `HudSearchInput` and `HudSelect` from
+Use `HudButton`, `HudIconButton`, `HudBackButton`, `HudSearchInput` and `HudSelect` from
 `HudControls.tsx` for new HUD controls. `HudButton` is the sole action implementation;
 `HudIconButton` delegates to it and `HudActionBand` composes it. These adapters retain Catalyst behavior
 and share font, height, padding, color, focus and touch defaults. Desktop compact
@@ -107,12 +156,24 @@ have local overrides and require deliberate migration; changing a token updates
 its consumers, not every legacy control. This section owns UI implementation
 guidance; `GLOSSARY.md` remains game vocabulary.
 
+### Determinate progress
+
+Travel uses `HudProgress` with the luminous rail selected on 2026-10-19: a thin
+cyan fill on a dark blue track, with percentage left and remaining duration right
+below it. `hud-tokens.css` owns `--hud-progress-height`, `--hud-progress-cut`,
+`--hud-progress-track` and `--hud-progress-fill`. The shared component replaces
+browser-default bar styling while retaining native progress semantics. Fill
+reflects measured completion; no minimum false fill or repeating busy sweep.
+Callers retain authority over world time, duration formatting and arrival/Stop
+behavior. The [design record](../.scratch/hud-travel-card/controls-design.md)
+preserves the comparison. Physical-phone and Firefox review remain outstanding.
+
 ### Smoked-crystal actions — accepted band and Lens buttons
 
 Travis selected full-width integrated footer cells, followed by smoked-crystal
 material C from the [appearance comparison](assets/hud/action-band-materials-reference.png).
 The [layout sketch](assets/hud/action-band-geometry-reference.png) establishes
-the band meeting the lower frame and following its clipped corners. Two actions
+the band meeting the lower frame and following its clipped corners. A single action spans the footer. Two actions
 split equally with the primary on the right; three use equal outer cells and a
 modestly wider center primary. The current preview uses 30/40/30 for three.
 
@@ -145,9 +206,8 @@ Standard controls retain `--hud-control-font` (the secondary sans role). Integra
 bands keep their accepted geometry/type treatment through the integrated shape.
 Button coverage includes primary, secondary, quiet, icon-only, selected toggle,
 long-label, disabled and pending states. `tone="neutral" | "warning" | "danger"`
-is independent of emphasis and is also available on `HudBandAction`. Cancel/Back
-that leave an uncommitted choice use neutral secondary (or quiet in compact
-contexts). Stop travel uses red (`danger`), including its pending state, per
+is independent of emphasis and is also available on `HudBandAction`. Cancel that leaves an uncommitted choice uses neutral secondary (or quiet in
+compact contexts). Back uses the shared navigation treatment below. Stop travel uses red (`danger`), including its pending state, per
 Travis’s correction on 2026-10-19. This is presentation only; stopping retains
 its existing gameplay behavior.
 Destructive actions use danger and explicit verb/object labels, such as Delete
@@ -156,6 +216,21 @@ not confirmation or gameplay behavior. Features own consequence explanations and
 any confirmation required for irreversible loss. `HUD/Buttons/Smoked Crystal`
 shows these tones, pending/disabled examples and a destructive footer for review.
 Travis accepted the warning/danger and working-state preview on 2026-10-19.
+
+### Back navigation — 2026-10-21
+
+Use `HudBackButton` from `HudControls` for in-card Back navigation. Place it first
+at the top-left of the view content, before identity, context or search. It uses
+one unframed left-arrow plus “Back to …” label, shared secondary typography,
+content width and a minimum 44px hit target on desktop and phone. Its ordinary
+keyboard focus outline remains visible; it is not a persistent framed button.
+Name the destination explicitly, such as objects, fleet status or trip.
+
+Back does not belong in the command footer, at the top-right of an inspector or
+as a full-width Lens action. Keep Close separate. Preserve the owning flow's
+callback, pending guard, browsing state and focus restoration. Cancel remains an
+action with its existing semantics. `HudActionBand` supports a single full-width
+command when navigation has moved out of the footer.
 
 ### Shared action interface and ownership
 
@@ -214,8 +289,13 @@ The [migration evidence](../.scratch/hud-card-layout/button-migration-evidence.m
 records per-site accounting, fixture coverage and the separate retained-preview
 formatting-guard failure.
 
-Travel and production shell placement remain unchanged. A reusable production
-card-footer slot is still to be settled.
+`HudCardShell.footer` now owns stationary action placement: its footer sits outside
+scrolling content, inside the shared frame inset and lower corner clipping.
+`HudWorkspacePanel.footer` forwards actions to the owning shell; a panel with a
+footer fills its dock. Use these slots rather than embedding footer actions in a
+nested content section. Notices and simulation copy belong above the actions or
+outside the card. The Fleet status study and Stationary Actions reference use
+this shared capability. Existing production travel placement is unchanged.
 
 ## Acceptance checks
 
@@ -1132,9 +1212,12 @@ and repeat after the last.
 When a browser blocks audible autoplay, enabled intent remains on and playback
 retries after the first game click/tap or key interaction; explicit Play also works.
 Music controls own their own interactions so switching off cannot accidentally
-unlock playback. Hidden tabs and leaving game routes temporarily pause music,
-then resume when visible/in-game again if the user has kept it on. These temporary
-pauses never persist off. File failures retain retry/next guidance. Browser autoplay
+unlock playback. Hidden tabs temporarily pause music by default; the saved
+**Play music in background** checkbox in Arrange HUD → Music allows playback
+and playlist advancement while switching tabs or working in another app. It
+defaults off for existing and new preferences. Leaving game routes still pauses
+music. Temporary suspensions resume when visible/in-game again if the user has
+kept it on. These temporary pauses never persist off. File failures retain retry/next guidance. Browser autoplay
 permission remains outside the game's control; default-on is not a guarantee of
 audible playback before interaction on every browser.
 

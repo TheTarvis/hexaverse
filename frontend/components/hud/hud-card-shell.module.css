@@ -54,7 +54,8 @@
 
 /* Offset the 45-degree corners by the same distance as the straight edges. */
 .surface,
-.content {
+.content,
+.footerLayout {
   clip-path: polygon(
     var(--hud-inner-cut) 0, calc(100% - var(--hud-inner-cut)) 0,
     100% var(--hud-inner-cut), 100% calc(100% - var(--hud-inner-cut)),
@@ -213,3 +214,8 @@
   translate: none;
   transform: translateY(-50%);
 }
+
+/* The clipped layout owns the lower corners; only its content region scrolls. */
+.footerLayout { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.footerLayout > .content { clip-path: none; }
+.footer { flex: 0 0 auto; min-width: 0; }

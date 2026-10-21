@@ -15,7 +15,7 @@ test('rejects aliased Catalyst imports and native semantic actions', () => {
 })
 
 test('allows shared aliases and native content/field semantics', () => {
-  assert.deepEqual(inspect(`import {HudButton as Button, HudIconButton as Icon} from '@/components/hud/HudControls'; const x = <><Button/><Icon/><a href="/">Content</a><input type="range"/><summary>Expand</summary></>`).violations, [])
+  assert.deepEqual(inspect(`import {HudButton as Button, HudIconButton as Icon, HudBackButton as BackButton} from '@/components/hud/HudControls'; const x = <><Button/><Icon/><BackButton destination="objects"/><a href="/">Content</a><input type="range"/><summary>Expand</summary></>`).violations, [])
 })
 
 test('rejects namespaced library actions', () => {

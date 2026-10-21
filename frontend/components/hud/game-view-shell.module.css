@@ -4,40 +4,15 @@
 .identity > p { display: none; }
 .identity h1 { margin: 0; line-height: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace { bottom: 0; --workspace-toolbar-align: center; --workspace-panels-bottom: 16px; --workspace-toolbar-top: 12px; --workspace-panels-top: 104px; --workspace-settings-reserve: 120px; }
-.vitals { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; min-width: 0; }
-.vitals [data-testid='vitals-details-toggle'] { display: none; }
+.footer { position: absolute; z-index: 35; bottom: 0; inset-inline: 0; pointer-events: auto; min-width: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .root { --phone-vitals-height: 0px; --game-navigation-bottom: 124px; --workspace-phone-navigation-top: calc(56px + env(safe-area-inset-top)); --phone-toolbar-top: calc(56px + env(safe-area-inset-top)); --phone-panel-top: calc(128px + env(safe-area-inset-top)); --phone-bottom: calc(12px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
-  .root:has([data-testid='vitals-strip'][data-expanded='true']) { --phone-vitals-height: 144px; }
+  .root { --game-navigation-bottom: 124px; --workspace-phone-navigation-top: calc(56px + env(safe-area-inset-top)); --phone-toolbar-top: calc(56px + env(safe-area-inset-top)); --phone-panel-top: calc(128px + env(safe-area-inset-top)); --phone-bottom: calc(12px + env(safe-area-inset-bottom)); position: fixed; inset: 0; width: 100%; max-width: 100%; min-width: 0; height: var(--system-viewport-height, 100dvh); box-sizing: border-box; overscroll-behavior: none; }
   .identity { top: calc(8px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); display: block; }
   .identity > p { display: none; }
   .identity h1 { margin: 0; line-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .workspace { bottom: 0; }
-  .vitals { bottom: env(safe-area-inset-bottom); }
-  .vitals [data-testid='vitals-strip'] { position: relative; box-sizing: border-box; height: var(--phone-vitals-height); min-width: 0; width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; padding: 4px max(12px, env(safe-area-inset-right)) 4px max(12px, env(safe-area-inset-left)); }
-  .vitals [data-testid='vitals-strip'] > * { min-width: 0; max-width: 100%; }
-  .vitals [data-testid='vitals-fleet-cell'] { grid-column: 1 / -1; }
-  .vitals [data-testid='vitals-fleet-cell'] > div { display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); gap: 6px; }
-  .vitals [data-testid='vitals-fleet-id'] { min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .vitals [data-testid='vitals-fleet-chevron'] { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
-  .vitals [data-testid='vitals-state-pill'] { min-width: 0; font: var(--hud-caption-font); overflow-wrap: anywhere; line-height: 1.3; }
-  .vitals [data-testid='vitals-fuel-cell'] { flex-wrap: wrap; gap: 2px 6px; }
-  .vitals [data-testid='hold-readout'] > div { flex-wrap: wrap; gap: 2px 4px; }
-  .vitals [data-testid='vitals-hold-cell'] { max-height: 44px; overflow: auto; }
-  .vitals [data-testid='vitals-credits-cell'] { align-items: start; }
-  .vitals [data-testid='vitals-clock-cell'] { text-align: right; overflow-wrap: anywhere; font: var(--hud-caption-font); }
-  .vitals [data-testid='vitals-strip']:not([data-expanded='true']) > :not([data-testid='vitals-fleet-cell']):not([data-testid='vitals-details-toggle']) { display: none; }
-  .vitals [data-testid='vitals-details-toggle'] { display: flex; align-items: center; position: absolute; bottom: calc(100% + 64px); left: max(12px, env(safe-area-inset-left)); min-height: 44px; padding: 0 10px; border: 1px solid #435d70; border-radius: 3px; background: #08121df2; color: #b1edff; font: var(--hud-secondary-font); }
-  .root:has(.workspace[data-mobile-open='true']) > .identity, .root:has(.workspace[data-mobile-open='true']) > .vitals { visibility: hidden; }
-}
-@media (max-height: 500px) and (max-width: 1024px) {
-  .vitals [data-testid='vitals-fleet-cell'] > div { grid-template-columns: minmax(0, 1fr) 44px minmax(0, 2fr); }
+  .root:has(.workspace[data-mobile-open='true']) > .identity, .root:has(.workspace[data-mobile-open='true']) > .footer { visibility: hidden; }
 }
 
-.telemetry { min-width: 0; }
-.telemetry [data-testid='vitals-strip'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; min-width: 0; gap: 12px; padding: 12px 0; border: 0; background: transparent; }
-.telemetry [data-testid='vitals-strip'] > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.telemetry [data-testid='vitals-fuel-cell'], .telemetry [data-testid='hold-readout'] > div { flex-wrap: wrap; }
-.telemetry [data-testid='vitals-credits-cell'] { align-items: start; }
 
 .root[data-guest="true"] .workspace { --workspace-panels-bottom: 80px; }

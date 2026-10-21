@@ -33,15 +33,8 @@ import React from 'react'
 //   stationkeep-control, stationkeep-rate,
 //   panel-error-live-region
 //
-// RE-HOMED (add-vitals-strip, RULING 7 — no coexistence). The cargo hold
-// readout (`hold-readout`, `hold-capacity`, `hold-<kind>`, `hold-free`, ...)
-// and the credit balance readout (`balance-readout`, `balance-value`,
-// `balance-figure`, `balance-live-region`) leave THIS panel for the vitals
-// strip (`system-console`'s *The Hold Cell...* / *The Credits Cell...*).
-// This panel no longer renders either — their scenarios are pinned in
-// `VitalsStrip.test.tsx` now. The `credits` prop STAYS on this panel (it
-// drives refuel's affordable default, impl contract §8.3) even though the
-// panel no longer displays it.
+// Cargo/credit summaries belong to the rebuilt status/transaction surfaces.
+// This panel retains credits for refuel affordability and cargo for its verbs.
 //
 // VACUITY NOTES inline. Structural one: every "offered" assertion has a
 // paired "not offered" case in the adjacent state, so a panel that rendered
@@ -375,20 +368,6 @@ describe('FleetActionsPanel — running mine gates the movement commands', () =>
   })
 })
 
-// ------------------------------------------------------------ cargo readout
-
-// The cargo hold readout — RE-HOMED (add-vitals-strip, RULING 7). This
-// panel no longer renders `hold-readout`/`hold-capacity`/`hold-<kind>`/
-// `hold-free`: those testids and every scenario that read them (contents +
-// capacity, the mine-resolution refresh, the scale-less render, the
-// unloaded-roster absent case) now live in `VitalsStrip.test.tsx`'s hold
-// cell describe block (`system-console`'s *The Hold Cell Shows Used, Total
-// and Free Tonnage Over a Kind-Segmented Gauge*), migrated onto the strip's
-// own props rather than the full panel. Nothing here proves the panel
-// itself still HOLDS the correct `held`/`freeHold` numbers driving its own
-// verbs — that is exercised throughout the mine/sell/refuel describes
-// below, which never stopped depending on them.
-
 // -------------------------------------------------------------------- sell
 
 describe('FleetActionsPanel — the sell offer', () => {
@@ -465,12 +444,7 @@ describe('FleetActionsPanel — the sell offer', () => {
     )
   })
 
-  // Scenario: A successful sale refreshes hold and balance. THE PANEL'S OWN
-  // HALF: the commit succeeds and toasts. The "hold and balance visibly
-  // reflect it" half is now the strip's (`system-console`), whose props
-  // this panel no longer feeds — see `VitalsStrip.test.tsx`'s credits-cell
-  // "balance visibly updates when a sale resolves" and the equivalent hold
-  // test, plus `SystemSpaceView.test.tsx`'s wiring-level companion.
+  // Successful commitment and feedback; served reads own refreshed balances.
   it('Scenario: A successful sale refreshes hold and balance', async () => {
     sell.mutate.mockImplementation((_v: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
       opts?.onSuccess?.({ fills: [{ source: 'floor', unitPrice: 5, tons: 10, proceeds: 50 }], proceeds: 50, balance: 1050 })
@@ -709,8 +683,7 @@ describe('FleetActionsPanel — the refuel offer', () => {
     expect(String(toastError.mock.calls[0][0])).not.toContain(raw)
     // No partial credit anywhere: the mutation was invoked exactly once,
     // with no retry and no second commit — the offer's state is otherwise
-    // untouched. (The hold FIGURE itself is the strip's now — see
-    // `VitalsStrip.test.tsx`'s unserved/dry-fuel absent-form tests.)
+    // untouched.
     expect(refuel.mutate).toHaveBeenCalledTimes(1)
   })
 })
@@ -846,25 +819,7 @@ describe('FleetActionsPanel — station-keeping hold and release', () => {
   })
 })
 
-// ---------------------------------------------------------- credit balance
-
-// The credit balance readout — RE-HOMED (add-vitals-strip, RULING 7). This
-// panel no longer renders `balance-readout`/`balance-value`/
-// `balance-figure`/`balance-live-region`: six of this describe block's
-// seven scenarios (current balance, unavailable, change announced,
-// transition announced, and the two update-on-sale/refuel scenarios) now
-// live in `VitalsStrip.test.tsx`'s credits-cell describe block
-// (`system-console`'s *The Credits Cell Shows the Corporation's Served
-// Balance and Announces Its Changes*). The `credits` prop itself STAYS on
-// this panel (refuel's affordable default, impl contract §8.3) — it is
-// simply no longer rendered here.
-//
-// The seventh scenario — *A failed sale's or refuel's error is announced to
-// assistive technology* — was never about the credit balance at all; it is
-// `panel-error-live-region`'s own behaviour (a SIBLING of the deleted
-// balance block, never inside it), re-anchored under
-// `docked-fleet-actions`' own new ADDED requirement of that name (RULING
-// 11). It stays here, unedited in substance, renamed to its new home.
+// Mutation failures remain announced independently of summary/readout surfaces.
 describe('FleetActionsPanel — A Failed Command Is Announced to Assistive Technology (docked-fleet-actions ADDED)', () => {
   // Scenario: A failed sale's or refuel's error is announced to assistive
   // technology
@@ -891,32 +846,10 @@ describe('FleetActionsPanel — usable while the canvas is unavailable', () => {
       station: STATION,
       stationQuotes: QUOTES,
     })
-    // `hold-readout`/`balance-readout` dropped from this enumeration
-    // (add-vitals-strip, impl contract §8.3/task 8.4): they no longer exist
-    // on THIS panel at all, having moved to the strip — a component that
-    // renders neither is not "unusable while the canvas is down", it is
-    // simply drawing them elsewhere now. The strip's own always-present
-    // matrix (`VitalsStrip.test.tsx`) is what proves those readouts survive
-    // canvas unavailability going forward.
+    // Task controls remain usable when the world renderer is unavailable.
     for (const id of ['sell-section', 'refuel-section', 'stationkeep-control']) {
       expect(screen.getByTestId(id), `${id} must remain usable`).toBeInTheDocument()
     }
-  })
-
-  // Scenario: A burn can be ended while the canvas is unavailable
-  it('Scenario: A burn can be ended while the canvas is unavailable', async () => {
-    const burning = fleet({
-      attachedTo: undefined,
-      state: { Mode: 0, Park: null, Drift: null, Burn: { Origin: { X: 0, Y: 0, Z: 0 }, Target: { BodyId: 'x', Point: null }, Intercept: { X: 1, Y: 0, Z: 0 }, Curve: [], Length: 1, DepartMs: T0 - 1, ArriveMs: T0 + 60_000, Accel: 1, InsertionPhase: 0 } },
-    })
-    panel({ canvasAvailable: false, fleet: burning, dockedFeature: null })
-    // Neither verb takes a canvas target: cut drive takes none at all, and
-    // stop parks at the fleet's own current position. Omitting them leaves a
-    // burning fleet uncommandable for the duration of a hardware fault.
-    const cut = screen.getByTestId('fleet-cmd-cut-drive-fleet_1') as HTMLButtonElement
-    const stop = screen.getByTestId('fleet-cmd-stop-fleet_1') as HTMLButtonElement
-    expect(cut.disabled).toBe(false)
-    expect(stop.disabled).toBe(false)
   })
 
   // Scenario: A failed interior read withdraws the mine offer without
@@ -927,66 +860,6 @@ describe('FleetActionsPanel — usable while the canvas is unavailable', () => {
     const notice = screen.getByTestId('mine-unavailable')
     expect(notice.textContent!.toLowerCase()).not.toMatch(/nothing to mine|no resources|carries no/)
     expect(notice.textContent!.toLowerCase()).toMatch(/load|read|unavailable|retry/)
-  })
-})
-
-
-// ---------------------------------------------------------------------------
-// fix-burn-order-geometry-refusals task 3.3 — docked-fleet-actions, *A Served
-// Burn Solve Refusal Reads as Player-Facing Copy on Commit and on Every Stop
-// Surface*: the panel's Stop reports a refusal through the BURN copy table,
-// not the mine one, and never as the raw server reason. The reasons and lines
-// are typed out verbatim from the delta / design.md Decision 6.
-// ---------------------------------------------------------------------------
-
-const STOP_REASON = {
-  origin: 'fleet: burn origin is at or inside the star-clearance radius',
-  destination: 'fleet: burn destination is at or inside the star-clearance radius',
-}
-const STOP_LINE = {
-  origin: 'This fleet is too close to the star to take a course from here right now.',
-  destination: 'That destination is too close to the star to fly to.',
-}
-
-describe('FleetActionsPanel — a stop refused for the star clearance', () => {
-  // Scenario: A stop refused for the clearance shows the same line a burn refused for it shows
-  it.each([
-    ['origin', STOP_REASON.origin, STOP_LINE.origin],
-    ['destination', STOP_REASON.destination, STOP_LINE.destination],
-  ] as const)(
-    'Scenario: A stop refused for the clearance shows the same line a burn refused for it shows (%s)',
-    async (_name, raw, line) => {
-      stop.mutate.mockImplementation((_id: unknown, opts?: { onError?: (e: unknown) => void }) => {
-        opts?.onError?.(Object.assign(new Error('x'), { data: { error: raw } }))
-      })
-      panel()
-      await userEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
-      await waitFor(() => expect(toastError).toHaveBeenCalled())
-      const shown = String(toastError.mock.calls.at(-1)![0])
-      expect(shown, 'the pinned line, verbatim').toBe(line)
-      expect(shown, 'never the raw reason').not.toContain(raw)
-      expect(shown, 'never the package prefix').not.toContain('fleet:')
-      // The assistive-technology announcement carries the same line.
-      expect(screen.getByTestId('panel-error-live-region').textContent).toBe(line)
-      stop.mutate.mockReset()
-    },
-  )
-
-  it('SDET-added: the panel Stop shows the origin line and the destination line as different lines', async () => {
-    const shown: string[] = []
-    for (const raw of [STOP_REASON.origin, STOP_REASON.destination]) {
-      stop.mutate.mockImplementation((_id: unknown, opts?: { onError?: (e: unknown) => void }) => {
-        opts?.onError?.(Object.assign(new Error('x'), { data: { error: raw } }))
-      })
-      const { unmount } = panel()
-      await userEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
-      await waitFor(() => expect(toastError).toHaveBeenCalled())
-      shown.push(String(toastError.mock.calls.at(-1)![0]))
-      unmount()
-      toastError.mockClear()
-    }
-    expect(new Set(shown).size).toBe(2)
-    stop.mutate.mockReset()
   })
 })
 

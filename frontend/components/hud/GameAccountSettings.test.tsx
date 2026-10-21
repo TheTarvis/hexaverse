@@ -10,7 +10,7 @@ beforeEach(() => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })
   vi.mocked(useAccountOptional).mockReturnValue({ user: { email: 'pilot@example.invalid' }, account: null, signOut } as unknown as ReturnType<typeof useAccountOptional>)
 })
-const panels = [{ id: 'command' as const, label: 'Command', children: <input aria-label="Command draft" defaultValue="" /> }]
+const panels = [{ id: 'fleets' as const, label: 'Fleets', children: <input aria-label="Command draft" defaultValue="" /> }]
 it('makes account actions reachable through existing settings without signing out on open or reset', () => {
   render(<GameViewWorkspace corporationId="one" panels={panels} />)
   expect(screen.queryByTestId('sign-out-button')).not.toBeInTheDocument()

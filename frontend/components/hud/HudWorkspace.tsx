@@ -9,15 +9,15 @@ import { MagnifyingGlassIcon, RocketLaunchIcon, Cog6ToothIcon } from '@heroicons
 import styles from './hud-workspace.module.css'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
-export type HudPanelId = 'objects' | 'command'
-const panelIcons = { objects: MagnifyingGlassIcon, command: RocketLaunchIcon }
+export type HudPanelId = 'objects' | 'fleets'
+const panelIcons = { objects: MagnifyingGlassIcon, fleets: RocketLaunchIcon }
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
-export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; suspended?: boolean }
+export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; footer?: ReactNode; suspended?: boolean }
 export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode; navigationAction?: ReactNode }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
-  { id: 'command', lane: 'right', visible: true },
+  { id: 'fleets', lane: 'right', visible: true },
 ]
 
 function readLayout(raw: string | null): Layout {
@@ -30,14 +30,15 @@ function readLayout(raw: string | null): Layout {
     for (const entry of data) {
       if (!entry || typeof entry !== 'object') continue
       const { id, lane, visible } = entry
-      if (!defaults.some(panel => panel.id === id) || seen.has(id) || !['left', 'right', 'bottom'].includes(lane) || typeof visible !== 'boolean') continue
-      valid.push({ id, lane, visible }); seen.add(id)
+      const panelId = id === 'command' ? 'fleets' : id
+      if (!defaults.some(panel => panel.id === panelId) || seen.has(panelId) || !['left', 'right', 'bottom'].includes(lane) || typeof visible !== 'boolean') continue
+      valid.push({ id: panelId, lane, visible }); seen.add(panelId)
     }
     return [...valid, ...defaults.filter(panel => !seen.has(panel.id))]
   } catch { return defaults }
 }
 
-/** Presentation only. Keep navigation/vitals outside this overlay, and panel content unpositioned. */
+/** Presentation only. Keep navigation outside this overlay, and panel content unpositioned. */
 export function HudWorkspace(props: HudWorkspaceProps) {
   return <Workspace key={props.corporationId} {...props} />
 }
@@ -81,7 +82,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       const raw = window.localStorage.getItem(storageKey), clean = readLayout(raw)
       setLayout(clean)
       const previous: unknown = raw ? JSON.parse(raw) : null
-      if (Array.isArray(previous) && previous.some(entry => entry?.id === 'console')) window.localStorage.setItem(storageKey, JSON.stringify(clean))
+      if (Array.isArray(previous) && previous.some(entry => entry?.id === 'console' || entry?.id === 'command')) window.localStorage.setItem(storageKey, JSON.stringify(clean))
     }
     catch { setAnnouncement('Preferences unavailable on this device. You can still arrange the HUD.') }
     setReady(true)
@@ -239,7 +240,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
           <HudCardShell title={panel.label} paused={!item.visible || panel.suspended || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
             closeLabel={phone ? `Close ${panel.label} panel` : `Hide ${panel.label}`}
             onClose={phone ? closePanel : () => { recoveryRef.current?.focus({ preventScroll: true }); toggle(item.id) }}
-            toolbar={phone ? navigation(item.id) : undefined}>
+            toolbar={phone ? navigation(item.id) : undefined} footer={panel.footer}>
             {panel.children}
           </HudCardShell>
         </section>

@@ -28,7 +28,7 @@ import { Figure } from '@/components/figure/Figure'
 import { Select } from '@/components/catalyst/select'
 import { Input } from '@/components/catalyst/input'
 import { useCancelAction, useRunningMine } from '@/hooks/use-actions'
-import { useCutDrive, useHold, useMine, useRelease, useStop } from '@/hooks/use-fleets'
+import { useHold, useMine, useRelease } from '@/hooks/use-fleets'
 import { useRefuel, useSell } from '@/hooks/use-market'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { formatByUnit } from '@/lib/format'
@@ -36,7 +36,6 @@ import { firstTonPrice, foldSale } from '@/lib/market/fold'
 import { GENERIC_SALE_FAILURE, isPriceChanged, saleErrorCopy } from '@/lib/market-copy'
 import { refuelErrorCopy } from '@/lib/refuel-copy'
 import {
-  burnErrorCopy,
   commandErrorReason,
   holdErrorCopy,
   mineErrorCopy,
@@ -109,8 +108,6 @@ export function FleetActionsPanel({
   const refuel = useRefuel(fleetId)
   const hold = useHold()
   const release = useRelease()
-  const cutDrive = useCutDrive()
-  const stop = useStop()
   const cancelAction = useCancelAction(systemId)
   const running = useRunningMine(fleetId || null).data ?? null
 
@@ -580,37 +577,7 @@ export function FleetActionsPanel({
         </div>
       )}
 
-      {/* TODO(HUD-HIDDEN-CLEANUP): Cut drive / Stop and their otherwise empty panel shell are CSS-hidden in the live system HUD. Retire this row and unused hooks after replacement controls land; retain resource actions. */}
-      <div data-testid="fleet-flight-controls" className="flex gap-2 border-t border-white/15 pt-4">
-        <HudButton
-          type="button"
-          data-testid={`fleet-cmd-cut-drive-${fleet.id}`} pending={cutDrive.isPending} pendingLabel="Cutting drive…"
-          tone="warning"
-          className="flex-1"
-          disabled={mineRunning}
-          onClick={() =>
-            cutDrive.mutate(fleet.id, {
-              onError: (error: unknown) => reportFailure(mineErrorCopy(commandErrorReason(error))),
-            })
-          }
-        >
-          Cut drive
-        </HudButton>
-        <HudButton
-          type="button"
-          data-testid={`fleet-cmd-stop-${fleet.id}`} pending={stop.isPending} pendingLabel="Stopping…"
-          tone="warning"
-          className="flex-1"
-          disabled={mineRunning}
-          onClick={() =>
-            stop.mutate(fleet.id, {
-              onError: (error: unknown) => reportFailure(burnErrorCopy(commandErrorReason(error))),
-            })
-          }
-        >
-          Stop
-        </HudButton>
-      </div>
+
     </HudCardShell>
   )
 }

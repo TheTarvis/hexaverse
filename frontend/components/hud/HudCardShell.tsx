@@ -19,6 +19,8 @@ export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title
   paused?: boolean
   /** Nested content shares its owning card's frame; detached overlays can opt in. */
   framing?: 'auto' | 'frame' | 'section'
+  /** Stationary actions outside the scrolling content, against the lower frame. */
+  footer?: ReactNode
   toolbar?: ReactNode
   closeTestId?: string
   closeButtonRef?: Ref<HTMLButtonElement>
@@ -34,6 +36,7 @@ export function HudCardShell({
   paused = false,
   framing = 'auto',
   toolbar,
+  footer,
   closeTestId,
   closeButtonRef,
   className,
@@ -94,9 +97,12 @@ export function HudCardShell({
       {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
       <CardFrameContext.Provider value={true}>
         <div className={styles.body} data-slot="hud-body">
-          <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
+          {footer ? <div className={styles.footerLayout} data-slot="hud-footer-layout">
+            <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">{children}</div>
+            <div className={styles.footer} data-slot="hud-footer">{footer}</div>
+          </div> : <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
             {children}
-          </div>
+          </div>}
         </div>
       </CardFrameContext.Provider>
     </section>

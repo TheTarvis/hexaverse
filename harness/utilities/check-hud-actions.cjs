@@ -49,7 +49,7 @@ function inspectSource(source) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName.getText(source)
       const imported = imports.get(tag)
-      const shared = imported && ['HudButton', 'HudIconButton'].includes(imported.name) && /(?:^|\/)HudControls$/.test(imported.module)
+      const shared = imported && ['HudButton', 'HudIconButton', 'HudBackButton'].includes(imported.name) && /(?:^|\/)HudControls$/.test(imported.module)
       const attributes = node.attributes.properties.filter(ts.isJsxAttribute)
       const value = name => {
         const initializer = attributes.find(attribute => attribute.name.getText(source) === name)?.initializer

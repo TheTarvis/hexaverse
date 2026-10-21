@@ -2,11 +2,12 @@
 
 import { fleetLabel } from '@/lib/fleet-label'
 import type { ReactNode } from 'react'
-import { HudButton } from '@/components/hud/HudControls'
+import { HudBackButton, HudButton } from '@/components/hud/HudControls'
 import { Select } from '@/components/catalyst/select'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { HudHeading, HudText } from '@/components/hud/HudTypography'
+import { HudProgress } from '@/components/hud/HudProgress'
+import { HudHeading, HudText, HudValue } from '@/components/hud/HudTypography'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { formatByUnit } from '@/lib/format'
 import type { BurnPreview, Fleet } from '@/lib/types/fleet'
@@ -48,6 +49,7 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
   const duration = (time: number) => formatByUnit(Math.max(0, time), scale, 'world-ms-span-in')
   return <HudCardShell title={mode === 'review' ? 'Travel review' : 'Command fleet'} onClose={onClose} closeLabel="Close travel card" className={styles.card}>
     <div className={styles.content} data-testid="compact-travel-card">
+      <HudBackButton destination="objects" onClick={onBack} disabled={pending} />
       {mode === 'review' ? <>
         {onChooseFleet ? <div><HudText>Command fleet · {fleet ? fleetLabel(fleet) : 'Choose a fleet'}</HudText><HudButton onClick={onChooseFleet} disabled={pending}>Choose command fleet</HudButton></div> : <label className={styles.picker}>Command fleet
           <Select aria-label="Travel command fleet" value={fleet?.id ?? ''} disabled={pending} onChange={event => onFleet(event.target.value)}>
@@ -68,20 +70,18 @@ export function CompactTravelCard({ mode, fleet, fleets, systemId, destination, 
         {blocker && quote && <p role="status" className={styles.warning}>{blocker}</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}
         <div className={styles.actions}>
-          <HudButton onClick={onBack} disabled={pending}>Back</HudButton>
           <HudButton variant="primary" data-testid="travel-start" pending={pending} pendingLabel="Starting…" disabled={!!blocker || !quote?.affordable} onClick={onStart}>Start travel</HudButton>
         </div>
         {!quote && <HudButton variant="quiet" disabled={pending} onClick={onRetry}>Retry estimate</HudButton>}
       </> : <>
         <HudHeading size="compact">{fleet ? fleetLabel(fleet) : 'Fleet unavailable'}</HudHeading>
         <HudText>{fleet?.jump ? 'In inter-system transit' : traveling ? 'Travelling' : fleet?.state?.Mode === 2 ? 'Drifting' : 'Ready'} · {destination}</HudText>
-        {burn && <><progress aria-label="Travel progress" value={progress} max={100} className={styles.progress} /><HudText>{Math.floor(progress)}% · {traveling ? duration(burn.ArriveMs - worldTime) : 'Arrived'}</HudText></>}
+        {burn && <div className={styles.travelProgress}><HudProgress label="Travel progress" value={progress} /><div className={styles.progressFigures}><HudValue>{Math.floor(progress)}%</HudValue><HudText variant="secondary"><HudValue>{traveling ? duration(burn.ArriveMs - worldTime) : 'Arrived'}</HudValue></HudText></div></div>}
         {notice && <p role="status">{notice}</p>}
         {warning && <p className={styles.warning}>This course leaves the fleet unable to reach a station or lane gate.</p>}
         {error && <p role="alert" className={styles.warning}>{error}</p>}
         {fleet && !fleet.jump && (traveling || fleet.state?.Mode === 2) && <HudButton tone="danger" data-testid="travel-stop" disabled={pending} pending={stopPending} pendingLabel="Stopping…" onClick={onStop}>Stop travel</HudButton>}
         {additionalActions}
-        <HudButton variant="quiet" onClick={onBack}>Browse destinations</HudButton>
       </>}
     </div>
   </HudCardShell>

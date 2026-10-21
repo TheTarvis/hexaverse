@@ -26,7 +26,7 @@ function LayoutSample({ overflowing, natural, count, actionState, longLabels }: 
   const reset: HudBandAction = { id: 'reset', label: longLabels ? 'Restore defaults' : 'Reset', onClick: () => { setDetail('Standard'); setNotice('Defaults restored in this preview.') } }
   return <article className={styles.sample} aria-label={`${count} action layout`}>
     <header className={styles.sampleTitle}><HudHeading size="compact">{count} actions</HudHeading><HudText variant="secondary">{count === 2 ? 'Equal halves; primary on the right.' : 'Equal outer cells; wider primary in the center.'}</HudText></header>
-    <HudCardShell title="Settings" lighting="none" className={`${styles.card} ${natural ? styles.natural : ''}`} contentClassName={styles.layout}>
+    <HudCardShell title="Settings" lighting="none" className={`${styles.card} ${natural ? styles.natural : ''}`} contentClassName={styles.layout} footer={<HudActionBand actions={count === 2 ? [cancel, primary] : [cancel, primary, reset]} label={`${count} card actions`} />}>
       <header className={styles.header} data-layout="header"><HudHeading size="compact">Display settings</HudHeading><HudText variant="secondary">Choose the amount of visual detail.</HudText></header>
       <section className={styles.body} aria-label="Scrollable card content" tabIndex={0} data-layout="body">
         <label className={styles.field}><HudText variant="label">Detail level</HudText><HudSelect aria-label="Detail level" value={detail} onChange={event => setDetail(event.target.value)}><option>Low</option><option>Standard</option><option>High</option></HudSelect></label>
@@ -34,7 +34,6 @@ function LayoutSample({ overflowing, natural, count, actionState, longLabels }: 
         {actionState === 'disabled' && <HudText variant="secondary">Apply is unavailable in this state example. Cancel and Reset remain usable.</HudText>}
         {overflowing && Array.from({ length: 12 }, (_, index) => <section key={index} className={styles.group}><HudHeading variant="section" level={4}>Display group {index + 1}</HudHeading><HudText>Supporting settings and explanations can extend beyond the visible area. Only this content region scrolls.</HudText><HudFacts items={[{ label: 'Quality', value: detail }, { label: 'Visibility', value: 'Automatic' }]} /></section>)}
       </section>
-      <HudActionBand actions={count === 2 ? [cancel, primary] : [cancel, primary, reset]} label={`${count} card actions`} />
     </HudCardShell>
     <HudText variant="caption" role="status" className={styles.notice}>{notice || 'Layout study only. No game settings are changed.'}</HudText>
   </article>
@@ -59,7 +58,7 @@ function CardLayoutStudy() {
   </main>
 }
 
-const meta = { title: 'HUD/Card Layout', component: CardLayoutStudy, parameters: { layout: 'fullscreen', docs: { description: { component: 'Smoked-crystal action band under visual review, composed with the accepted HudCardShell. Uses shared HudControls, typography and band tokens. Stationary layout composition remains story-only; travel is unchanged.' } } } } satisfies Meta<typeof CardLayoutStudy>
+const meta = { title: 'HUD/Card Layout', component: CardLayoutStudy, parameters: { layout: 'fullscreen', docs: { description: { component: 'Smoked-crystal action band under visual review, composed with the accepted HudCardShell. Uses shared HudControls, typography and band tokens. Stationary actions use the shared shell footer slot; travel behavior is unchanged.' } } } } satisfies Meta<typeof CardLayoutStudy>
 export default meta
 type Story = StoryObj<typeof meta>
 export const StationaryActions: Story = {}

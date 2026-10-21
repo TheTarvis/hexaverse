@@ -1,5 +1,4 @@
 import type { HTMLAttributes, ReactNode, ComponentPropsWithRef } from 'react'
-import { CONSOLE_DOCK_LANE_COLUMN } from '@/lib/console-dock-layout'
 import styles from './game-hud.module.css'
 import { HudHeading as ContentHeading, HudText } from './HudTypography'
 
@@ -15,14 +14,6 @@ export function HudPanel({ as: Element = 'section', tone = 'default', className 
   tone?: 'default' | 'warning' | 'navigation' | 'inset'
 }) {
   return <Element {...props} className={`${styles.theme} ${styles.panel} ${tone === 'default' ? '' : styles[tone]} ${className}`} />
-}
-
-export function HudColumn({ side = 'right', paired = false, dockAware = false, className = '', ...props }: HTMLAttributes<HTMLDivElement> & {
-  side?: 'left' | 'right'
-  paired?: boolean
-  dockAware?: boolean
-}) {
-  return <div {...props} className={`${styles.column} ${styles[side]} ${dockAware ? CONSOLE_DOCK_LANE_COLUMN : side === 'left' ? 'bottom-[200px]' : 'bottom-20'} ${paired ? styles.paired : ''} ${className}`} />
 }
 
 export function HudHeading({ eyebrow, title, detail, className = '', ...props }: Omit<Props, 'title'> & {

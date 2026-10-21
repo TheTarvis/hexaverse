@@ -22,7 +22,7 @@ function SearchCard() {
       onPanelDismiss={id => { if (id === 'objects') setActive(false) }}
       panels={[
         { id: 'objects', label: 'Objects', children: <SystemObjectIndex compact objects={objects} selected={selected} open={active} onOpen={setActive} onSelect={select} onFocus={() => {}} systemName="Solace" /> },
-        { id: 'command', label: 'Command', children: <p>Command state is separate from object browsing.</p> },
+        { id: 'fleets', label: 'Fleets', children: <p>Command state is separate from object browsing.</p> },
       ]} />
   </div>
 }
@@ -54,3 +54,6 @@ export const AlwaysVisibleSearch: Story = {
     await expect(search).toBeVisible()
   },
 }
+
+/** Free inspection without the search walkthrough running concurrently. */
+export const Inspection: Story = { render: () => <SearchCard /> }
