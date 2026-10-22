@@ -54,7 +54,7 @@ export function HudCardShell({
           <span>{title}</span>
         </h2>
       )}
-      {onClose && (
+      {onClose && !section && (
         <HudButton
           presentation="chrome"
           type="button"

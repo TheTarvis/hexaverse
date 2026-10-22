@@ -263,7 +263,7 @@ describe('Objects own-fleet parent integration', () => {
     expect(life.created).toEqual(['fleet_2']); expect(life.disposed).toEqual([])
     fireEvent.change(screen.getByLabelText('Find a system object'), { target: { value: 'no-match' } })
     expect(screen.getByTestId('test-preview')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' })); expect(screen.queryByTestId('test-preview')).toBeNull()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' })); expect(screen.queryByTestId('test-preview')).toBeNull()
     showIndex(); expect(screen.getByTestId('test-preview')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('details-back')); expect(screen.queryByTestId('test-preview')).toBeNull()
   })

@@ -36,6 +36,7 @@ it('targets a real station for the return and explains unavailable station telem
   const { rerender } = render(<RecoveryTransmission {...props} guide={guide} station={station} bodies={[body]} />)
   expect(screen.getByTestId('live-mining-check')).toHaveTextContent('Confirmed')
   expect(screen.getByTestId('live-fuel-check')).toHaveTextContent('Pending')
+  expect(screen.getByTestId('guide-station')).toHaveTextContent('Select station station')
   fireEvent.click(screen.getByTestId('guide-station'))
   expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ stationId: 'station', phase: 'return' }))
   expect(props.onTarget).toHaveBeenCalledWith('station')

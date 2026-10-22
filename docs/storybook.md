@@ -46,6 +46,18 @@ alongside copied controls and private specimen typography. Browser checks verify
 one owning frame/light layer and stationary footer geometry; source checks alone
 cannot prove rendered consistency.
 
+Card commands use `HudCardShell`'s `footer` slot and `HudActionBand`, including
+one-action cards. Shared `HudButton` alone does not enforce card placement. Direct
+card-body action buttons and primary commands inside body wrappers are rejected
+by the source check. Contextual section/form controls, navigation and field
+configuration remain beside their content. Helper-generated layouts still need
+rendered review: source checks cannot infer every command's purpose.
+
+Workspace examples use production dismissal: desktop launcher toggles and focused
+Escape, phone Return to map above the tabs. Hiding retains mounted panel state and
+ongoing orders. Standalone Shell examples retain the corner-X capability; nested
+sections do not render a second close control.
+
 For a foundation change, exercise representative consuming tasks at desktop and
 portrait-phone widths, including relevant pending/disabled states, long names and
 overflow. Run interaction checks and inspect actual renders; static checks cannot

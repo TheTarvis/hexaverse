@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
+import { within, render as rtlRender, screen, fireEvent, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
@@ -225,7 +225,7 @@ it('delays historical ghost reads until the interior answers; never mounts the r
 it('preserves disclosed historical ghosts and highlight interaction while panels are hidden', () => {
   sightings.byArg.set(SYSTEM_ID, pileOf([record('retained')]))
   mount()
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' }))
   const ghost = screen.getByTestId('mock-ghost-retained')
   fireEvent.click(ghost)
   expect(ghost).toHaveAttribute('data-highlighted', 'true')

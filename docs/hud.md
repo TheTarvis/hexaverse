@@ -840,11 +840,37 @@ Geometry assertions compare title/card midpoints within 1 CSS px at 375/390 port
 Back/48 px close controls, and real object detail/back transitions. Storybook's
 MobileHeaderAlignment story exercises the same shared shell.
 
-## Current header and close contract: original Storybook chrome — 2026-10-18
+## Workspace dismissal — 2026-10-21
+
+Arrange HUD's Reset action and Recovery's guide actions use the shared stationary
+footer/action band. The body scrolls above the footer, including on short screens.
+Show/hide, dock and reorder controls remain contextual configuration fields;
+account Sign out belongs to the Account section. The shared-foundations and
+workspace specimens follow the same footer contract as production cards.
+
+Desktop workspace launchers toggle each panel's visibility. Their pressed state
+reports visibility, so several docked panels can be pressed at once. Escape from
+a panel or its launcher hides that panel and returns focus to its launcher;
+Escape inside Arrange HUD closes settings first. Nested controls that consume
+Escape retain ownership, and keyboard events outside the workspace do not hide
+panels.
+
+Phone panels and Arrange HUD use a stationary, labeled **Return to map** control
+above their navigation tabs. It closes the sheet and restores launcher focus
+without changing saved panel visibility. Workspace panels have no corner X on
+either viewport; nested shell sections do not add their own dismissal chrome.
+Back remains navigation within a task. The standalone shell specimen retains its
+outside X as a foundation capability, separate from workspace dismissal.
+
+Hiding keeps panel children mounted, retaining drafts, searches and disclosures.
+Dismissal never submits Stop/Cut or changes ongoing travel, mining or scanning.
+Existing explicit owner activation requests can reveal a hidden panel again.
+
+## Standalone header and close contract: original Storybook chrome — 2026-10-18
 
 The visual source is HudCardShell and its Plain story from commit 624c4ff. This
-supersedes the inset mobile-header refinements above. Every framed app card and
-Storybook story uses the same component and original visual rules: 11px floating
+supersedes the inset mobile-header refinements above. Standalone cards use the
+same component and original visual rules: 11px floating
 centered plaque; transparent 28x28px corner close at top/right -10px; 14px X with
 its original stroke/glow. The mobileHeader variant and app-specific close offsets
 are removed. Broad phone button sizing excludes the close; keyboard focus styling

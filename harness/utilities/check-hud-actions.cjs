@@ -57,6 +57,23 @@ function inspectSource(source) {
         if (ts.isStringLiteral(initializer)) return initializer.text
         if (ts.isJsxExpression(initializer) && initializer.expression && ts.isStringLiteral(initializer.expression)) return initializer.expression.text
       }
+      if (shared && imported.name === 'HudButton' && !['chrome', 'row', 'map'].includes(value('presentation'))) {
+        // Whole-card commands use the stationary footer. Section/form commands
+        // remain beside the fields they commit; footer/toolbar slots own theirs.
+        let wrapped = false
+        for (let owner = node.parent; owner; owner = owner.parent) {
+          if (ts.isJsxAttribute(owner) && ['footer', 'toolbar'].includes(owner.name.getText(source))) break
+          if (!ts.isJsxElement(owner)) continue
+          if (owner.openingElement === node) continue
+          const component = imports.get(owner.openingElement.tagName.getText(source))
+          if (component?.name === 'HudSection' || owner.openingElement.tagName.getText(source) === 'form') break
+          if (component?.name === 'HudCardShell') {
+            if (!wrapped || value('variant') === 'primary') add(node, 'card action in scrolling content; use HudCardShell footer with HudActionBand, or HudSection for a contextual form action')
+            break
+          }
+          wrapped = true
+        }
+      }
       if (imported?.name === 'HudCardShell' && /(?:^|\/)HudCardShell$/.test(imported.module) && value('lighting') === 'none') {
         add(node, 'shell lighting override bypasses shared defaults; use the Static Frame specimen for CSS-only review')
       }

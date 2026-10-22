@@ -3,7 +3,7 @@
 import { useRef } from 'react'
 import { usePhoneSheet } from '@/hooks/use-phone-sheet'
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { HudButton } from '@/components/hud/HudControls'
+import { HudActionBand, type HudBandAction } from '@/components/hud/HudActionBand'
 import type { CommandGuide } from '@/lib/command-onboarding'
 import type { Fleet } from '@/lib/types/fleet'
 import type { Station } from '@/lib/types/market'
@@ -53,24 +53,26 @@ export function RecoveryTransmission({ guide, fleet, bodies, station = null, sta
   else if (guide.phase === 'refuel') copy = stationUnavailable || !atStation ? stationCopy : 'Sale confirmed. Use Refuel to buy fuel at the station. Review the live price, your credits and free hold: fuel shares cargo capacity. Purchase an affordable amount to complete this check.'
   else copy = 'Refuelling confirmed. You can travel, mine, sell cargo and replenish fuel. Before the next burn, budget enough fuel to reach a station again.'
 
+  const actions: HudBandAction[] = []
+  if (guide.phase === 'wake') actions.push({ id: 'begin-guide', testId: 'begin-guide', label: 'Begin systems check', onClick: () => onSave({ ...guide, phase: 'objects', targetId: null }) })
+  if (guide.phase === 'objects') actions.push({ id: 'guide-objects', testId: 'guide-objects', label: 'Open Objects panel', onClick: () => onObjects?.() })
+  if (guide.phase === 'station') actions.push({ id: 'guide-introduce-scan', testId: 'guide-introduce-scan', label: 'Check sensors', onClick: () => onSave({ ...guide, phase: 'scan', stationId: station?.featureId ?? guide.stationId }) })
+  if (['scan', 'contacts'].includes(guide.phase)) actions.push({ id: 'guide-open-scan', testId: 'guide-open-scan', label: 'Open Scan', onClick: () => { if (guide.phase === 'contacts') onSave({ ...guide, phase: 'scan', scanActionId: null }); onScan() } })
+  if (guide.phase === 'scanning' && actionFailed) actions.push({ id: 'guide-retry-scan', testId: 'guide-retry-scan', label: 'Retry scan report', onClick: onRetryAction })
+  if (['target', 'travel', 'mine'].includes(guide.phase) && !unavailable && activeTarget) actions.push({ id: 'guide-target', testId: 'guide-target', label: guide.phase === 'target' ? 'Open Objects panel' : `Open Objects · ${label ?? candidate?.id}`, onClick: () => { onSave({ ...guide, targetId: activeTarget }); onTarget(activeTarget) } })
+  if ((guide.phase === 'target' && !activeTarget || guide.phase === 'mine' && !target?.resources?.length) && !interiorFailed) actions.push({ id: 'guide-scan', testId: 'guide-scan', label: 'Open Scan', onClick: onScan })
+  if (guide.phase === 'extraction' && actionFailed) actions.push({ id: 'guide-retry', testId: 'guide-retry', label: 'Retry extraction report', onClick: onRetryAction })
+  if (['return', 'returning', 'sell', 'refuel'].includes(guide.phase) && !stationUnavailable && station) actions.push({ id: 'guide-station', testId: 'guide-station', label: `Select station ${station.featureId}`, onClick: () => { onSave({ ...guide, stationId: station.featureId }); onTarget(station.featureId) } })
+  if (guide.phase === 'done') actions.push({ id: 'finish-guide', testId: 'finish-guide', label: 'Command network online', onClick: () => onSave({ ...guide, phase: 'dismissed' }) })
+  const [primary, secondary] = actions
+
   return <aside ref={sheetRef} role="dialog" aria-modal="true" tabIndex={-1} data-phone-sheet="true" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onSave({ ...guide, phase: 'dismissed' }) } }} className={styles.transmission} aria-label="Recovery transmission" data-testid="recovery-transmission" data-phase={guide.phase}>
-    <HudCardShell title="Recovery signal" className={styles.recoveryCard} contentClassName={styles.recoveryContent} closeLabel="Dismiss startup guide" closeTestId="dismiss-guide" onClose={() => onSave({ ...guide, phase: 'dismissed' })}>
+    <HudCardShell title="Recovery signal" className={styles.recoveryCard} contentClassName={styles.recoveryContent} closeLabel="Dismiss startup guide" closeTestId="dismiss-guide" onClose={() => onSave({ ...guide, phase: 'dismissed' })} footer={primary && <HudActionBand label="Recovery actions" actions={secondary ? [primary, secondary] : [primary]} />}>
     <div className={styles.transmissionBody}>
     <p role="status" aria-live="polite" data-testid="recovery-copy">{copy}</p>
     <ol className={styles.checks} aria-label="Startup checks"><li data-testid="live-motor-check">{motorDone ? '✓ Confirmed' : '01 Pending'} · Motor function</li><li data-testid="live-mining-check">{miningDone ? '✓ Confirmed' : '02 Pending'} · Mining function</li><li data-testid="live-fuel-check">{guide.phase === 'done' ? '✓ Confirmed' : '03 Pending'} · Refuelling</li></ol>
     </div>
-    <div className={styles.transmissionActions}>
-    {guide.phase === 'wake' && <HudButton variant="primary" data-testid="begin-guide" onClick={() => onSave({ ...guide, phase: 'objects', targetId: null })}>Begin systems check</HudButton>}
-    {guide.phase === 'objects' && <HudButton variant="primary" data-testid="guide-objects" onClick={onObjects}>Open Objects panel</HudButton>}
-    {guide.phase === 'station' && <HudButton variant="primary" data-testid="guide-introduce-scan" onClick={() => onSave({ ...guide, phase: 'scan', stationId: station?.featureId ?? guide.stationId })}>Check sensors</HudButton>}
-    {['scan', 'contacts'].includes(guide.phase) && <HudButton variant="primary" data-testid="guide-open-scan" onClick={() => { if (guide.phase === 'contacts') onSave({ ...guide, phase: 'scan', scanActionId: null }); onScan() }}>Open Scan</HudButton>}
-    {guide.phase === 'scanning' && actionFailed && <HudButton variant="primary" data-testid="guide-retry-scan" onClick={onRetryAction}>Retry scan report</HudButton>}
-    {['target', 'travel', 'mine'].includes(guide.phase) && !unavailable && activeTarget && <HudButton variant="primary" data-testid="guide-target" onClick={() => { onSave({ ...guide, targetId: activeTarget }); onTarget(activeTarget) }}>{guide.phase === 'target' ? 'Open Objects panel' : `Open Objects · ${label ?? candidate?.id}`}</HudButton>}
-    {(guide.phase === 'target' && !activeTarget || guide.phase === 'mine' && !target?.resources?.length) && !interiorFailed && <HudButton variant="primary" data-testid="guide-scan" onClick={onScan}>Open Scan</HudButton>}
-    {guide.phase === 'extraction' && actionFailed && <HudButton variant="primary" data-testid="guide-retry" onClick={onRetryAction}>Retry extraction report</HudButton>}
-    {['return', 'returning', 'sell', 'refuel'].includes(guide.phase) && !stationUnavailable && station && <HudButton variant="primary" data-testid="guide-station" onClick={() => { onSave({ ...guide, stationId: station.featureId }); onTarget(station.featureId) }}>Select station {station.featureId}</HudButton>}
-    {guide.phase === 'done' && <HudButton variant="primary" data-testid="finish-guide" onClick={() => onSave({ ...guide, phase: 'dismissed' })}>Command network online</HudButton>}
-    </div>
+
     <small>Guide progress is saved in this browser.</small>
     </HudCardShell>
   </aside>

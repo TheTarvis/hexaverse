@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render as rtlRender, screen, act, fireEvent } from '@testing-library/react'
+import { within, render as rtlRender, screen, act, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
@@ -447,7 +447,7 @@ it('retains the accepted travel response when status is closed and reopened befo
   mount([{ ...ready, roster: { ...ready.roster, cargo: { fuel: 1000 } } }]); await flush()
   await click('mock-select-point'); await click('travel-review-entry'); await click('travel-start')
   expect(screen.getByTestId('travel-stop')).toBeVisible()
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Fleet status' })); await flush()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Fleet status' })); await flush()
   expect(mocks.stop).not.toHaveBeenCalled()
   await click('travel-status-entry')
   expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('Under way')
@@ -487,7 +487,7 @@ it('replaces the retained acceptance response with the next served fleet read', 
   const ready = fleet('fleet_1')
   mount([{ ...ready, roster: { ...ready.roster, cargo: { fuel: 1000 } } }]); await flush()
   await click('mock-select-point'); await click('travel-review-entry'); await click('travel-start')
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Fleet status' })); await flush()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Fleet status' })); await flush()
   const arrived = attachedTo('fleet_1', STATION)
   await act(async () => { qc.setQueryData(queryKeys.fleets.mine(), [arrived]); setFleets([arrived]); rerenderView() }); await flush()
   await click('travel-status-entry')
@@ -502,7 +502,7 @@ it('keeps an accepted stranding warning through dismissal and lets a fresh serve
   mount([{ ...initial, roster: { ...initial.roster, cargo: { fuel: 1000 } } }]); await flush()
   await click('mock-select-point'); await click('travel-review-entry'); await click('travel-start')
   expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('unable to reach a station or lane gate')
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Fleet status' })); await flush()
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Fleet status' })); await flush()
   await click('travel-status-entry')
   expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('unable to reach a station or lane gate')
   const fresh = burningFleet('fleet_1')
@@ -528,7 +528,7 @@ it('keeps Fleet Status disclosures and Objects search independent through hiding
   fireEvent.change(search, { target: { value: 'rocky' } })
   fireEvent.click(screen.getByRole('button', { name: /^Cargo · / }))
   fireEvent.click(screen.getByRole('button', { name: 'Ships · 2' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Fleet status' }))
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Fleet status' }))
   expect(search).toHaveValue('rocky')
   expect(screen.queryByRole('button', { name: /^Cargo · / })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Fleet status (hidden)' }))

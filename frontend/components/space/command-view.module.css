@@ -61,11 +61,8 @@
 /* Mobile geometry shares one viewport budget instead of independent offsets. */
 .guideLayer { display: contents; }
 .transmissionBody { min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.transmissionActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.transmissionActions > button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .commandView .transmission { box-sizing: border-box; display: flex; flex-direction: column; }
 .transmission .signal { flex-shrink: 0; }
-.transmissionActions { flex-shrink: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .guideLayer { display: flex; position: absolute; z-index: 40; inset: var(--phone-panel-top) max(12px, env(safe-area-inset-right)) var(--phone-bottom) max(12px, env(safe-area-inset-left)); flex-direction: column; min-height: 0; min-width: 0; gap: 8px; pointer-events: none; }
   .commandView .guideLayer .transmission { position: relative; inset: auto; transform: none; width: 100%; max-width: 100%; max-height: 100%; min-height: 0; padding: 8px 12px 12px; overflow: hidden; pointer-events: auto; }
@@ -90,7 +87,6 @@
 @media (max-height: 500px) and (max-width: 1024px) {
   .commandView .guideLayer .transmission { display: grid; height: 100%; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 44px minmax(0, 1fr); gap: 4px 12px; }
   .transmission .signal { grid-column: 1 / -1; }
-  .transmissionActions { max-width: 220px; align-self: center; }
   .transmissionBody { align-self: stretch; }
 }
 
@@ -102,7 +98,6 @@
   .commandView .guideLayer:has(.transmission) { position: fixed; inset: 0; top: var(--system-viewport-top, 0px); bottom: auto; height: var(--system-viewport-height, 100dvh); z-index: 65; box-sizing: border-box; padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #08121d; }
   .commandView .guideLayer .transmission { display: flex; flex: 1; height: auto; min-height: 0; max-height: none; padding: 12px; }
   .guideLayer .transmissionBody { flex: 1; }
-  .guideLayer .transmissionActions { max-width: none; align-self: stretch; }
   .commandView:has(.transmission) .identity { visibility: hidden; }
 }
 .resumeGuide { position: absolute; top: var(--phone-toolbar-top, 100px); right: max(12px, env(safe-area-inset-right)); z-index: 45; min-height: 44px; }

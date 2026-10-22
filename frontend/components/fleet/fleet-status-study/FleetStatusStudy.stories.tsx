@@ -1,3 +1,4 @@
+import { PHONE_HUD_QUERY } from '@/hooks/use-phone-sheet'
 import { expect, userEvent, within } from 'storybook/test'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { FleetStatusHostingStudy } from './FleetStatusStudy'
@@ -21,8 +22,8 @@ export const OwnCard: Story = {
     // Isolate the regression from this demonstration's persisted arrangement.
     await userEvent.click(canvas.getByRole('button', { name: 'Arrange HUD' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Reset HUD layout' }))
-    await userEvent.click(canvas.getByRole('button', { name: 'Close HUD settings' }))
-    await userEvent.click(canvas.getByRole('button', { name: 'Fleet status' }))
+    await userEvent.click(canvas.getByRole('button', { name: window.matchMedia(PHONE_HUD_QUERY).matches ? 'Return to map' : 'Arrange HUD' }))
+    if (window.matchMedia(PHONE_HUD_QUERY).matches) await userEvent.click(canvas.getByRole('button', { name: 'Fleet status' }))
     const band = canvasElement.querySelector<HTMLElement>('[data-slot="hud-action-band"]')!
     const frame = band.closest<HTMLElement>('[data-hud-framing="frame"]')!
     const content = frame.querySelector<HTMLElement>('[data-slot="hud-footer-layout"] > [data-slot="hud-content"]')!

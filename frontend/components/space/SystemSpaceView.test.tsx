@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, waitFor, act, fireEvent } from '@testing-library/react'
+import { within, render as rtlRender, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
@@ -934,7 +934,7 @@ it.each(['index-feat-body-0', 'guide-target'])('advances object discovery throug
     expect(screen.queryByLabelText('Current objective')).not.toBeInTheDocument()
     expect(screen.getByTestId('system-index-search')).toBeVisible()
     expect(screen.getByTestId('live-object-browser')).toHaveAttribute('data-attention', 'false')
-    await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' }))
     expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
     expect(mutations.order.mutate).not.toHaveBeenCalled()
   } finally {
@@ -1018,7 +1018,7 @@ it('keeps docked station services in station details and preserves quantities ac
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
   await userEvent.click(screen.getByTestId(`index-${STATION.featureId}`))
   expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
-  await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+  await userEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' }))
   expect(screen.getByTestId('refuel-section')).not.toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
   expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
@@ -1084,7 +1084,7 @@ describe('reachable non-map HUD actions', () => {
     expect(mutations.refuel.mutate).toHaveBeenCalledTimes(1)
     await userEvent.click(screen.getByTestId('stationkeep-control'))
     expect(mutations.hold.mutate).toHaveBeenCalledTimes(1)
-    await userEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' }))
     expect(screen.getByTestId('refuel-section')).not.toBeVisible()
     await userEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
     expect(screen.getByTestId('refuel-tons-input')).toHaveValue(3)
@@ -1124,7 +1124,7 @@ it('hands phone onboarding to one full-page panel and resumes the guide only whe
     await userEvent.click(screen.getByTestId('guide-objects'))
     expect(screen.queryByTestId('recovery-transmission')).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Objects panel' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Close Objects panel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Return to map' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Resume guide' }))
     expect(screen.getByRole('dialog', { name: 'Recovery transmission' })).toBeInTheDocument()

@@ -28,7 +28,7 @@
 // props reaching `<GalaxyGraph>`), not their derivation.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { within, render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
@@ -317,7 +317,7 @@ describe('GalaxyView', () => {
     fireEvent.click(screen.getByTestId('galaxy-object-sys-0'))
     expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
     expect(pushSpy).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Objects' }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' }))
     expect(search).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Objects (hidden)' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back to galaxy systems' }))

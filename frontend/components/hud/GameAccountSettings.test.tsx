@@ -37,7 +37,7 @@ it('keeps account actions inside the single phone settings sheet without activat
   const sheet = screen.getByRole('dialog', { name: 'Arrange HUD' })
   expect(within(sheet).getByRole('button', { name: 'Sign out' })).toBeVisible()
   expect(screen.getAllByRole('dialog')).toHaveLength(1)
-  fireEvent.click(screen.getByRole('button', { name: 'Close HUD settings' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
   expect(screen.queryByTestId('sign-out-button')).not.toBeInTheDocument()
   expect(signOut).not.toHaveBeenCalled()
 })

@@ -8,6 +8,13 @@ const { inspectSource, audit } = require('./check-hud-actions.cjs')
 
 const inspect = code => inspectSource(ts.createSourceFile('fixture.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX))
 
+test('rejects card commands in scrolling content while allowing contextual forms and footer actions', () => {
+  const imports = `import {HudCardShell as Card, HudSection as Section} from '@/components/hud/HudCardShell'; import {HudButton as Action} from '@/components/hud/HudControls';`
+  assert.ok(inspect(imports + `const x=<Card><div><Action variant="primary">Reset</Action></div></Card>`).violations.some(item => item.reason.includes('card action')))
+  assert.ok(inspect(imports + `const x=<Card><Action>Reset HUD layout</Action></Card>`).violations.some(item => item.reason.includes('card action')))
+  assert.deepEqual(inspect(imports + `const x=<Card footer={<Action variant="primary">Save</Action>}><Section><Action variant="primary">Sell</Action></Section></Card>`).violations, [])
+})
+
 test('rejects aliased Catalyst imports and native semantic actions', () => {
   const result = inspect(`import {Button as Renamed} from '@/components/catalyst/button'; const x = <><Renamed/><button/><input type={'submit'}/><div role="button"/></>`)
   assert.equal(result.violations.length, 4)

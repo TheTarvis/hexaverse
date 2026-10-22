@@ -122,7 +122,7 @@ describe('HUD card foundation', () => {
   })
 })
 
-it('shares one frame with nested card content and preserves independently named dismissal', async () => {
+it('shares one frame with nested content and leaves dismissal to the owning frame', async () => {
   const close = vi.fn()
   render(<HudCardShell title="Command" lighting="none"><HudCardShell title="Travel review" onClose={close} closeLabel="Back to commands"><input aria-label="Retained draft" /></HudCardShell></HudCardShell>)
   const owner = screen.getByRole('region', { name: 'Command' })
@@ -131,8 +131,8 @@ it('shares one frame with nested card content and preserves independently named 
   expect(content).toHaveAttribute('data-hud-framing', 'section')
   expect(owner.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(0)
   fireEvent.change(screen.getByLabelText('Retained draft'), { target: { value: 'Keep this' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Back to commands' }))
-  expect(close).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('button', { name: 'Back to commands' })).toBeNull()
+  expect(close).not.toHaveBeenCalled()
   expect(screen.getByLabelText('Retained draft')).toHaveValue('Keep this')
   await act(async () => {})
   expect(renderer.entries).toHaveLength(0)
