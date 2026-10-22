@@ -3,7 +3,8 @@
 // GalaxyView — the container the home page renders (spec #0002).
 //
 // Uses the same viewport, heading, vitals and configurable workspace as System.
-// Objects supplies the galaxy browser/inspector; Command retains fleet controls;
+// Objects supplies the galaxy browser; Fleets owns the roster; Fleet status
+// presents the selected command fleet with the shared status/task module.
 // This route owns its reads,
 // inspection, commands and renderer; changing panel visibility never issues a command.
 //
@@ -22,7 +23,11 @@
 import { SceneNavigationAction } from '@/components/hud/SceneNavigationAction'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { useSubmitGuard } from '@/hooks/use-submit-guard'
-import { FleetLocationPanel } from '@/components/fleet/FleetLocationPanel'
+import { FleetStatusActions, FleetStatusContent, type FleetStatusProps } from '@/components/fleet/FleetStatusCard'
+import { useSettledScan } from '@/hooks/use-scan'
+import { useRunningMine, useRunningScan } from '@/hooks/use-actions'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/query-keys'
 import { useCorporationSessionOptional } from '@/components/corporation-provider'
 import { BOARD_POLL_MS } from '@/lib/realtime'
 
@@ -121,13 +126,26 @@ export function GalaxyView() {
   // presence-marker/recenter source (components/galaxy/presence.ts).
   // Disabled on the logged-out start area (no auth token, and nothing to
   // command).
-  const { data: myFleets, scale: envelopeScale, worldTime: envelopeWorldTime, isError: fleetsFailed } = useMyFleets({
+  const fleetRead = useMyFleets({
     enabled: !isStartArea,
     refetchInterval: BOARD_POLL_MS,
   })
+  const { data: myFleets, scale: envelopeScale, worldTime: envelopeWorldTime, isError: fleetsFailed } = fleetRead
+  const qc = useQueryClient()
+  const commandGuard = useSubmitGuard()
+  const [commandPending, setCommandPending] = useState(false)
+  const [commandError, setCommandError] = useState<string | null>(null)
+  const [commandNotice, setCommandNotice] = useState<string | null>(null)
+  const [travelControlsOpen, setTravelControlsOpen] = useState(false)
+  const [statusReceipt, setStatusReceipt] = useState<{ fleet: Fleet; readCount: number | undefined } | null>(null)
   const ownFleets = useMemo(() => myFleets ?? [], [myFleets])
   const { fleet: activeFleet, select: setActiveFleetId } = useSelectedFleet(ownFleets, null, fleetsFailed)
   const activeFleetId = activeFleet?.id ?? null
+  const mineRead = useRunningMine(activeFleetId)
+  const scanReportRead = useSettledScan(activeFleetId)
+  const scanRead = useRunningScan(activeFleetId)
+  const statusReadCount = qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount
+  const statusFleet = statusReceipt?.fleet.id === activeFleetId && statusReceipt.readCount === statusReadCount ? statusReceipt.fleet : activeFleet
   const session = useCorporationSessionOptional()
   const systemNames = useMemo(() => Object.fromEntries((galaxy?.nodes ?? []).map(n => [n.id, n.name])), [galaxy])
   // Live clock (for the roster's countdowns) anchored to the fleet read's
@@ -240,32 +258,38 @@ export function GalaxyView() {
   const stop = useStop()
   const handleBurn = useCallback(
     (fleet: Fleet) => {
+      if (commandGuard.held || fleetsFailed) return
       setActiveFleetId(fleet.id)
       toast.error('Open the system view to choose a target')
       router.push(`/systems/${fleet.systemId}`)
     },
-    [router, setActiveFleetId],
+    [router, setActiveFleetId, commandGuard, fleetsFailed],
   )
   const handleCutDrive = useCallback(
     (fleet: Fleet) => {
+      if (fleetsFailed || !commandGuard.claim()) return
+      setCommandPending(true); setCommandError(null); setCommandNotice(null)
       cutDrive.mutate(fleet.id, {
-        onSuccess: () => toast.success('Drive cut'),
-        onError: (e) => toast.error(e.message || 'Cut drive failed'),
+        onSuccess: accepted => { if (accepted) setStatusReceipt({ fleet: accepted, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }); setCommandNotice('Drive cut.'); toast.success('Drive cut') },
+        onError: e => { const text = e.message || 'Cut drive failed'; setCommandError(text); toast.error(text) },
+        onSettled: () => { commandGuard.release(); setCommandPending(false) },
       })
     },
-    [cutDrive],
+    [cutDrive, commandGuard, fleetsFailed, qc],
   )
   const handleStop = useCallback(
     (fleet: Fleet) => {
+      if (fleetsFailed || !commandGuard.claim()) return
+      setCommandPending(true); setCommandError(null); setCommandNotice(null)
       stop.mutate(fleet.id, {
-        onSuccess: () => toast.success('Stopping'),
-        onError: (e) => toast.error(burnErrorCopy(commandErrorReason(e))),
+        onSuccess: accepted => { if (accepted) setStatusReceipt({ fleet: accepted, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }); setCommandNotice('Stop accepted.'); toast.success('Stopping') },
+        onError: e => { const text = burnErrorCopy(commandErrorReason(e)); setCommandError(text); toast.error(text) },
+        onSettled: () => { commandGuard.release(); setCommandPending(false) },
       })
     },
-    [stop],
+    [stop, commandGuard, fleetsFailed, qc],
   )
   const jump = useJump()
-  const jumpGuard = useSubmitGuard()
   // handleJump — names the laneId straight off the attached gate's OWN fleet
   // DTO field (fleet-movement "Fleet Read Serves the Attached Gate's Lane
   // Id"), never `galaxy.links[]` — that read is charted-filtered
@@ -285,17 +309,18 @@ export function GalaxyView() {
         return
       }
       // Claim synchronously: React Query pending state updates after this task.
-      if (!jumpGuard.claim()) return
+      if (fleetsFailed || !commandGuard.claim()) return
+      setCommandPending(true); setCommandError(null); setCommandNotice(null)
       jump.mutate(
         { fleetId: fleet.id, laneId: fleet.laneId },
         {
-          onSuccess: () => toast.success('Jump underway'),
-          onError: (e) => toast.error(jumpErrorCopy(jumpErrorReason(e))),
-          onSettled: () => jumpGuard.release(),
+          onSuccess: accepted => { if (accepted) setStatusReceipt({ fleet: accepted, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }); setCommandNotice('Jump underway.'); toast.success('Jump underway') },
+          onError: e => { const text = jumpErrorCopy(jumpErrorReason(e)); setCommandError(text); toast.error(text) },
+          onSettled: () => { commandGuard.release(); setCommandPending(false) },
         },
       )
     },
-    [jump, jumpGuard],
+    [jump, commandGuard, fleetsFailed, qc],
   )
   // isGateBody: "is the body this fleet is attached to a lane-gate body at
   // all?" (replace-observation-with-sightings tasks.md 4.10, 4.13;
@@ -308,6 +333,24 @@ export function GalaxyView() {
   // "gate-"+destSystemId convention; the prefix alone is sufficient to
   // identify one, with no cross-reference against any charted set.
   const isGateBody = (bodyId: string) => bodyId.startsWith('gate-')
+  const fleetStatus: FleetStatusProps = {
+    fleet: statusFleet, worldTime, scale: servedScale, nameOf: id => systemNames[id] ?? id,
+    mine: !mineRead.isError ? mineRead.data : null, scan: !scanRead.isError ? scanRead.data : null,
+    scanReport: !scanReportRead.isError ? scanReportRead.data : null,
+    loading: fleetRead.isLoading, failed: fleetsFailed, activityFailed: mineRead.isError || scanRead.isError || scanReportRead.isError, travelControlsOpen,
+    notice: commandNotice, error: commandError, pending: commandPending, stopPending: stop.isPending,
+    onTravelControls: () => setTravelControlsOpen(true), onBack: () => setTravelControlsOpen(false),
+    onReviewTravel: () => { if (statusFleet && !statusFleet.jump) handleBurn(statusFleet) },
+    onStop: () => { if (statusFleet) handleStop(statusFleet) },
+    onFocus: () => { if (statusFleet) handleSelectSystemId(statusFleet.jump?.destSystemId ?? statusFleet.systemId) },
+    focusLabel: statusFleet?.jump ? 'Focus destination' : 'Focus fleet', focusDisabled: !graphReady,
+    onRetry: () => { void fleetRead.refetch(); if (activeFleetId) { void mineRead.refetch(); void scanRead.refetch(); void scanReportRead.refetch() } },
+    additionalActions: [
+      ...(statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump ? [{ id: 'cut-drive', label: 'Cut drive', tone: 'warning', disabled: commandPending, onClick: () => handleCutDrive(statusFleet) }] as const : [] as const),
+      ...(statusFleet?.laneId && !statusFleet.jump ? [{ id: 'jump', label: 'Jump through gate', disabled: commandPending, onClick: () => handleJump(statusFleet) }] as const : [] as const),
+    ],
+  }
+
 
   if (isLoading) {
     return (
@@ -378,7 +421,9 @@ export function GalaxyView() {
             commandOwner="roster"
             isChartedGate={isGateBody}
             activeFleetId={activeFleetId}
+            selectionDisabled={commandPending}
             onSelect={(f) => {
+              setTravelControlsOpen(false); setStatusReceipt(receipt => receipt?.fleet.id === f.id ? receipt : null); setCommandNotice(null); setCommandError(null)
               setActiveFleetId(f.id)
               handleShowFleet(f)
             }}
@@ -389,15 +434,11 @@ export function GalaxyView() {
             enabled={!isStartArea}
           />
 
-          {activeFleet && <FleetLocationPanel fleet={activeFleet} names={systemNames} worldTime={worldTime} scale={servedScale} failed={fleetsFailed} onFocus={handleSelectSystemId} />}
-          {/* This view mounts no command panel of its own, so the roster
-              rows ARE the fleet command surface here — declared explicitly
-              (fleet-roster: "The Roster Row Is the Fleet Command Surface
-              Where the Mounting View Provides None"), and every command a
-              row can offer is supplied below. */}
+          {/* Roster quick actions and Fleet Status delegate to the same command handlers. */}
 
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
+        ...(!isStartArea ? [{ id: 'fleet-status' as const, label: 'Fleet status', children: <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: <FleetStatusActions {...fleetStatus} /> }] : []),
       ]} />
       {isStartArea && <GameViewFooter><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><HudButton href="/login" variant="primary">Sign in</HudButton></div></GameViewFooter>}
 

@@ -79,7 +79,8 @@ vi.mock('@/hooks/use-fleets', () => ({
   useStop: vi.fn(),
   useJump: vi.fn(),
 }))
-vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn() }))
+vi.mock('@/hooks/use-scan', () => ({ useSettledScan: () => ({ data: null, isError: false, refetch: vi.fn() }) }))
+vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn(), useRunningMine: () => ({ data: null, isError: false, refetch: vi.fn() }), useRunningScan: () => ({ data: null, isError: false, refetch: vi.fn() }) }))
 vi.mock('@/hooks/use-market', () => ({ useMarketBoard: vi.fn() }))
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock('@/components/account-provider', () => ({

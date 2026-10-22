@@ -7,18 +7,10 @@
 
 .card { width: 380px; max-width: 100%; }
 .narrow { width: 280px; }
-.group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 4px 16px; margin: 0; }
-.facts dt, .facts dd { min-width: 0; margin: 0; }
-.facts dd { text-align: right; }
 .samples { display: flex; flex-direction: column; gap: 20px; }
 .controlRow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .controlRow > [data-slot='control'] { width: auto; }
 .comparison { display: flex; flex-wrap: wrap; align-items: start; gap: 40px; }
-.option { display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 100%; }
-.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bounded { height: 420px; max-width: 100%; }
 .textList { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .textEntry { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .textEntry + .textEntry { border-top: 1px solid #31485a; padding-top: 10px; }

@@ -94,12 +94,15 @@ if [[ $want_frontend -eq 1 ]]; then
   fi
   if [[ $want_lint -eq 1 ]]; then
     run_step "frontend: HUD action boundary" node "$REPO_ROOT/harness/utilities/check-hud-actions.cjs" || [[ $KEEP_GOING -eq 1 ]] || exit 1
+    run_step "frontend: Storybook catalog" node "$REPO_ROOT/harness/utilities/check-storybook.cjs" || [[ $KEEP_GOING -eq 1 ]] || exit 1
     run_step "frontend: tsc"     npx --no-install tsc --noEmit || [[ $KEEP_GOING -eq 1 ]] || exit 1
     run_step "frontend: eslint"  npx --no-install eslint . --quiet || [[ $KEEP_GOING -eq 1 ]] || exit 1
   fi
   if [[ $want_test -eq 1 ]]; then
     run_step "frontend: HUD action boundary tests" node --test "$REPO_ROOT/harness/utilities/check-hud-actions.test.cjs" || [[ $KEEP_GOING -eq 1 ]] || exit 1
+    run_step "frontend: Storybook catalog tests" node --test "$REPO_ROOT/harness/utilities/check-storybook.test.cjs" || [[ $KEEP_GOING -eq 1 ]] || exit 1
     run_step "frontend: vitest"  npx --no-install vitest run --reporter=basic || [[ $KEEP_GOING -eq 1 ]] || exit 1
+    run_step "frontend: Storybook browser interactions" npm run test:stories || [[ $KEEP_GOING -eq 1 ]] || exit 1
   fi
   cd "$REPO_ROOT"
 fi

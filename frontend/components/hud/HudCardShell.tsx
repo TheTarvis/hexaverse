@@ -97,12 +97,10 @@ export function HudCardShell({
       {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
       <CardFrameContext.Provider value={true}>
         <div className={styles.body} data-slot="hud-body">
-          {footer ? <div className={styles.footerLayout} data-slot="hud-footer-layout">
+          <div className={footer ? styles.footerLayout : styles.contentLayout} data-slot={footer ? 'hud-footer-layout' : 'hud-content-layout'}>
             <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">{children}</div>
-            <div className={styles.footer} data-slot="hud-footer">{footer}</div>
-          </div> : <div className={clsx(styles.content, contentClassName)} data-slot="hud-content">
-            {children}
-          </div>}
+            {footer && <div className={styles.footer} data-slot="hud-footer">{footer}</div>}
+          </div>
         </div>
       </CardFrameContext.Provider>
     </section>

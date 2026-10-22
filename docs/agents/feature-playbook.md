@@ -20,7 +20,9 @@ the effort's brief which existing components, tokens and assets will cover each
 part of the feature, and identify any capability they genuinely lack.
 
 For HUD work, read [shared HUD foundations](../hud.md#shared-hud-foundations),
-then inspect the applicable components and `HUD/Typography/Shared Foundations`:
+then inspect the applicable components and `Foundations/Typography/Shared Foundations`.
+Follow the [Storybook catalog rules](../storybook.md) when adding, changing or
+retiring examples. Inspect these owners:
 
 - `HudCardShell`, `HudTypography` and `HudFacts` for framing and content.
 - `HudIcon`, `HudObjectThumbnail` and existing assets for utility/object visuals.

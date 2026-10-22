@@ -2,7 +2,7 @@ import type { StorybookConfig } from '@storybook/nextjs-vite'
 
 const config: StorybookConfig = {
   stories: ['../components/**/*.stories.@(ts|tsx)'],
-  staticDirs: ['../public'],
+  staticDirs: ['../public', { from: '../../docs', to: '/project-docs' }],
   // Storybook copies staticDirs; Vite must not race a second public/ copy.
   viteFinal: async config => ({
     ...config,

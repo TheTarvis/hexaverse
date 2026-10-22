@@ -10,8 +10,10 @@ so mining, hauling, docking and selling can begin locally. On 2026-10-19, Travis
 confirmed that the home station belongs to the spawning corporation, superseding
 the earlier NPC-ownership intent. Trading-service behavior and starting protection
 remain separate decisions. [Discovery and identity](discovery-and-identity.md) owns
-the developing control and transfer model. Stations are
-structures with ownership, distinct from mineable resource hosts. Player-built
+the accepted control and transfer direction. A station owner may rename its
+own station, including a permitted guest station in another corporation’s
+system (confirmed 2026-10-20). Station ownership alone does not automatically
+challenge the system controller. Stations are structures with ownership, distinct from mineable resource hosts. Player-built
 stations and network infrastructure are future ambitions, not shipped services.
 Sources: [goods-market decisions](../plans/goods-market.md),
 [Station definition](../../GLOSSARY.md).

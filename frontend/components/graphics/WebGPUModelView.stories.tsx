@@ -5,9 +5,9 @@ import { createLaneGatePortal } from './lane-gate-portal'
 import { SpacecraftPreview } from '@/components/space/SpacecraftPreview'
 
 const meta = {
-  title: 'Graphics/Model View',
+  id: 'graphics-model-view', title: 'Foundations/Graphics/Model viewer',
   component: WebGPUModelView,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'catalog'],
   args: {
     src: '/models/space/lane-gate.glb',
     label: 'Lane gate',
@@ -28,7 +28,7 @@ const meta = {
     style: { control: false },
     createEffect: { control: false, table: { disable: true } },
   },
-  parameters: {
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/art-direction.md' },
     docs: { description: { component: 'Raw GLB art review on the shared WebGPU canvas foundation, using the production preview/thumbnail light rig. Change src to review another raw model; framing and drag/scroll orbit are automatic. Ship and Station render the actual game SpacecraftPreview, including production material/accent treatment. Use Graphics/Game Preview for its full controls. The lane gate has two independent rigid halves; its wormhole is separate and material-role masks remain production work.' } },
   },
 } satisfies Meta<typeof WebGPUModelView>
@@ -57,7 +57,7 @@ export const Narrow: Story = { args: { style: { width: 280, height: 320 } } }
 export const InHudCard: Story = {
   render: args => (
     <div className="dark p-8">
-      <HudCardShell title="Lane gate" lighting="none" style={{ width: 420, maxWidth: '100%' }}>
+      <HudCardShell title="Lane gate" style={{ width: 420, maxWidth: '100%' }}>
         <WebGPUModelView {...args} style={{ height: 340 }} />
       </HudCardShell>
     </div>

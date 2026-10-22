@@ -1,0 +1,7 @@
+.story-catalog-canvas { color: var(--hud-type-body); }
+.story-catalog-canvas, body:has(.story-catalog-canvas) { background: #050e17; }
+.story-catalog-page { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; }
+.story-catalog-content { min-width: 0; min-height: 0; }
+.story-catalog-notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding: 8px 16px; color: var(--hud-type-body); background: var(--hud-control-bg); border-bottom: 1px solid var(--hud-control-border); font: var(--hud-caption-font); }
+.story-catalog-notice a { color: var(--hud-type-label); text-decoration: underline; }
+.story-catalog-notice a:focus-visible { outline: 2px solid var(--hud-control-focus); outline-offset: 2px; }

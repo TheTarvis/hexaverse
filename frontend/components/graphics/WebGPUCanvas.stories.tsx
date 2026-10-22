@@ -16,12 +16,12 @@ const createExampleScene: CanvasSceneFactory = () => {
 }
 
 const meta = {
-  title: 'Graphics/WebGPU Canvas',
+  id: 'graphics-webgpu-canvas', title: 'Foundations/Graphics/Canvas',
   component: WebGPUCanvas,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'catalog'],
   args: { label: 'Example scene', createScene: createExampleScene, animate: false, surface: 'preview', alpha: true, stencil: false, style: { width: '100%', height: '100dvh' } },
   argTypes: { createScene: { control: false }, rendererFactory: { control: false }, style: { control: false } },
-  parameters: {
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/art-direction.md' },
     docs: { description: { component: 'Reusable canvas foundation. Supply one stable createScene callback returning a Three scene and camera. The canvas owns WebGPU-first initialization, WebGL2 compatibility, recovery, resizing, demand rendering, visibility/reduced-motion handling and disposal. Add optional frame/resize hooks for custom content. Use WebGPUModelView to display a GLB without writing a scene.' } },
   },
 } satisfies Meta<typeof WebGPUCanvas>

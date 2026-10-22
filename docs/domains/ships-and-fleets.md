@@ -45,6 +45,14 @@ No names are generated, no live fleets are renamed, and no migration/backfill or
 name-writing endpoint is introduced. Assignment/renaming policy and alerts remain
 future questions. Commands, selection and query identity continue to use fleet IDs.
 
+Selected-fleet status now uses
+[FleetStatusCard](../../frontend/components/fleet/FleetStatusCard.tsx) from System,
+Galaxy and fixture stories. It reads the served fleet roster for pooled cargo,
+free hold and ship class counts; missing rosters are unavailable rather than
+invented seed-hull UI data. It does not create individual ship IDs or per-ship
+cargo allocation. The Galaxy roster retains selection and quick commands;
+[HUD](../hud.md) owns the separate status launcher and task handoffs.
+
 ## Open questions
 
 How are individual hulls created, transferred, refitted or lost? How do escorts

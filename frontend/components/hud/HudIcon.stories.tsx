@@ -15,12 +15,12 @@ const utilities = [
 ] as const
 
 const meta = {
-  title: 'HUD/Icons',
+  id: 'hud-icons', title: 'Foundations/Icons',
   component: HudIcon,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'catalog'],
   args: { icon: ArrowLeftIcon, size: 20 },
   argTypes: { icon: { control: false }, size: { control: 'radio', options: [16, 20, 24] } },
-  parameters: {
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' },
     docs: { description: { component: 'A — Light outline, using existing Heroicons 24px outline assets at their native 1.5-unit stroke. The 20px display has a 1.25px effective stroke. Icons inherit text color and are decorative by default; interactive controls need accessible labels. Game-object artwork and button design remain separate.' } },
   },
   decorators: [(Story) => <div className={`dark ${styles.stage}`}><Story /></div>],

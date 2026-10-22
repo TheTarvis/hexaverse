@@ -28,7 +28,7 @@
 // props reaching `<GalaxyGraph>`), not their derivation.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
@@ -174,7 +174,8 @@ vi.mock('@/hooks/use-fleets', () => ({
   useStop: vi.fn(),
   useJump: vi.fn(),
 }))
-vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn() }))
+vi.mock('@/hooks/use-scan', () => ({ useSettledScan: () => ({ data: null, isError: false, refetch: vi.fn() }) }))
+vi.mock('@/hooks/use-actions', () => ({ useCancelAction: vi.fn(), useRunningMine: () => ({ data: null, isError: false, refetch: vi.fn() }), useRunningScan: () => ({ data: null, isError: false, refetch: vi.fn() }) }))
 vi.mock('@/hooks/use-market', () => ({ useMarketBoard: vi.fn() }))
 // fix-world-time-render-loop, task 3.4/K7: the old per-frame world-time hook
 // this line used to mock is deleted (task 3.5); the new `@/lib/client-clock`
@@ -497,14 +498,34 @@ describe('GalaxyView', () => {
     const traveling = { ...parkedFleet('fleet_transit', 'sys-0'), scale: 1, jump: { laneId: 'lane-0', destSystemId: 'sys-1', departMs: 0, arriveMs: 660_000 } }
     mockUseMyFleets.mockReturnValue({ data: [traveling] } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
-    expect(screen.getByTestId('fleet-location-panel')).toHaveTextContent('Axion → Borealis')
+    expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('Axion → Borealis')
     expect(screen.getByTestId('fleet-row-fleet_transit')).toHaveAttribute('aria-pressed', 'true')
     await screen.findByTestId('mock-graph')
-    fireEvent.click(screen.getByTestId('focus-selected-fleet'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Focus destination' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Focus destination' }))
     expect(focusSpy).toHaveBeenCalledWith('sys-1')
     expect(screen.queryByTestId('open-fleet-system')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))
     expect(pushSpy).toHaveBeenCalledWith('/systems/sys-1')
+  })
+
+  it('shares Stop guards and the accepted response between roster and Fleet Status', async () => {
+    mockGalaxyState()
+    const moving: Fleet = { ...parkedFleet('fleet_1', 'sys-0'), state: { Mode: 0, Park: null, Drift: null, Burn: { Origin: { X: 0, Y: 0, Z: 0 }, Target: { BodyId: 'p-1', Point: null }, Intercept: { X: 1, Y: 0, Z: 0 }, Curve: [], Length: 1, DepartMs: 0, ArriveMs: 180000, Accel: 1, InsertionPhase: 0 } } }
+    mockUseMyFleets.mockReturnValue({ data: [moving], worldTime: 0, scale: 1 } as unknown as ReturnType<typeof useMyFleets>)
+    let accepted: { onSuccess: (fleet: Fleet) => void; onSettled: () => void } | undefined
+    stopMutate.mockImplementation((_id, options) => { accepted = options as typeof accepted })
+    renderView()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to travel' }))
+    act(() => {
+      fireEvent.click(screen.getByTestId('fleet-cmd-stop-fleet_1'))
+      fireEvent.click(screen.getByTestId('travel-stop'))
+    })
+    expect(stopMutate).toHaveBeenCalledTimes(1)
+    act(() => { accepted!.onSuccess(parkedFleet('fleet_1', 'sys-0')); accepted!.onSettled() })
+    expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('On station')
+    expect(screen.queryByTestId('travel-stop')).not.toBeInTheDocument()
+    expect(cutDriveMutate).not.toHaveBeenCalled()
   })
 
   it('focuses a local fleet system, then enters only through the shared navigation action', async () => {
@@ -512,7 +533,8 @@ describe('GalaxyView', () => {
     mockUseMyFleets.mockReturnValue({ data: [parkedFleet('fleet_focus', 'sys-0')] } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
     await screen.findByTestId('mock-graph')
-    fireEvent.click(screen.getByTestId('focus-selected-fleet'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Focus fleet' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Focus fleet' }))
     expect(focusSpy).toHaveBeenCalledWith('sys-0')
     expect(pushSpy).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /^Enter selected system/ }))

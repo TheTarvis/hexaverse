@@ -9,91 +9,17 @@ import { HudHeading, HudText, HudValue } from './HudTypography'
 import styles from './hud-typography.stories.module.css'
 
 const meta = {
-  title: 'HUD/Typography',
+  id: 'hud-typography', title: 'Foundations/Typography',
   component: HudHeading,
-  tags: ['autodocs'],
-  parameters: {
-    docs: { description: { component: 'Shared HUD foundation: geometric identity headings, sans body copy, cyan labels, tabular figures and outline icons. Edit hud-tokens.css for font roles, colors, icon sizes and compact control defaults. HudControls adapts Catalyst; the game and these examples consume the same defaults. Compact controls are under visual review.' } },
+  tags: ['autodocs', 'catalog'],
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' },
+    docs: { description: { component: 'Shared HUD foundation: geometric identity headings, sans body copy, cyan labels, tabular figures and outline icons. Edit hud-tokens.css for font roles, colors, icon sizes and compact control defaults. HudControls adapts Catalyst; the game and these examples consume the same defaults. These are component specimens; player-task reviews live under Tasks.' } },
   },
   decorators: [(Story) => <div className={`dark ${styles.stage}`}><Story /></div>],
 } satisfies Meta<typeof HudHeading>
 
 export default meta
 type Story = StoryObj<typeof meta>
-
-function TravelSample({ narrow = false, longNames = false, ellipsis = false }: { narrow?: boolean; longNames?: boolean; ellipsis?: boolean }) {
-  const fleetName = longNames ? 'Peregrine Deep Space Expedition' : 'Peregrine'
-  const destinationName = longNames ? 'Aurelia Outer System Research Anchorage' : 'Aurelia Station'
-  const nameProps = {
-    size: longNames && !ellipsis ? 'compact' as const : 'default' as const,
-    ...(ellipsis ? { className: styles.ellipsis } : {}),
-  }
-  return (
-    <HudCardShell title="Travel review" className={`${styles.card} ${narrow ? styles.narrow : ''}`}>
-      <div className={styles.group}>
-        <HudText variant="label">Command fleet</HudText>
-        <HudHeading {...nameProps} title={fleetName}>{fleetName}</HudHeading>
-        <HudText variant="secondary">3 ships · Ready</HudText>
-      </div>
-      <div className={styles.section}>
-        <HudHeading variant="section" level={4}>Destination</HudHeading>
-        <HudHeading {...nameProps} title={destinationName}>{destinationName}</HudHeading>
-        <HudText>Review the trip before issuing an order.</HudText>
-      </div>
-      <div className={styles.section}>
-        <HudHeading variant="section" level={4}>Trip estimate</HudHeading>
-        <dl className={styles.facts}>
-          <dt><HudText variant="secondary">Arrival</HudText></dt>
-          <dd><HudValue>3m 12s</HudValue></dd>
-          <dt><HudText variant="secondary">Fuel cost</HudText></dt>
-          <dd><HudValue>12.4 t</HudValue></dd>
-          <dt><HudText variant="secondary">Fuel remaining</HudText></dt>
-          <dd><HudValue>58.9 t</HudValue></dd>
-        </dl>
-      </div>
-      <HudText variant="caption">Estimate for {fleetName} → {destinationName}</HudText>
-    </HudCardShell>
-  )
-}
-
-export const TravelReview: Story = { render: () => <TravelSample /> }
-export const Narrow: Story = { render: () => <TravelSample narrow /> }
-export const LongNames: Story = { render: () => <TravelSample narrow longNames /> }
-
-export const LongNameComparison: Story = {
-  render: () => (
-    <div className={styles.comparison}>
-      <div className={styles.option}>
-        <HudText variant="label">Smaller, full name</HudText>
-        <TravelSample narrow longNames />
-      </div>
-      <div className={styles.option}>
-        <HudText variant="label">Original size, ellipsis</HudText>
-        <TravelSample narrow longNames ellipsis />
-      </div>
-    </div>
-  ),
-}
-
-export const NameLengthStudy: Story = {
-  render: () => (
-    <div className={styles.comparison}>
-      {[32, 40, 60, 200].map(length => (
-        <div key={length} className={styles.option}>
-          <HudText variant="label">{length} characters{length === 200 ? ' · outlier' : ''}</HudText>
-          <HudCardShell title="Naming stress test" className={`${styles.narrow} ${styles.bounded}`}>
-            <HudText variant="label">Wide, unbroken name</HudText>
-            <HudHeading size="compact">{'W'.repeat(length)}</HudHeading>
-            <HudText variant="secondary">All characters remain available by scrolling.</HudText>
-            <HudHeading variant="section" level={4}>Trip estimate</HudHeading>
-            <HudValue>3m 12s · 12.4 t</HudValue>
-            <HudText>Trip details remain reachable below the name.</HudText>
-          </HudCardShell>
-        </div>
-      ))}
-    </div>
-  ),
-}
 
 const textEntries = [
   { name: 'Reference sample', quantity: '12', state: 'Available', value: '71.3 t' },
@@ -127,27 +53,8 @@ function StructuredListSample({ narrow = false, stress = false }: { narrow?: boo
 }
 
 export const StructuredTextList: Story = {
-  parameters: { docs: { description: { story: 'D — Structured: generic text-list hierarchy. Names, labels and values demonstrate typography; fleet list composition and interactions remain separate decisions.' } } },
-  render: () => <StructuredListSample />,
-}
-
-export const StructuredTextListNarrow: Story = { render: () => <StructuredListSample narrow /> }
-
-export const StructuredTextListLongContent: Story = { render: () => <StructuredListSample narrow stress /> }
-
-export const StructuredTextListComparison: Story = {
-  render: () => (
-    <div className={styles.comparison}>
-      <div className={styles.option}>
-        <HudText variant="label">Standard card</HudText>
-        <StructuredListSample />
-      </div>
-      <div className={styles.option}>
-        <HudText variant="label">Narrow card</HudText>
-        <StructuredListSample narrow />
-      </div>
-    </div>
-  ),
+  name: 'Long content and lists',
+  render: () => <div className={styles.comparison}><StructuredListSample /><StructuredListSample narrow stress /></div>,
 }
 
 export const TextRoles: Story = {
@@ -168,7 +75,7 @@ export const TextRoles: Story = {
 
 function FoundationSample() {
   const [scope, setScope] = useState('local')
-  return <HudCardShell title="Shared foundations" className={styles.card} lighting="none">
+  return <HudCardShell title="Shared foundations" className={styles.card}>
     <div className={styles.samples}>
       <HudHeading size="compact">Peregrine</HudHeading>
       <HudText variant="secondary">One shared token source for typography, icons and HUD controls.</HudText>

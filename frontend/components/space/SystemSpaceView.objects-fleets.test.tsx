@@ -216,7 +216,7 @@ describe('Objects own-fleet parent integration', () => {
       const alert = screen.getAllByRole('alert').find(el => /fleet/i.test(el.textContent ?? '') && within(el).queryByRole('button', { name: /retry/i }))!
       expect(alert).toBeDefined(); fireEvent.click(within(alert).getByRole('button', { name: /retry/i }))
       expect(shared.fleetRefetch).toHaveBeenCalledTimes(1); expect(shared.refetch).not.toHaveBeenCalled()
-    } else if (reason === 'loading') expect(screen.getByText(/loading.*fleet/i)).toBeVisible()
+    } else if (reason === 'loading') expect(within(screen.getByRole('region', { name: 'Objects panel' })).getByText(/loading.*fleet/i)).toBeVisible()
     else expect(screen.queryByText('Fleets', { exact: true })).toBeNull()
   })
   it.each(['loading', 'failed'] as const)('Scenario: Fleet read unavailable or empty — independent interior %s leaves fleets usable', reason => {

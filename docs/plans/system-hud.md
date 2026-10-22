@@ -1,6 +1,10 @@
 > **Historical record.** Current intent and open questions live in the
 > [canonical domain documentation](../README.md). Status labels, checklists and
 > workflow instructions below describe the earlier design, not current authority.
+>
+> The legacy `/dev/system-storyboard` and `/dev/system-storyboard/hud` routes and
+> their executable variants were removed on 2026-10-21. Review maintained examples
+> through [Storybook](../storybook.md); [System HUD](../hud.md) owns current intent.
 
 # System HUD — Scoping
 

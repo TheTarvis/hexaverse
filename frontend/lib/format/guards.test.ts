@@ -102,12 +102,6 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     ruling: 'not a player-facing figure / D2',
     note: 'toFixed(4) builds a memo key, never rendered to a player',
   },
-  {
-    file: 'frontend/components/space/storyboard/SystemStoryboard.tsx',
-    lines: [155],
-    ruling: 'figure-formatting: rounding exception list permits non-player-facing values; archive review 2026-10-12',
-    note: 'SVG dust circle cx/cy coordinate serialization, not a displayed numeric figure',
-  },
 ]
 
 const TOFIXED_SCOPE_DIRS = ['frontend/components/space', 'frontend/components/fleet']

@@ -337,14 +337,14 @@ export function FleetActionsPanel({
 
   if (!fleet) {
     return (
-      <HudCardShell title="Fleet actions" lighting="none" data-testid="space-fleet-panel">
+      <HudCardShell title="Fleet actions" data-testid="space-fleet-panel">
         <HudText variant="secondary">No fleet selected.</HudText>
       </HudCardShell>
     )
   }
 
   return (
-    <HudCardShell title="Fleet actions" lighting="none"
+    <HudCardShell title="Fleet actions"
       data-testid="space-fleet-panel"
       data-has-actions={!!(mineOffered || interiorFailed || mineRunning || sellOffered || refuelOffered || parkMode)}
       className="w-full min-w-0"

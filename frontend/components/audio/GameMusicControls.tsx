@@ -18,6 +18,10 @@ export function GameMusicControls() {
       <input type="checkbox" checked={music.musicOn} disabled={!music.ready} onChange={event => event.target.checked ? music.play() : music.pause()} />
       <span className="hud-type-label">Music enabled</span>
     </label>
+    <label className={styles.enable}>
+      <input type="checkbox" checked={music.playInBackground} disabled={!music.ready} onChange={event => music.setPlayInBackground(event.target.checked)} />
+      <span className="hud-type-label">Play music in background</span>
+    </label>
     <HudText variant="secondary">{music.playing ? 'Now playing' : 'Paused'}: {music.track.title}</HudText>
     <label htmlFor={`${id}-track`} className="hud-type-label">Track</label>
     <Select id={`${id}-track`} value={music.track.id} disabled={!music.ready} onChange={event => music.select(event.target.value)}>
@@ -35,7 +39,7 @@ export function GameMusicControls() {
     </label>
     {music.error && <HudText role="alert">{music.error}</HudText>}
     {music.waitingForInteraction && <HudText role="status" variant="caption">Music will start after your first game interaction, or press Play.</HudText>}
-    <HudText variant="caption">Five tracks repeat in order. Music starts automatically when allowed. Your on/off choice is saved in this browser.</HudText>
+    <HudText variant="caption">Five tracks repeat in order. Music starts automatically when allowed. Your music preferences are saved in this browser.</HudText>
     <details className={styles.credits}>
       <summary className="hud-type-label">Music credits</summary>
       <HudText variant="caption">Music by <a href="https://www.scottbuckley.com.au" target="_blank" rel="noreferrer">Scott Buckley</a>, released under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>. Original recordings, unmodified.</HudText>

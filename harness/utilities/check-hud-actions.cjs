@@ -57,6 +57,9 @@ function inspectSource(source) {
         if (ts.isStringLiteral(initializer)) return initializer.text
         if (ts.isJsxExpression(initializer) && initializer.expression && ts.isStringLiteral(initializer.expression)) return initializer.expression.text
       }
+      if (imported?.name === 'HudCardShell' && /(?:^|\/)HudCardShell$/.test(imported.module) && value('lighting') === 'none') {
+        add(node, 'shell lighting override bypasses shared defaults; use the Static Frame specimen for CSS-only review')
+      }
       if (!shared && (tag === 'button' || /(?:^|\.)\w*[Bb]utton$/.test(tag) || actionExports.has(tag.split('.').at(-1)) || value('role') === 'button' || (tag === 'input' && ['button', 'submit', 'reset'].includes(value('type'))))) {
         add(node, `action <${tag}> bypasses HudControls`)
       }

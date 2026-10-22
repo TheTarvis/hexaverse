@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/catalyst/button'
+import { HudButton } from '@/components/hud/HudControls'
 import { DEFAULT_BODY_FOCUS, type BodyFocusSettings } from './body-camera-focus'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { createWorldClock } from '@/lib/client-clock'
@@ -45,7 +45,7 @@ function SolarSystem({ pointDistance = 40, framing = DEFAULT_BODY_FOCUS.framing,
   const scene = useMemo(() => buildSceneModel({ ...inputs, worldTimeMs: 120_000 }), [inputs])
   return <div style={{ position: 'relative', width: '100%', height: '100dvh', overflow: 'hidden', background: '#05070d' }}>
     <div style={{ position: 'absolute', zIndex: 20, top: 12, left: 12 }}>
-      <Button onClick={() => setFocusRequest(previous => ({ bodyId: selection?.point ? 'point-selection' : selection?.bodyId ?? 'rocky', sequence: (previous?.sequence ?? 0) + 1, replay: true }))}>Replay focus</Button>
+      <HudButton onClick={() => setFocusRequest(previous => ({ bodyId: selection?.point ? 'point-selection' : selection?.bodyId ?? 'rocky', sequence: (previous?.sequence ?? 0) + 1, replay: true }))}>Replay focus</HudButton>
     </div>
     <SpaceStage bodyFocusSettings={{ framing, pointDistance, durationMs: glideDuration, orientation: followOrientation }} focusBodyRequest={focusRequest} systemId={interior.systemId} scene={scene} extent={interior.extent}
       worldTime={120_000} scale={1} selection={selection} onSelect={select} frameSource={frameSource} gridMode={gridMode}
@@ -54,10 +54,10 @@ function SolarSystem({ pointDistance = 40, framing = DEFAULT_BODY_FOCUS.framing,
 }
 
 const meta = {
-  title: 'Graphics/Solar System',
+  id: 'graphics-solar-system', title: 'Graphics/System',
   component: SolarSystem,
-  tags: ['autodocs'],
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Production SpaceStage and SpaceWorld with a fixed review system: star, rocky world, gas giant, ice world, belt, station and lane gate. Uses the real camera, picking, orbit drawing, materials and guarded renderer. No backend or sign-in required. Double-click a body to frame and follow it. Tune framing, glide duration and follow orientation in Controls, then use Replay focus to compare from the same starting view. Freeze animation or change spectral class in Controls.' } } },
+  tags: ['autodocs', 'catalog'],
+  parameters: { catalog: { purpose: 'scene', status: 'reference', record: 'docs/art-direction.md' }, layout: 'fullscreen', docs: { description: { component: 'Production SpaceStage and SpaceWorld with a fixed review system: star, rocky world, gas giant, ice world, belt, station and lane gate. Uses the real camera, picking, orbit drawing, materials and guarded renderer. No backend or sign-in required. Double-click a body to frame and follow it. Tune framing, glide duration and follow orientation in Controls, then use Replay focus to compare from the same starting view. Freeze animation or change spectral class in Controls.' } } },
   args: { pointDistance: 40, framing: DEFAULT_BODY_FOCUS.framing, glideDuration: DEFAULT_BODY_FOCUS.durationMs, followOrientation: DEFAULT_BODY_FOCUS.orientation, starClass: 'G', animate: true, extent: 500, gridMode: 'surround', gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style },
   argTypes: {
     pointDistance: { control: { type: 'number', min: 0.1, max: 1000, step: 1 }, description: 'Viewing distance for a selected location in scene units. Click empty space, then replay focus.', table: { category: 'Camera' } },

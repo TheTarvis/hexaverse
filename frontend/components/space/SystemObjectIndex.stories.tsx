@@ -5,9 +5,9 @@ import { HudWorkspace } from '@/components/hud/HudWorkspace'
 import { SystemObjectIndex } from './SystemObjectIndex'
 
 const meta: Meta<typeof SystemObjectIndex> = {
-  title: 'HUD/Objects Search',
+  id: 'hud-objects-search', title: 'Tasks/Objects/Current app', tags: ['catalog'],
   component: SystemObjectIndex,
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'The actual Objects card opens directly to all disclosed rows. Text search stays pinned during internal scrolling; typing filters and clearing restores the full list. No disclosure or hidden category filter.' } } },
+  parameters: { catalog: { purpose: 'task', status: 'reference', record: 'docs/hud.md', task: 'objects' }, layout: 'fullscreen', docs: { description: { component: 'The actual Objects card opens directly to all disclosed rows. Text search stays pinned during internal scrolling; typing filters and clearing restores the full list. No disclosure or hidden category filter.' } } },
 }
 export default meta
 type Story = StoryObj<typeof meta>
@@ -56,4 +56,4 @@ export const AlwaysVisibleSearch: Story = {
 }
 
 /** Free inspection without the search walkthrough running concurrently. */
-export const Inspection: Story = { render: () => <SearchCard /> }
+export const Inspection: Story = { parameters: { catalog: { primary: true } }, render: () => <SearchCard /> }

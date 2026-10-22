@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { expect, fn, userEvent, within } from 'storybook/test'
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 import clsx from 'clsx'
 import { HudBackButton } from './HudControls'
 import { HudHeading, HudText } from './HudTypography'
@@ -13,9 +13,10 @@ type StoryArgs = HudCardShellProps & {
 }
 
 const meta = {
-  title: 'HUD/Card Shell',
+  id: 'hud-card-shell', title: 'Foundations/Cards/Shell',
   component: HudCardShell,
-  tags: ['autodocs'],
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' } },
+  tags: ['autodocs', 'catalog'],
   args: {
     title: 'Inspector',
     onClose: fn(),
@@ -57,7 +58,7 @@ export const Tall: Story = {}
 // Plain is the standard empty card, including its shared signal lighting.
 export const Plain: Story = {
   play: async ({ canvasElement }) => {
-    await expect(canvasElement.querySelector('[data-slot="hud-frame-lighting"]')).not.toBeNull()
+    await waitFor(() => expect(canvasElement.querySelector('[data-slot="hud-frame-lighting"]')).not.toBeNull())
   },
 }
 
@@ -165,14 +166,15 @@ export const SizeComparison: Story = {
 }
 
 export const NestedSections: Story = {
-  args: { title: 'Command', lighting: 'none', style: { width: 360, height: 520 } },
+  args: { title: 'Command', style: { width: 360, height: 520 } },
   render: args => <HudCardShell {...args}>
-    <HudCardShell title="Fleet actions" lighting="none"><HudHeading size="compact">Peregrine</HudHeading><HudText variant="secondary">Mining metals · 40 t free hold</HudText></HudCardShell>
-    <HudCardShell title="Travel review" lighting="none"><HudText>One owning frame; travel and action sections retain their own meaning and controls.</HudText></HudCardShell>
+    <HudCardShell title="Fleet actions"><HudHeading size="compact">Peregrine</HudHeading><HudText variant="secondary">Mining metals · 40 t free hold</HudText></HudCardShell>
+    <HudCardShell title="Travel review"><HudText>One owning frame; travel and action sections retain their own meaning and controls.</HudText></HudCardShell>
   </HudCardShell>,
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
     await expect(canvasElement.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(2)
+    await waitFor(() => expect(canvasElement.querySelectorAll('[data-slot="hud-frame-lighting"]')).toHaveLength(1))
   },
 }
 
@@ -180,7 +182,7 @@ export const NestedSections: Story = {
 export const OriginalChromeAlignment: Story = {
   args: {
     title: 'Objects',
-    lighting: 'none',
+    paused: true,
     children: <><HudBackButton destination="objects" /><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
   },
   play: async ({ canvasElement, args }) => {

@@ -22,6 +22,12 @@ test('rejects namespaced library actions', () => {
   assert.ok(inspect(`import * as Menu from '@headlessui/react'; const x = <Menu.MenuButton/>`).violations.length)
 })
 
+test('rejects disabling the shared frame lighting, including aliased shells', () => {
+  const result = inspect(`import {HudCardShell as Card} from '@/components/hud/HudCardShell'; const x = <Card lighting={'none'}/>;`)
+  assert.ok(result.violations.some(item => item.reason.includes('shell lighting override')))
+  assert.deepEqual(inspect(`import {HudCardShell as Card} from '@/components/hud/HudCardShell'; const x = <Card paused/>;`).violations, [])
+})
+
 test('traverses root entries, re-exports and dynamic imports; keeps dev separate', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hud-action-boundary-'))
   try {

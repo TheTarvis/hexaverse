@@ -24,6 +24,7 @@ domain documentation structure. Documentation does not authorize unscoped gamepl
 [HUD](hud.md) owns interaction/layout, [art direction](art-direction.md) owns style,
 [vision](vision.md) and [lore](lore.md) preserve the broader setting.
 [Architecture](game-architecture.md) helps locate code but includes historical milestones.
+[Storybook](storybook.md) owns catalog organization and story lifecycle.
 [Testing](testing-tiers.md) describes verification; [phone preview](phone-preview.md)
 is a separately permission-dependent access proposal. [Migration map](documentation-migration.md)
 records source coverage and retained historical paths.

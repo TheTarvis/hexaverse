@@ -60,14 +60,14 @@ function GateWorld({ distance = 45, lineup = false, rendererReview = 'auto' }: {
     {rendererReview === 'recovery' && <aside aria-label="Static object categories during renderer recovery" style={{ position: 'absolute', top: 16, left: 16, padding: 12, color: '#d6e2ef', background: '#102030', display: 'flex', gap: 12, zIndex: 1 }}>
       {(['gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] satisfies HudObjectKind[]).map(kind => <span key={kind} style={{ display: 'grid', justifyItems: 'center', gap: 4 }}><HudObjectThumbnail kind={kind} /><span>{kind.replaceAll('_', ' ')}</span></span>)}
     </aside>}
-    {lineup && <p style={{ position: 'absolute', top: '100%', left: 0, right: 0, minHeight: 64, margin: 0, padding: '10px 16px', background: '#080e19', color: '#d6e2ef', fontSize: 13 }}>Back: accepted lane gate. Middle row, left to right: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.</p>}
+    {lineup && <p style={{ position: 'absolute', top: '100%', left: 0, right: 0, minHeight: 64, margin: 0, padding: '10px 16px', background: '#080e19', color: '#d6e2ef', font: 'var(--hud-secondary-font)' }}>Back: accepted lane gate. Middle row, left to right: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.</p>}
   </div>
 }
 
 const meta = {
-  title: 'Graphics/World Gate',
+  id: 'graphics-world-gate', title: 'Graphics/Gates and features', tags: ['catalog'],
   component: GateWorld,
-  parameters: { layout: 'fullscreen' },
+  parameters: { catalog: { purpose: 'scene', status: 'reference', record: 'docs/art-direction.md' }, layout: 'fullscreen' },
   args: { distance: 45 },
   argTypes: { distance: { control: { type: 'range', min: 8, max: 150, step: 1 } } },
 } satisfies Meta<typeof GateWorld>

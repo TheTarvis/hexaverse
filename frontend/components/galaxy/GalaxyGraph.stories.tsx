@@ -7,8 +7,8 @@ import type { WireGalaxy } from '@/lib/types/galaxy'
 import { RendererStateNotice } from '@/components/render-guard'
 import type { RendererSnapshot } from '@/components/render-guard/renderer-owner'
 import { Field, Label } from '@/components/catalyst/fieldset'
-import { Select } from '@/components/catalyst/select'
-import { Button } from '@/components/catalyst/button'
+import { HudSelect } from '@/components/hud/HudControls'
+import { HudButton } from '@/components/hud/HudControls'
 import { GalaxyGraph, type GalaxyGraphController } from './GalaxyGraph'
 import { MAP_PALETTES, type MapPalette, type MapRoute } from './map-route-overlay'
 import { MapVisionPreview, type VisionPreview } from './map-vision-preview'
@@ -27,7 +27,6 @@ interface ReviewArgs {
   gridStyle: HexSkyStyle
   showLanes: boolean
   showFleet: boolean
-  artStyle: 'stellar' | 'current'
   palette: MapPalette
   routeState: 'none' | MapRoute['state']
   completedLegs: number
@@ -47,7 +46,7 @@ function GridSlider({ label, value, min, max, step, display, disabled, onChange 
 }
 
 function GalaxyMap({ onReviewChange, ...args }: ReviewArgs & { onReviewChange: (values: Partial<ReviewArgs>) => void }) {
-  const { showLanes, showFleet, artStyle, palette, routeState, completedLegs, vision, zoom, gridMode, gridDistance, gridBrightness, gridThickness, gridStyle } = args
+  const { showLanes, showFleet, palette, routeState, completedLegs, vision, zoom, gridMode, gridDistance, gridBrightness, gridThickness, gridStyle } = args
   const [selectedId, select] = useState<string | null>(null)
   const [framing, resetFraming] = useState(0)
   const [renderer, setRenderer] = useState<RendererSnapshot>({ phase: 'pending', backend: null, retrying: false })
@@ -61,7 +60,7 @@ function GalaxyMap({ onReviewChange, ...args }: ReviewArgs & { onReviewChange: (
   return <main aria-label="Galaxy map art review" className={styles.review + ' dark'}>
     <MapVisionPreview mode={vision}>
       <GalaxyGraph key={zoom + '-' + framing} galaxy={galaxy} selectedId={selectedId} onSelect={node => select(node?.id ?? null)}
-        artStyle={artStyle} mapPalette={palette} route={route} homeSystemId={home} gridMode={gridMode}
+        artStyle="stellar" mapPalette={palette} route={route} homeSystemId={home} gridMode={gridMode}
         gridSettings={{ distance: gridDistance, brightness: gridBrightness, thickness: gridThickness, style: gridStyle }}
         fleetSystemIds={fleetSystems}
         onController={value => { controller.current = value }} onRendererState={setRenderer} />
@@ -69,36 +68,33 @@ function GalaxyMap({ onReviewChange, ...args }: ReviewArgs & { onReviewChange: (
     <details open className={styles.panel}>
       <summary>GALAXY · ART REVIEW</summary>
       <div className={styles.controls}>
-        <Field className={styles.fullWidth}><Label>Map palette</Label><Select value={palette} onChange={e => onReviewChange({ palette: e.target.value as MapPalette })}>
+        <Field className={styles.fullWidth}><Label>Map palette</Label><HudSelect value={palette} onChange={e => onReviewChange({ palette: e.target.value as MapPalette })}>
           {Object.entries(MAP_PALETTES).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}
-        </Select></Field>
-        <Field><Label>Route state</Label><Select value={routeState} onChange={e => onReviewChange({ routeState: e.target.value as ReviewArgs['routeState'] })}>
+        </HudSelect></Field>
+        <Field><Label>Route state</Label><HudSelect value={routeState} onChange={e => onReviewChange({ routeState: e.target.value as ReviewArgs['routeState'] })}>
           <option value="proposed">Proposed</option><option value="active">Active</option><option value="none">No route</option>
-        </Select></Field>
-        <Field><Label>Completed hops</Label><Select value={completedLegs} disabled={routeState !== 'active'} onChange={e => onReviewChange({ completedLegs: Number(e.target.value) })}>
+        </HudSelect></Field>
+        <Field><Label>Completed hops</Label><HudSelect value={completedLegs} disabled={routeState !== 'active'} onChange={e => onReviewChange({ completedLegs: Number(e.target.value) })}>
           {Array.from({ length: itinerary.length }, (_, i) => <option key={i} value={i}>{i} of 13</option>)}
-        </Select></Field>
-        <Field><Label>View</Label><Select value={zoom} onChange={e => onReviewChange({ zoom: e.target.value as ReviewArgs['zoom'] })}>
+        </HudSelect></Field>
+        <Field><Label>View</Label><HudSelect value={zoom} onChange={e => onReviewChange({ zoom: e.target.value as ReviewArgs['zoom'] })}>
           <option value="wide">Wide</option><option value="close">Close</option>
-        </Select></Field>
-        <Field><Label>Vision preview</Label><Select value={vision} onChange={e => onReviewChange({ vision: e.target.value as VisionPreview })}>
+        </HudSelect></Field>
+        <Field><Label>Vision preview</Label><HudSelect value={vision} onChange={e => onReviewChange({ vision: e.target.value as VisionPreview })}>
           <option value="none">Normal</option><option value="protanopia">Protanopia</option><option value="deuteranopia">Deuteranopia</option><option value="tritanopia">Tritanopia</option><option value="grayscale">Grayscale</option>
-        </Select></Field>
-        <Field><Label>Map art</Label><Select value={artStyle} onChange={e => onReviewChange({ artStyle: e.target.value as ReviewArgs['artStyle'] })}>
-          <option value="stellar">Stellar sky</option><option value="current">Original</option>
-        </Select></Field>
-        <Field><Label>Hex grid</Label><Select value={gridMode} disabled={artStyle !== 'stellar'} onChange={e => onReviewChange({ gridMode: e.target.value as SpaceGridMode })}>
+        </HudSelect></Field>
+        <Field><Label>Hex grid</Label><HudSelect value={gridMode} onChange={e => onReviewChange({ gridMode: e.target.value as SpaceGridMode })}>
           <option value="surround">Surrounding</option><option value="ground">Ground</option><option value="none">No grid</option>
-        </Select></Field>
+        </HudSelect></Field>
         <GridSlider label="Grid distance" value={gridDistance} min={6} max={36} step={1} display={`${gridDistance}×`}
-          disabled={gridMode !== 'surround' || artStyle !== 'stellar'} onChange={value => onReviewChange({ gridDistance: value })} />
+          disabled={gridMode !== 'surround'} onChange={value => onReviewChange({ gridDistance: value })} />
         <GridSlider label="Grid brightness" value={gridBrightness} min={0} max={0.3} step={0.005} display={`${Math.round(gridBrightness * 1000) / 10}%`}
-          disabled={gridMode !== 'surround' || artStyle !== 'stellar'} onChange={value => onReviewChange({ gridBrightness: value })} />
+          disabled={gridMode !== 'surround'} onChange={value => onReviewChange({ gridBrightness: value })} />
         <GridSlider label="Grid thickness" value={gridThickness} min={0.5} max={4} step={0.25} display={`${gridThickness}px`}
-          disabled={gridMode !== 'surround' || artStyle !== 'stellar'} onChange={value => onReviewChange({ gridThickness: value })} />
-        <Field className={styles.fullWidth}><Label>Grid treatment</Label><Select value={gridStyle} disabled={gridMode !== 'surround' || artStyle !== 'stellar'} onChange={e => onReviewChange({ gridStyle: e.target.value as HexSkyStyle })}>
+          disabled={gridMode !== 'surround'} onChange={value => onReviewChange({ gridThickness: value })} />
+        <Field className={styles.fullWidth}><Label>Grid treatment</Label><HudSelect value={gridStyle} disabled={gridMode !== 'surround'} onChange={e => onReviewChange({ gridStyle: e.target.value as HexSkyStyle })}>
           <option value="dark">Dark seams</option><option value="luminous">Luminous lines</option>
-        </Select></Field>
+        </HudSelect></Field>
       </div>
       <div className={styles.route} aria-live="polite">
         <p><span aria-hidden="true" className={styles.swatch} style={{ background: MAP_PALETTES[palette].route }} />
@@ -107,8 +103,8 @@ function GalaxyMap({ onReviewChange, ...args }: ReviewArgs & { onReviewChange: (
         <details><summary>Review itinerary</summary><ol>{itinerary.map((id, i) => <li key={id}>{fixture.nodes.find(node => node.id === id)?.name}{i === itinerary.length - 1 ? ' · Destination' : ''}</li>)}</ol></details>
       </div>
       <div className={styles.actions}>
-        <Button outline onClick={() => resetFraming(value => value + 1)}>Reset camera</Button>
-        <Button outline onClick={() => onReviewChange({ gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style })}>Reset grid</Button>
+        <HudButton onClick={() => resetFraming(value => value + 1)}>Reset camera</HudButton>
+        <HudButton onClick={() => onReviewChange({ gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style })}>Reset grid</HudButton>
       </div>
       <p className={styles.note}>Shared in-app sky and dark seams. Controls are for art review. Fixed review journey; palette alternatives remain candidates.</p>
       {selectedId && <p className={styles.note}>Inspecting: {fixture.nodes.find(node => node.id === selectedId)?.name}</p>}
@@ -121,14 +117,13 @@ function GalaxyMap({ onReviewChange, ...args }: ReviewArgs & { onReviewChange: (
 }
 
 const meta = {
-  title: 'Graphics/Galaxy Map',
+  id: 'graphics-galaxy-map', title: 'Graphics/Galaxy',
   component: GalaxyMap,
-  tags: ['autodocs'],
-  parameters: { layout: 'fullscreen', docs: { description: { component: 'Production GalaxyGraph with Stellar art, a sky shared with Solar System and a fixed 13-hop fixture journey. Compare surrounding/ground/no grid; tune surrounding-grid distance, brightness and pixel thickness directly on canvas or in Controls. Distance also changes angular cell size so the camera-centered shell visibly recedes. Palette, route-state, progress, zoom and vision previews remain available. No backend, sign-in or gameplay route execution.' } } },
-  args: { showLanes: true, showFleet: false, artStyle: 'stellar', palette: 'emerald', routeState: 'active', completedLegs: 4, vision: 'none', zoom: 'wide', gridMode: 'surround', gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style, onReviewChange: () => {} },
+  tags: ['autodocs', 'catalog'],
+  parameters: { catalog: { purpose: 'scene', status: 'reference', record: 'docs/art-direction.md' }, layout: 'fullscreen', docs: { description: { component: 'Production GalaxyGraph with Stellar art, a sky shared with Solar System and a fixed 13-hop fixture journey. Compare surrounding/ground/no grid; tune surrounding-grid distance, brightness and pixel thickness directly on canvas or in Controls. Distance also changes angular cell size so the camera-centered shell visibly recedes. Palette, route-state, progress, zoom and vision previews remain available. No backend, sign-in or gameplay route execution.' } } },
+  args: { showLanes: true, showFleet: false, palette: 'emerald', routeState: 'active', completedLegs: 4, vision: 'none', zoom: 'wide', gridMode: 'surround', gridDistance: DEFAULT_HEX_SKY.distance, gridBrightness: DEFAULT_HEX_SKY.brightness, gridThickness: DEFAULT_HEX_SKY.thickness, gridStyle: DEFAULT_HEX_SKY.style, onReviewChange: () => {} },
   argTypes: {
     onReviewChange: { table: { disable: true }, control: false },
-    artStyle: { control: 'select', options: ['stellar', 'current'] },
     palette: { control: 'select', options: Object.keys(MAP_PALETTES) },
     routeState: { control: 'select', options: ['none', 'proposed', 'active'] },
     completedLegs: { control: { type: 'range', min: 0, max: 13, step: 1 } },
@@ -151,4 +146,3 @@ type Story = StoryObj<typeof meta>
 export const Overview: Story = {}
 export const StarsOnly: Story = { args: { showLanes: false, showFleet: false, routeState: 'none' } }
 export const ProposedRoute: Story = { args: { routeState: 'proposed' } }
-export const Original: Story = { args: { artStyle: 'current', routeState: 'none' } }

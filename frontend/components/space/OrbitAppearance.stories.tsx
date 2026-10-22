@@ -77,7 +77,7 @@ function OrbitAppearance({ orbitBrightness, orbitThickness, selectedOrbitBrightn
       selection={selection} onSelect={select} frameSource={frameSource} gridMode="surround"
       orbitAppearance={{ brightness: orbitBrightness, thickness: orbitThickness, selectedBrightness: selectedOrbitBrightness, selectedThickness: selectedOrbitThickness }}
       labelAppearance={{ visible: labelsVisible, opacity: labelOpacity, selectedVisible: selectedLabelVisible, selectedOpacity: selectedLabelOpacity }} />
-    <aside style={{ position: 'absolute', top: 20, left: 20, maxWidth: 320, pointerEvents: 'none', color: '#b6cedb', fontSize: 13, lineHeight: 1.7 }}>
+    <aside style={{ position: 'absolute', top: 20, left: 20, maxWidth: 320, pointerEvents: 'none', color: 'var(--hud-type-secondary)', font: 'var(--hud-secondary-font)' }}>
       <strong style={{ color: '#e1f6ff' }}>Orbit &amp; label study</strong><br />
       Adjust the Storybook Controls below. Click a body to select it; click empty space to clear. Drag to orbit, scroll to zoom.<br />
       <span role="status">Selected: {selectedName ?? 'none'}</span>
@@ -86,9 +86,9 @@ function OrbitAppearance({ orbitBrightness, orbitThickness, selectedOrbitBrightn
 }
 
 const meta = {
-  title: 'Graphics/Orbit Appearance',
+  id: 'graphics-orbit-appearance', title: 'Graphics/Orbits and labels', tags: ['catalog'],
   component: OrbitAppearance,
-  parameters: { layout: 'fullscreen' },
+  parameters: { catalog: { purpose: 'scene', status: 'reference', record: 'docs/art-direction.md' }, layout: 'fullscreen' },
   args: {
     orbitBrightness: SYSTEM_ORBIT_APPEARANCE.brightness, orbitThickness: SYSTEM_ORBIT_APPEARANCE.thickness,
     selectedOrbitBrightness: SYSTEM_ORBIT_APPEARANCE.selectedBrightness, selectedOrbitThickness: SYSTEM_ORBIT_APPEARANCE.selectedThickness,

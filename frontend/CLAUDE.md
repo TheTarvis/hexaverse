@@ -55,6 +55,8 @@ On mutate, invalidate at the right level. Adding a new widget invalidates `lists
 
 **Shared actions over Catalyst.** App action buttons use `HudControls` (below). Generic library primitives live in `components/catalyst/`; retain Catalyst as the behavioral backend rather than importing `@headlessui/react` directly into features.
 
+**Storybook.** Before adding, changing or retiring stories, read `docs/storybook.md`.
+
 **Game HUD foundations.** Read `docs/hud.md#shared-hud-foundations` for game
 typography, icons and controls. Use `HudTypography`, `HudIcon` and `HudControls`
 (which wrap Catalyst); edit shared defaults in `components/hud/hud-tokens.css`.

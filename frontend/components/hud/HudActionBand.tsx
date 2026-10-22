@@ -13,6 +13,7 @@ export type HudBandAction = {
   disabled?: boolean
   pending?: boolean
   pendingLabel?: string
+  testId?: string
 }
 
 type HudActionBandProps = {
@@ -25,7 +26,7 @@ type HudActionBandProps = {
 export function HudActionBand({ actions, label = 'Card actions', className }: HudActionBandProps) {
   const busy = actions.some(action => action.pending)
   return <div role="group" aria-label={label} aria-busy={busy} data-slot="hud-action-band" data-count={actions.length} className={clsx(styles.band, className)}>
-    {actions.map((action, index) => <HudButton key={action.id} appearance="crystal" shape="integrated" tone={action.tone} variant={index === (actions.length === 1 ? 0 : 1) ? 'primary' : 'secondary'} data-primary={index === (actions.length === 1 ? 0 : 1)} pending={action.pending} pendingLabel={action.pendingLabel ?? `${action.label}…`} disabled={busy || action.disabled} onClick={action.onClick} className={styles.cell}>
+    {actions.map((action, index) => <HudButton key={action.id} data-testid={action.testId} appearance="crystal" shape="integrated" tone={action.tone} variant={index === (actions.length === 1 ? 0 : 1) ? 'primary' : 'secondary'} data-primary={index === (actions.length === 1 ? 0 : 1)} pending={action.pending} pendingLabel={action.pendingLabel ?? `${action.label}…`} disabled={busy || action.disabled} onClick={action.onClick} className={styles.cell}>
       {action.label}
     </HudButton>)}
   </div>

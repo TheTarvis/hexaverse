@@ -17,7 +17,7 @@ function SelectionConcepts() {
     <div className={styles.comparison}>{(['A', 'B', 'C'] as const).map(concept => <article key={concept} className={styles.variant} data-active={active === concept} aria-label={`Concept ${concept}`}><header className={styles.optionHeading}><HudHeading size="compact">{concept} · {conceptNames[concept]}</HudHeading><HudText variant="secondary">{conceptDescriptions[concept]}</HudText></header><TravelStudy key={`${entry}-${revision}`} concept={concept} startSelecting objective={entry === 'objective'} initialKind={entry === 'destination' ? 'destination' : 'fleet'} /></article>)}</div>
   </main>
 }
-const meta = { title: 'HUD/Travel Selection', component: SelectionConcepts, parameters: { layout: 'fullscreen' } } satisfies Meta<typeof SelectionConcepts>
+const meta = { id: 'hud-travel-selection', title: 'Tasks/Travel/Selection comparison', tags: ['catalog'], component: SelectionConcepts, parameters: { catalog: { purpose: 'task', status: 'comparison', record: 'docs/hud.md', task: 'travel', question: 'Which fleet and destination chooser supports finding and returning to this trip?' }, layout: 'fullscreen' } } satisfies Meta<typeof SelectionConcepts>
 export default meta
 type Story = StoryObj<typeof meta>
 export const Concepts: Story = {}

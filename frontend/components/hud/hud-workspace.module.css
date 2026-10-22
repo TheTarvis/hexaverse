@@ -5,6 +5,7 @@
   color: #d5e7f1;
   pointer-events: none;
   --workspace-gap: 12px;
+  --workspace-default-panels-top: calc(var(--workspace-toolbar-top, 76px) + 92px);
 }
 .recovery {
   position: absolute;
@@ -23,7 +24,7 @@
 .settings {
   position: absolute;
   z-index: 3;
-  top: var(--workspace-panels-top, 124px);
+  top: var(--workspace-panels-top, var(--workspace-default-panels-top));
   left: 16px;
   width: min(400px, calc(100% - 32px));
   max-height: calc(100% - var(--workspace-settings-reserve, 144px));
@@ -38,7 +39,7 @@
 .moves button { padding: 4px 7px; }
 .stage {
   position: absolute;
-  inset: var(--workspace-panels-top, 122px) 16px var(--workspace-panels-bottom, 112px);
+  inset: var(--workspace-panels-top, var(--workspace-default-panels-top)) 16px var(--workspace-panels-bottom, 112px);
   display: grid;
   grid-template-columns: minmax(0, 320px) minmax(24px, 1fr) minmax(0, 360px);
   grid-template-rows: repeat(6, minmax(0, 1fr));
@@ -118,14 +119,14 @@
 
 /* One shared card owns each panel's chrome and scrolling. */
 .panelCard { flex: 1; width: 100%; min-height: 0; max-height: 100%; }
-.panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
+.panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
 .panelCard [data-hud-framing='section'] { flex: 0 0 auto; max-height: none; }
-.cardNavigation { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 56px; width: max-content; max-width: 100%; box-sizing: border-box; gap: 12px; padding: 0; margin-inline: auto; border: 0; background: transparent; pointer-events: auto; }
-.cardNavigation :is(button, a) { width: 56px; height: 48px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 0; }
+.cardNavigation { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(44px, 56px); width: max-content; max-width: 100%; box-sizing: border-box; gap: 12px; padding: 0; margin-inline: auto; border: 0; background: transparent; pointer-events: auto; }
+.workspace .cardNavigation :is(button, a) { width: 100%; min-width: 44px; max-width: 56px; height: 48px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspace[data-mobile-open='true'] .stage { padding: calc(18px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box; }
   .workspace[data-mobile-open='true'] .recovery[hidden] { display: none; }
-  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > .panelContent { padding: 24px 12px 12px; }
+  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: 24px 12px 12px; }
   .workspace[data-mobile-open='true'] .panelContent > div { flex: 0 0 auto; height: auto; }
   .workspace[data-mobile-open='true'] .panelContent [data-hud-framing='section'] { flex: 0 0 auto; overflow: visible; }
   .workspace[data-mobile-open='true'] .settings { padding-top: calc(18px + env(safe-area-inset-top)); }
@@ -150,7 +151,7 @@
 /* A panel with stationary actions fills its dock and delegates scrolling to the shell. */
 .panel:has(> .panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout']) { align-self: stretch; }
 .panelCard:has(> [data-slot='hud-body'] > [data-slot='hud-footer-layout']) { height: 100%; }
-.panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout'] > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; }
+
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
-  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > [data-slot='hud-footer-layout'] > .panelContent { padding: 24px 12px 12px; }
+  .cardNavigation { gap: 8px; }
 }

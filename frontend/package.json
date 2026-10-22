@@ -17,7 +17,9 @@
     "e2e:headed": "bash ../scripts/dev/with-test-emulators.sh 'cd frontend && npx playwright test --headed'",
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
-    "users": "vite-node e2e/cli/users.ts --"
+    "users": "vite-node e2e/cli/users.ts --",
+    "check:stories": "node ../harness/utilities/check-storybook.cjs",
+    "test:stories": "vitest run --config vitest.storybook.config.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",

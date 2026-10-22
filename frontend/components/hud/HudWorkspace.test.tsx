@@ -343,9 +343,9 @@ it('uses one shared signal layer per owning panel and settings without lighting 
 
 
 it('migrates legacy Console entries without changing remaining hidden/dock preferences', () => {
-  saved.set(key('legacy'), JSON.stringify([{ id: 'console', lane: 'bottom', visible: true }, { id: 'objects', lane: 'right', visible: false }, { id: 'fleets', lane: 'left', visible: false }]))
+  saved.set(key('legacy'), JSON.stringify([{ id: 'console', lane: 'bottom', visible: true }, { id: 'objects', lane: 'right', visible: false }, { id: 'fleets', lane: 'left', visible: false }, { id: 'fleet-status', lane: 'right', visible: true }]))
   render(<HudWorkspace corporationId="legacy" panels={panels} />)
-  expect(JSON.parse(saved.get(key('legacy'))!)).toEqual([{ id: 'objects', lane: 'right', visible: false }, { id: 'fleets', lane: 'left', visible: false }])
+  expect(JSON.parse(saved.get(key('legacy'))!)).toEqual([{ id: 'objects', lane: 'right', visible: false }, { id: 'fleets', lane: 'left', visible: false }, { id: 'fleet-status', lane: 'right', visible: true }])
   expect(screen.queryByRole('button', { name: /Console/ })).toBeNull()
   settings(); expect(screen.getByRole('button', { name: 'Reset HUD layout' })).toBeVisible()
 })
@@ -375,5 +375,5 @@ it('migrates retired Command preferences to Fleets and drops the removed Console
   expect(screen.queryByRole('button', { name: 'Command' })).not.toBeInTheDocument()
   const stored = JSON.parse(saved.get(key('migration'))!)
   expect(stored).toContainEqual({ id: 'fleets', lane: 'left', visible: false })
-  expect(stored.map((entry: { id: string }) => entry.id)).toEqual(['fleets', 'objects'])
+  expect(stored.map((entry: { id: string }) => entry.id)).toEqual(['fleets', 'objects', 'fleet-status'])
 })

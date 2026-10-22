@@ -10,11 +10,11 @@ import styles from './hud-object-thumbnail.stories.module.css'
 // Storybook controls describe the known-object branch; unresolved stories
 // render the separate, kind-free branch explicitly.
 const meta: Meta<{ kind: HudObjectKind; alt?: string }> = {
-  title: 'HUD/Object Thumbnails',
+  id: 'hud-object-thumbnails', title: 'Foundations/Object thumbnails',
   component: HudObjectThumbnail,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'catalog'],
   args: { kind: 'fleet' },
-  parameters: {
+  parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' },
     docs: { description: { component: 'C2 — 32px static thumbnails, using 128px transparent sources rendered offline from existing game art. Representative category images rather than per-object portraits. Decorative beside names; supply alt for standalone images. No model loading, canvas or GPU renderer is created by this component. These examples do not settle fleet-list composition.' } },
   },
   argTypes: { kind: { control: 'select', options: ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon', 'gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] } },
@@ -51,7 +51,7 @@ const featureObjects: typeof objects = [
 
 function ObjectSample({ narrow = false, longName = false, analyzed = true, entries = objects }: { narrow?: boolean; longName?: boolean; analyzed?: boolean; entries?: typeof objects }) {
   return (
-    <HudCardShell title={analyzed ? 'Object thumbnails' : 'Not analyzed'} lighting="none" className={`${styles.card} ${narrow ? styles.narrow : ''}`}>
+    <HudCardShell title={analyzed ? 'Object thumbnails' : 'Not analyzed'} className={`${styles.card} ${narrow ? styles.narrow : ''}`}>
       <ul className={styles.list}>
         {entries.map(({ kind, name, description }) => (
           <li key={kind} className={styles.row}>
@@ -81,7 +81,7 @@ export const Comparison: Story = {
 
 export const Standalone: Story = {
   args: { alt: 'Fleet category' },
-  render: args => <HudCardShell title="Thumbnail" lighting="none" className={styles.narrow}><HudObjectThumbnail {...args} /></HudCardShell>,
+  render: args => <HudCardShell title="Thumbnail" className={styles.narrow}><HudObjectThumbnail {...args} /></HudCardShell>,
 }
 
 export const Unanalyzed: Story = {
@@ -101,7 +101,7 @@ export const AnalysisStates: Story = {
 
 export const UnanalyzedStandalone: Story = {
   render: () => (
-    <HudCardShell title="Unresolved" lighting="none" className={styles.narrow}>
+    <HudCardShell title="Unresolved" className={styles.narrow}>
       <HudObjectThumbnail analyzed={false} alt="Unanalyzed object" />
     </HudCardShell>
   ),
@@ -121,7 +121,7 @@ export const CelestialComparison: Story = {
 export const ImageUnavailable: Story = {
   parameters: { docs: { description: { story: 'The middle row makes a real missing-image request. Its known name/type remain visible beside a muted Photo icon. The unanalyzed row retains its separate diffuse return.' } } },
   render: () => (
-    <HudCardShell title="Image fallback" lighting="none" className={styles.narrow}>
+    <HudCardShell title="Image fallback" className={styles.narrow}>
       <ul className={styles.list}>
         <li className={styles.row}>
           <HudObjectThumbnail kind="fleet" />
@@ -169,7 +169,7 @@ export const FeatureComparison: Story = {
 }
 
 export const UnsupportedCategory: Story = {
-  render: () => <HudCardShell title="Known object" lighting="none" className={styles.narrow}><HudObjectThumbnail kind="future feature" alt="Known object" /><HudText variant="secondary">No category image yet</HudText></HudCardShell>,
+  render: () => <HudCardShell title="Known object" className={styles.narrow}><HudObjectThumbnail kind="future feature" alt="Known object" /><HudText variant="secondary">No category image yet</HudText></HudCardShell>,
 }
 
 

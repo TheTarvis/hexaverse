@@ -11,58 +11,79 @@ an object's identity are different concepts. Naming protection is not a combat
 shield. [Sensors](sensors-and-stealth.md) owns observation/identification, not this
 page's control and naming rights.
 
-### Control and succession direction — 2026-10-19
+### Discovery, control and naming — accepted 2026-10-19–20
 
-Travis revised the earlier discovery/naming design during domain review: current
-control of a celestial body grants naming authority. Initial analysis of an
-untouched body establishes initial control; this does not guarantee permanent
-control after the explorer leaves. Building a station around that body can
-establish a later corporation's control and allow it to rename the body. Preserve
-first-discovery attribution and the history of names and control changes. This
-supersedes the earlier intent that exploration claims provide only display/naming
-rights and that the first confirmed name is permanent. These are accepted design
-directions, not implemented transfer or renaming mechanics.
+This review revises the earlier exploration-claim and permanent-name design.
+Discovery credit, current territorial control and ownership of individual assets
+are distinct facts. Control grants celestial naming authority; discovery credit
+and the history of names and control changes survive later transfers.
 
-Control may transfer by agreement, including purchase or another negotiated
-exchange, as well as by military means. Neither the military mechanism nor
-contract execution rules are settled. Bribery and subterfuge are longer-term
-possibilities, not accepted mechanics.
+- Initial analysis of an untouched body establishes initial exploration control
+  and naming authority. This is provisional: leaving an unsupported exploration
+  claim does not reserve permanent authority against later established control.
+  “Analysis” describes the exploration intent here; this review does not merge
+  the existing Survey command with the sensors domain’s Analyze terminology.
+- The first completed, operational station establishes system control. It may
+  orbit the star, a planet or a moon; no station at every body is required.
+  Uncontested system control extends to bodies with only exploration claims,
+  including the authority to rename them while preserving their histories.
+- Home stations belong to their spawning corporations. This is actual asset
+  ownership, superseding honorary naming rights over NPC-owned property.
+- Station ownership is separate from system control. Bob may request permission
+  to build in Alice’s system; if Alice agrees, Bob completing his station leaves
+  Alice in control. Bob owns and may rename his own station. Multiple station
+  owners do not automatically make the system contested.
+- Bob must deliberately initiate a challenge to take system control. An
+  established station anywhere in the system can support a competing system
+  claim. The initiation mechanics belong to later combat/control design.
+- Competing claims make control **contested**. Freeze celestial renaming for
+  the star, planets and moons throughout a system-control dispute; preserve
+  existing names. Ownership of individual stations remains separate, including
+  their owners’ naming authority. No percentage-based control formula is needed
+  for this model.
+- A dispute ends through agreement or when only one claimant retains an
+  established territorial foothold. Competing footholds may be captured,
+  destroyed or voluntarily relinquished. Station count alone does not decide
+  control, and a larger visiting fleet does not automatically transfer it.
+- A completed, operational station is the initial qualifying **territorial
+  foothold**. Construction in progress cannot establish control or freeze naming.
+  Once established, temporary damage or disabling its services does not remove
+  the foothold. Other qualifying infrastructure remains future scope.
+- Military capture requires overcoming or suppressing station defenses and
+  completing a capture operation with a fleet remaining nearby. Defenders can
+  interrupt capture by driving that fleet away. Capture can retain the station
+  intact; destroying it is an alternative. Equipment, proximity, duration and
+  detailed defense/capture conditions remain for combat design.
+- Control can also transfer by agreement, including purchase or another exchange,
+  without military capture. Contract execution and enforcement remain future
+  design. Taxation, bribery and subterfuge are longer-term possibilities, not
+  mechanics established by this review.
+- If all established footholds are removed, the system becomes uncontrolled.
+  A surviving fleet alone does not gain lasting control, and earlier exploration
+  claims do not automatically reactivate. Preserve current names and history;
+  a new controller must establish a qualifying station to gain territorial naming
+  authority. A former claimant’s fleets elsewhere do not prolong a dispute.
+- A later uncontested controller may rename its territory. This supersedes the
+  earlier rule that the first confirmed celestial name is permanently locked.
 
-Home stations belong to their spawning corporations; this is actual station
-ownership, rather than honorary naming credit over NPC property. Station services
-and starting protection require separate rules.
+These are accepted domain directions, not implemented construction, territorial
+transfer, capture or renaming mechanics. The existing claim model does not
+establish the new contracts by itself.
 
-Control can extend across a system without infrastructure at every body.
-Station ownership is distinct from system control: a corporation may allow
-another corporation to build a station while retaining recognized control of
-the system. Taxation is a longer-term possibility, outside the present scope.
-Competing claims without agreement can leave a body or system **contested**;
-multiple station owners alone need not imply a dispute.
-
-A control dispute ends by agreement or when only one claimant retains an
-established territorial foothold: competing footholds can be captured or
-eliminated. Merely bringing a larger fleet through does not transfer control;
-a defeated claimant retaining ships elsewhere does not keep the territory
-contested indefinitely. What qualifies as a foothold and how capture works
-remain unresolved. While control is contested, preserve the existing public
-name and freeze renaming. A later uncontested controller may rename the place
-without erasing discovery or naming history.
-
-The reach of infrastructure-backed claims and their relationship to
-individual-body control remain unresolved. No percentage-based control formula
-has been accepted.
-
-The exact meaning and scope of control, qualifying infrastructure, contested
-control and station capture remain unresolved. The existing claim model does not
-settle them. “Analysis” here describes the player's exploration intent; whether
-the existing Survey command remains distinct from Analyze is still a question.
+### Account and corporation lifecycle
 
 An account survives the end of its corporation. Voluntary **dissolution** should
 let a player end a corporation and start over, including after an undesirable
 spawn or becoming stranded. It must not permit two living corporations for one
-account. Confirmation, effective timing, any undo period, asset disposition and
-successor inheritance remain undecided. Account-level corporation history and
-statistics are future possibilities outside this review's immediate scope.
+account. Dissolution timing, confirmation, any undo period, asset disposition and
+successor inheritance remain deferred. Account-level corporation history and
+statistics are future possibilities outside this review’s immediate scope.
+
+Corporation survival through station ownership was explicitly deferred on
+2026-10-20. Retain the current coded lifecycle rule for now; this review does
+not extend corporation survival to stations or establish a new automatic death
+flow. Reconcile the disposition of a dead corporation’s stations and territorial
+claims in that later lifecycle review.
 
 ## Current implementation and gaps
 
@@ -70,8 +91,8 @@ statistics are future possibilities outside this review's immediate scope.
   [Corporation](../../backend/corporations/model.go) owns player state.
   [ResolveCorporation](../../backend/middlewares/corporation.go) resolves the
   account-linked corporation and can continue corpless. It does not currently
-  filter a dead linked corporation or establish a restart flow. Old account scaffold organization/
-  membership prose is not the current model.
+  filter a dead linked corporation or establish a restart flow. Old account
+  scaffold organization/membership prose is not the current model.
 - [Spawn](../../backend/corporations/service.go) reuses an existing corporation,
   validates names, atomically anchors account/corporation/home reservation, then
   heals interrupted assets. The normal service stack seeds at the home station,
@@ -91,20 +112,42 @@ statistics are future possibilities outside this review's immediate scope.
   rights, arrival and station name. Home star ownership alone does not grant naming
   entitlement without survey. Name confirmation requires ownership/entitlement;
   first confirmed name is permanent in current code, identical retry succeeds.
-  That lock predates the revised control-based naming direction above. Names are unique
-  within a system, star names also galaxy-wide; [validation](../../backend/discovery/validation.go)
+  That lock predates the revised control-based naming direction above. Names
+  are unique within a system, star names also galaxy-wide; [validation](../../backend/discovery/validation.go)
   normalizes and rejects invalid/reserved/offensive forms.
+- Stations currently have one venue identity per system, NPC provisioning and
+  discovery name/owner overlays. Multiple independently owned stations, coherent
+  corporation ownership, owner-directed station renaming and territorial disputes
+  are not established by that implementation; see [stations](stations.md).
 - Corporation death requires zero fleets, but current gameplay has no fleet
   destruction path. Do not infer combat rules from administrative death support
   or equate `NamingProtected` with immunity to attack.
 
-## Open questions
+## Deferred design and implementation boundaries
 
-Define what establishes and transfers control, its scope across stars, planets,
-moons and stations, and how contested control works. Implement corporation ownership of home stations consistently across station
-records and discovery projections; define its services and protection separately. Determine how dissolution ends control without erasing history.
-Which knowledge products can players trade? Confirm that contract separately. Active discovery/naming scratch work is implementation
-tracking; durable decisions belong here once verified, not in a second rulebook.
+This review settles the domain contract above and defers the following details;
+it does not authorize gameplay implementation.
+
+- **Stations/construction:** costs, completion and operational requirements,
+  services, permission workflow and starting protection. Support multiple stations
+  and consistent asset ownership before treating current station overlays as
+  implementation of the accepted model.
+- **Combat/control:** challenge initiation, detailed capture and interruption
+  conditions, and how independently supported local holdings interact with system
+  claims beyond the system-wide dispute model above.
+- **Agreements/economy:** transfer execution, recognition and enforcement; future
+  taxation and subterfuge. Which knowledge products players can trade remains a
+  separate economy question.
+- **Naming:** implement control succession, history, celestial naming freezes and
+  station-owner renaming. Detailed repeat-renaming and validation policies, and
+  the Survey/Analyze command distinction, are not redesigned here.
+- **Lifecycle:** dissolution and restart mechanics, station-based survival,
+  inheritance and disposition of assets/control after corporation death.
+
+Active discovery/naming scratch work tracks the earlier implementation. Its
+approved design remains provenance, but this review supersedes its display-only
+claims, permanently locked celestial names and fixed station-name policy where
+those conflict with the accepted direction above.
 
 Historical deferred intent: [backup/restore lore](../lore.md) and #0009 envision
 restoration into a new corporation with mechanically fresh state, while preserving

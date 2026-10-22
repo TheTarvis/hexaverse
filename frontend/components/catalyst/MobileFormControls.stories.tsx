@@ -6,7 +6,7 @@ import { Select } from './select'
 import { Button } from './button'
 import { Dialog, DialogBody, DialogTitle } from './dialog'
 
-const meta: Meta = { title: 'Forms/Mobile Input Sizing', parameters: { layout: 'fullscreen' } }
+const meta: Meta = { id: 'forms-mobile-input-sizing', title: 'Foundations/Forms', tags: ['catalog'], parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' }, layout: 'fullscreen' } }
 export default meta
 
 function Controls() {

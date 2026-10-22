@@ -186,7 +186,6 @@
 .section .title { position: relative; top: auto; left: auto; transform: none; max-width: none; margin: 0 40px 12px 0; padding: 0; background: transparent; clip-path: none; }
 .section .title::before { display: none; }
 .section .title span { white-space: normal; overflow-wrap: anywhere; }
-.section .close { top: -8px; right: -8px; }
 .toolbar { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 5px 5px 0; padding: 28px 11px 8px; border-bottom: 1px solid #435d7066; }
 .contentSection { min-width: 0; margin: 0; padding-block: 16px; border-top: 1px solid #435d7066; display: flex; flex-direction: column; gap: 12px; }
 .contentSection:first-of-type { padding-top: 0; border-top: 0; }
@@ -216,6 +215,7 @@
 }
 
 /* The clipped layout owns the lower corners; only its content region scrolls. */
+.contentLayout { display: contents; }
 .footerLayout { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .footerLayout > .content { clip-path: none; }
 .footer { flex: 0 0 auto; min-width: 0; }

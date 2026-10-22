@@ -5,12 +5,12 @@ import clsx from 'clsx'
 import { HudButton } from '@/components/hud/HudControls'
 import { HudCardShell } from './HudCardShell'
 import { HudIcon } from './HudIcon'
-import { MagnifyingGlassIcon, RocketLaunchIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { MagnifyingGlassIcon, RocketLaunchIcon, QueueListIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import styles from './hud-workspace.module.css'
 import { usePhoneHud, usePhoneSheet } from '@/hooks/use-phone-sheet'
 
-export type HudPanelId = 'objects' | 'fleets'
-const panelIcons = { objects: MagnifyingGlassIcon, fleets: RocketLaunchIcon }
+export type HudPanelId = 'objects' | 'fleets' | 'fleet-status'
+const panelIcons = { objects: MagnifyingGlassIcon, fleets: QueueListIcon, 'fleet-status': RocketLaunchIcon }
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
 export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; footer?: ReactNode; suspended?: boolean }
@@ -18,6 +18,7 @@ export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; 
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
   { id: 'fleets', lane: 'right', visible: true },
+  { id: 'fleet-status', lane: 'right', visible: true },
 ]
 
 function readLayout(raw: string | null): Layout {

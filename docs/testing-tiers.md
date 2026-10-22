@@ -6,7 +6,9 @@ the relevant package.
 | Scope | Command | Dependencies |
 | --- | --- | --- |
 | Edited-file syntax/format | `bash harness/validate-file.sh <path>` | Language tooling when installed |
-| Backend/frontend static and unit checks | `bash harness/check.sh` | Go, Node, installed frontend dependencies |
+| Backend/frontend checks and Storybook interactions | `bash harness/check.sh` | Go, Node, installed frontend dependencies |
+| Story catalog and reuse | `cd frontend && npm run check:stories` | Frontend dependencies; Audio excluded |
+| Story rendering and interactions | `cd frontend && npm run test:stories` | Chromium installed with Playwright; desktop and phone; starts its own test server, no app/emulators |
 | Frontend unit tests | `cd frontend && npx vitest run <test-file>` | Frontend dependencies |
 | Frontend types | `cd frontend && npx tsc --noEmit` | Frontend dependencies |
 | Production action interface | `node harness/utilities/check-hud-actions.cjs` | Frontend TypeScript dependency; `--inventory` also lists dev/unused findings |
@@ -36,3 +38,13 @@ Run full backend and browser suites sequentially because their wrappers share em
 Use `npm run firebase:emulators:test` to keep test emulators running locally.
 See `frontend/e2e/README.md` for browser setup. A timeout is an incomplete run,
 not proof of an assertion failure; diagnose it before changing test budgets.
+
+
+Storybook verification is part of `harness/check.sh` frontend lint/test stages.
+Its browser suite runs in-scope stories at 1440 × 960 and 390 × 844, including their
+`play` functions; Audio is excluded. Install Chromium with
+`cd frontend && npx playwright install chromium` if needed. Some graphics recovery
+stories intentionally fail assets/renderers; expected fixture failures are not
+production gameplay validation. See [catalog guidance](storybook.md). Do not run
+frontend type discovery concurrently with the full unit suite: anti-mirror guards
+create and remove temporary TypeScript probes during their test run.

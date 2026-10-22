@@ -45,25 +45,25 @@ and need focused review. The [baseline inventory](../.scratch/hud-card-rebuild/c
 and [removal record](../.scratch/hud-card-rebuild/removal-pass.md) distinguish the
 old composition from the current checkout.
 
-Travel review/status temporarily replace the Objects body, with contextual
-entries in its list header. Real estimates, Start/Stop, Cut drive, eligible Jump,
-accepted-receipt handoff and native fleet selection remain. Station services,
+Travel review replaces the Objects body, with contextual entries in its list
+header. Fleet status now has its own card and launcher in System and Galaxy.
+Real estimates, Start/Stop, Cut drive, eligible Jump, accepted-receipt handoff
+and native fleet selection remain. Station services,
 inspection, discovery and world/settlement reads remain. Sensors and general
 nonstation mining setup have no HUD entry during this staged rebuild; sensor
 onboarding cannot complete until its replacement exists. Their services and
 reusable task components remain for deliberate reintegration. The removal pass
 is not completion of the full card rework.
 
-The accepted full travel study has not yet replaced production's older card
-composition; adopting the shared luminous progress rail alone does not establish
-that integration. Fleet status is the first design task: Travis selected a
+The accepted travel presentation is now shared by production and Storybook.
+Fleet status was the first design task: Travis selected a
 **compact fleet/activity summary with expandable cargo and ship details**.
 Travis selected **activity first** in the first comparison: identity, current
 activity/progress, then compact fuel/hold facts, with cargo and ships independently
 expandable below. Travis subsequently selected **its own Fleet status card and
-launcher**, separate from Objects. Entry/return behavior and detailed fact/action
-placement remain for review. This accepts hierarchy and hosting; full interaction,
-production integration and in-game acceptance remain outstanding.
+launcher**, separate from Objects. The shared production view now implements
+that hierarchy and hosting. Entry/return behavior and detailed fact/action
+placement still need in-game review; implementation does not establish acceptance.
 
 Completion requirement, confirmed by Travis on 2026-10-20: once the HUD/card
 rework is integrated, delete the superseded legacy and deprecated implementation.
@@ -82,22 +82,26 @@ Travel-control visual direction, accepted 2026-10-19: the review header uses
 two compact, equally weighted identity columns for command fleet and destination.
 Each shows thumbnail/name and activity or object type, with a right-side dropdown
 chevron replacing a separate Change button. Each identity is a selection target.
-Trip facts use left-aligned labels and right-aligned values. This is accepted
-presentation direction in Storybook; production adoption and selection behavior
-for potentially large collections remain unresolved. The
+Trip facts use left-aligned labels and right-aligned values. Production and
+fixture journeys render the same `CompactTravelCard`. Its fleet identity opens
+the existing eligible-fleet native selection; its destination identity returns
+to Objects. The fixture A/B/C chooser comparison remains unresolved for larger
+collections and has not been adopted as a live global search. The
 [travel controls design record](../.scratch/hud-travel-card/controls-design.md)
 preserves comparisons and review evidence.
 
-Current ownership after the 2026-10-20 removal pass:
+Current ownership after the 2026-10-21 shared-card adoption:
 
 - [SystemSpaceView](../frontend/components/space/SystemSpaceView.tsx) retains
   gameplay state, server preview/quote/order/Stop hooks and command ownership.
   [CompactTravelCard](../frontend/components/space/CompactTravelCard.tsx) presents
-  review/status using served figures. [Selection](../frontend/components/space/space-selection.ts)
+  review using served figures. [Selection](../frontend/components/space/space-selection.ts)
   already supports bodies, gates and bounded points in empty space.
 - [HudWorkspace](../frontend/components/hud/HudWorkspace.tsx) is presentation
-  only: panel IDs are Objects and Fleets, using ordered left/right/bottom docks.
-  System supplies Objects; Galaxy also supplies Fleets.
+  only: panel IDs are Objects, Fleets and Fleet status, using ordered
+  left/right/bottom docks. System supplies Objects and Fleet status; Galaxy also
+  retains Fleets for its roster and quick actions. The new `fleet-status` ID
+  preserves the separate `fleets` roster identity and existing preferences.
   Phones use a launcher and one full-page active panel. Dock buttons support
   touch/keyboard arrangement without dragging. This is the current reversible
   implementation choice, not an accepted final freeform editor.
@@ -105,6 +109,20 @@ Current ownership after the 2026-10-20 removal pass:
   browser. Reset restores defaults. Settings/recovery stay reachable with every
   configurable panel hidden; navigation remains outside the workspace.
   Panel containers remain mounted to preserve browsing context.
+- [FleetStatusCard](../frontend/components/fleet/FleetStatusCard.tsx) owns the
+  activity-first presentation, fuel/hold facts, pooled cargo and class-count
+  disclosures. Production System/Galaxy and Storybook all use its content/actions.
+  It consumes served fleet, running mine/scan and settled scan reads; missing
+  readings remain unavailable. Changing fleets resets disclosures; hiding a
+  panel preserves them. Stop/Cut drive/Jump remain explicit task actions supplied
+  by each view's existing hooks and synchronous guards. Summary exposes focus
+  and travel entry; mining/sensor setup remains outside this adoption.
+- Accepted travel opens Fleet status with travel controls available. Back returns
+  to its summary. Objects browsing remains independent. Accepted mutation reads
+  remain visible until the next fleet read supersedes them; dismissing a panel
+  never cancels an order. Galaxy retains roster quick actions using the same
+  command handlers. The superseded Galaxy `FleetLocationPanel` and the studies'
+  private travel/status presentation markup and styles have been deleted.
 - [HudCardShell](../frontend/components/hud/HudCardShell.tsx) and existing
   typography/icons provide the reviewed frame and materials. Reuse this component
   foundation. [Art direction](art-direction.md) governs object assets; decorative
@@ -127,7 +145,10 @@ values and alternative palettes still require visual acceptance.
 
 ## Shared HUD foundations
 
-Game surfaces and `HUD/Typography` stories consume
+[Storybook guidance](storybook.md) owns catalog structure, shared-source reuse,
+prototype disclosure and review-link preservation.
+
+Game surfaces and `Foundations/Typography` stories consume
 `frontend/components/hud/hud-tokens.css` through `hud-type.css`. Change font
 families, role font shorthands, tracking, role colors, icon sizes and HUD control
 defaults in **hud-tokens.css**. Michroma identities use the compact role in lists
@@ -149,7 +170,7 @@ Use `HudButton`, `HudIconButton`, `HudBackButton`, `HudSearchInput` and `HudSele
 and share font, height, padding, color, focus and touch defaults. Desktop compact
 controls currently use 30px height; phone/coarse-pointer targets retain 44px and
 inputs retain 16px text. Feature styles own arrangement, not copied control
-fonts or sizes. `HUD/Typography/Shared Foundations` demonstrates the same APIs.
+fonts or sizes. `Foundations/Typography/Shared Foundations` demonstrates the same APIs.
 
 The travel selection prototype adopts these defaults. Older HUD controls still
 have local overrides and require deliberate migration; changing a token updates
@@ -294,8 +315,12 @@ scrolling content, inside the shared frame inset and lower corner clipping.
 `HudWorkspacePanel.footer` forwards actions to the owning shell; a panel with a
 footer fills its dock. Use these slots rather than embedding footer actions in a
 nested content section. Notices and simulation copy belong above the actions or
-outside the card. The Fleet status study and Stationary Actions reference use
-this shared capability. Existing production travel placement is unchanged.
+outside the card. The Fleet status study, selected travel study, production travel
+and Stationary Actions reference use this shared capability. Production travel's
+`CompactTravelActions` supplies the same action band to its standalone shell or
+the owning workspace footer; callers pass action data rather than button markup.
+The shell preserves mounted content when a footer appears or disappears, so
+returning from travel retains the Objects browsing context.
 
 ## Acceptance checks
 
@@ -839,6 +864,13 @@ actual app side by side at phone/desktop widths, including long titles, independ
 Back, invisible-target edge taps and desktop hide/reopen. The reference must not
 be silently updated to make a changed design pass. Physical iPhone acceptance is
 still distinct from these browser checks.
+
+The 2026-10-21 close audit found a Travel study override that enlarged the visible
+button to 44px and moved its glyph 8px inward. That override and the separate
+nested-section offset are removed. `HudCardShell` owns the single outside corner
+placement for every HUD consumer; feature and fixture CSS must not target
+`data-slot="hud-close"` or `data-mobile-close`. The catalog source check rejects
+those overrides. Generic Catalyst dialogs/drawers retain their application chrome.
 
 ## Direct mobile HUD navigation — 2026-10-18
 

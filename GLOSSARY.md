@@ -11,7 +11,7 @@ gameplay rules, implementation gaps and open questions.
 The relationship between a player's account and the corporation representing them in the game.
 
 **[Discovery](docs/domains/discovery-and-identity.md)**:
-Exploration recognition and rights associated with finding, arriving at, surveying and naming world objects.
+Historical exploration recognition associated with finding, arriving at and surveying world objects; distinct from current territorial control.
 
 **[Account](docs/domains/discovery-and-identity.md)**:
 Player login identity associated with a corporation.
@@ -24,6 +24,9 @@ A corporation’s current authority over a body or system, including naming auth
 
 **[Contested control](docs/domains/discovery-and-identity.md)**:
 A dispute between corporations asserting competing authority over the same body or system.
+
+**[Territorial foothold](docs/domains/discovery-and-identity.md)**:
+An established installation that supports a corporation’s territorial claim; stations are the initial qualifying installations.
 
 **[Dissolution](docs/domains/discovery-and-identity.md)**:
 A player’s voluntary ending of their corporation while retaining their account.

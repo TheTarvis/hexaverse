@@ -11,7 +11,7 @@ import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace } from
 import { HudButton } from '@/components/hud/HudControls'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { type HudPanelId } from '@/components/hud/HudWorkspace'
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { rosterRowStatus, type ResolvedBody } from '@/components/fleet/roster-status'
@@ -29,7 +29,8 @@ import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
 import { jumpErrorCopy } from '@/lib/jump-copy'
-import { CompactTravelCard } from './CompactTravelCard'
+import { CompactTravelActions, CompactTravelCard, type CompactTravelCardProps } from './CompactTravelCard'
+import { FleetStatusActions, FleetStatusContent, type FleetStatusProps } from '@/components/fleet/FleetStatusCard'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
 import { useScanTargets, useSettledScan, type ScanCommitMarker } from '@/hooks/use-scan'
@@ -263,11 +264,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const stopGuard = useSubmitGuard()
   const cutDriveGuard = useSubmitGuard()
   const [guidePageVisible, setGuidePageVisible] = useState(true)
-  const [travelMode, setTravelMode] = useState<'review' | 'status' | null>(null)
+  const [travelReviewOpen, setTravelReviewOpen] = useState(false)
+  const [travelControlsOpen, setTravelControlsOpen] = useState(false)
   const [travelNotice, setTravelNotice] = useState<string | null>(null)
   const [travelError, setTravelError] = useState<string | null>(null)
   const [travelPending, setTravelPending] = useState(false)
-  const [travelReceipt, setTravelReceipt] = useState<{ fleet: Fleet; destination: string; readCount: number | undefined } | null>(null)
+  const [travelReceipt, setTravelReceipt] = useState<{ fleet: Fleet; readCount: number | undefined } | null>(null)
   const [selection, setSelection] = useState<SpaceSelection | null>(null)
   const [inspectedFleetId, setInspectedFleetId] = useState<string | null>(null)
   useEffect(() => { setInspectedFleetId(null) }, [systemId, selection])
@@ -474,7 +476,8 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     }
   }, [commitPendingMarker.data, committedPending, actingRunningScan.isError, actingRunningScan.data, acting?.id, rereadPilesAfterSettle, qc])
 
-  const runningMine = useRunningMine(acting?.id ?? null).data ?? null
+  const runningMineRead = useRunningMine(acting?.id ?? null)
+  const runningMine = runningMineRead.data ?? null
 
   // The clock: a CLOCK OBJECT, not clock state (openspec change
   // `fix-world-time-render-loop`, design.md Decision 1) — the interior
@@ -802,17 +805,17 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const startTravel = () => {
     const request = selectionWireRequest(selection)
     if (travelBlocker || !acting || !request || !currentQuote?.affordable || !travelGuard.claim()) return
-    const fleetId = acting.id, targetKey = selectionKey(selection), label = destinationLabel, agreedArrival = currentQuote.arriveMs
+    const fleetId = acting.id, targetKey = selectionKey(selection), agreedArrival = currentQuote.arriveMs
     setTravelError(null); setTravelPending(true)
     travelOrder.mutate({ fleetId, request: { ...request, maxFuelTons: currentQuote.fuelCostTons * BURN_FUEL_ALLOWANCE } }, {
       onSuccess: fleet => {
         const burn = fleet.state?.Burn
         setTravelNotice(burn && burn.ArriveMs !== agreedArrival ? 'The accepted arrival differs from the estimate. Status reflects the accepted order.' : null)
         handleCommitAccepted({ fleetId, departMs: burn?.DepartMs ?? null, arriveMs: burn?.ArriveMs ?? null, selectionKey: targetKey })
-        setTravelReceipt({ fleet, destination: label, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
-        setTravelMode('status')
-        setObjectIndexOpen(true)
-        requestHudPanel('objects')
+        setTravelReceipt({ fleet, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelReviewOpen(false)
+        setTravelControlsOpen(true)
+        requestHudPanel('fleet-status')
       },
       onError: error => {
         const reason = commandErrorReason(error)
@@ -824,11 +827,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   }
   const statusRead = travelReceipt ? allFleets.find(fleet => fleet.id === travelReceipt.fleet.id) : acting
   const statusFleet = travelReceipt && fleetReadCount === travelReceipt.readCount ? travelReceipt.fleet : statusRead ?? null
+  useEffect(() => { setTravelControlsOpen(false) }, [statusFleet?.id])
   const stopTravel = () => {
     if (!statusFleet || fleets.isError || travelPending || !stopGuard.claim()) return
     setTravelError(null); setTravelPending(true)
     travelStop.mutate(statusFleet.id, {
-      onSuccess: fleet => setTravelReceipt({ fleet, destination: 'Stopping in place', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }),
+      onSuccess: fleet => setTravelReceipt({ fleet, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount }),
       onError: error => setTravelError(burnErrorCopy(commandErrorReason(error))),
       onSettled: () => { stopGuard.release(); setTravelPending(false) },
     })
@@ -838,7 +842,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     setTravelError(null); setTravelPending(true)
     travelCutDrive.mutate(statusFleet.id, {
       onSuccess: fleet => {
-        setTravelReceipt({ fleet, destination: 'Coasting', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelReceipt({ fleet, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
         setTravelNotice('Drive cut. The fleet is coasting.')
       },
       onError: error => setTravelError(burnErrorCopy(commandErrorReason(error))),
@@ -850,26 +854,43 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
     setTravelError(null); setTravelPending(true)
     travelJump.mutate({ fleetId: statusFleet.id, laneId: statusFleet.laneId }, {
       onSuccess: fleet => {
-        setTravelReceipt({ fleet, destination: 'Inter-system transit', readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
+        setTravelReceipt({ fleet, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
         setTravelNotice('Jump committed.')
       },
       onError: error => setTravelError(jumpErrorCopy(commandErrorReason(error))),
       onSettled: () => { jumpGuard.release(); setTravelPending(false) },
     })
   }
-  const statusDestination = travelReceipt?.destination ?? (statusFleet?.state?.Burn?.Target.BodyId ? nameOf(statusFleet.state.Burn.Target.BodyId) : statusFleet?.state?.Burn?.Target.Point ? 'Point in space' : statusFleet?.attachedTo ? nameOf(statusFleet.attachedTo) : 'In this system')
-  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelMode('review'); requestHudPanel('objects') }
-  const travelCard = travelMode ? <CompactTravelCard mode={travelMode} fleet={travelMode === 'status' ? statusFleet : acting}
-    fleets={allFleets} systemId={systemId} destination={travelMode === 'status' ? statusDestination : destinationLabel}
-    quote={currentQuote} worldTime={worldTime} scale={servedScale} blocker={travelBlocker} notice={travelNotice} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
-    pending={travelPending} stopPending={travelStop.isPending} warning={statusFleet?.strandingWarning}
-    additionalActions={<>
-      {statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton tone="warning" data-testid="travel-cut-drive" pending={travelCutDrive.isPending} pendingLabel="Cutting drive…" disabled={travelPending || mineRunning || fleets.isError} onClick={cutTravelDrive}>Cut drive</HudButton>}
-      {statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId && <HudButton data-testid="travel-jump" pending={travelJump.isPending} pendingLabel="Jumping…" disabled={travelPending || mineRunning || fleets.isError} onClick={jumpTravel}>Jump through gate</HudButton>}
-    </>}
-    onFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }} onStart={startTravel} onStop={stopTravel}
-    onBack={() => { if (!travelGuard.held) { setTravelMode(null); openObjectIndex(true) } }}
-    onClose={() => { if (!travelGuard.held) setTravelMode(null) }} onRetry={burnPreview.retry} /> : null
+  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelReviewOpen(true); requestHudPanel('objects') }
+  const travelCard: ReactElement<CompactTravelCardProps> | null = travelReviewOpen ? <CompactTravelCard footerHost="workspace" fleet={acting}
+    fleets={allFleets} systemId={systemId} destination={destinationLabel}
+    destinationKind={selection?.bodyId ? interior.data?.features.find(body => body.id === selection.bodyId)?.type ?? (interior.data?.laneGates.some(gate => gate.id === selection.bodyId) ? 'gate' : 'unknown') : selection?.point ? 'point' : 'unknown'}
+    quote={currentQuote} worldTime={worldTime} mine={!runningMineRead.isError ? runningMine : null} scale={servedScale} blocker={travelBlocker} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
+    pending={travelPending} onFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }} onStart={startTravel}
+    onBack={() => { if (!travelGuard.held) { setTravelReviewOpen(false); openObjectIndex(true) } }}
+    onChooseDestination={() => { if (!travelGuard.held) { setTravelReviewOpen(false); openObjectIndex(true) } }}
+    onClose={() => { if (!travelGuard.held) setTravelReviewOpen(false) }} onRetry={burnPreview.retry} /> : null
+  const fleetStatus: FleetStatusProps = {
+    fleet: statusFleet, worldTime, scale: servedScale, nameOf: id => systemNames[id] ?? id, resolveBody,
+    mine: statusFleet?.id === acting?.id && !runningMineRead.isError ? runningMine : null, scan: statusFleet?.id === acting?.id && !actingRunningScan.isError ? actingRunningScan.data : null,
+    scanReport: statusFleet?.id === acting?.id && !actingSettledScan.isError ? actingSettledScan.data : null,
+    activityFailed: runningMineRead.isError || actingRunningScan.isError || actingSettledScan.isError, failed: fleets.isError, loading: fleets.isLoading,
+    notice: travelNotice, error: travelError, pending: travelPending, stopPending: travelStop.isPending,
+    travelControlsOpen, onTravelControls: () => setTravelControlsOpen(true), onBack: () => setTravelControlsOpen(false), onReviewTravel: reviewTravel,
+    onFocus: () => {
+      if (!statusFleet) return
+      if (statusFleet.jump) router.push(`/systems/${statusFleet.jump.destSystemId}`)
+      else if (statusFleet.systemId !== systemId) router.push(`/systems/${statusFleet.systemId}`)
+      else setFleetFocus(previous => ({ fleetId: statusFleet.id, sequence: (previous?.sequence ?? 0) + 1 }))
+    },
+    focusLabel: statusFleet?.jump ? 'Focus destination' : statusFleet && statusFleet.systemId !== systemId ? 'Open fleet system' : 'Focus fleet',
+    focusDisabled: !statusFleet || (!statusFleet.jump && statusFleet.systemId === systemId && (!canvasAvailable || interiorFailed || !scene.marks.some(mark => mark.kind === 'fleet' && mark.id === statusFleet.id))),
+    onRetry: () => { void fleets.refetch(); if (acting?.id) { void runningMineRead.refetch(); void actingRunningScan.refetch(); void actingSettledScan.refetch() } }, onStop: stopTravel,
+    additionalActions: [
+      ...(statusFleet?.state.Mode === 0 && statusFleet.state.Burn && statusFleet.state.Burn.ArriveMs > worldTime && !statusFleet.jump && statusFleet.systemId === systemId ? [{ id: 'cut-drive', label: 'Cut drive', tone: 'warning', testId: 'travel-cut-drive', pending: travelCutDrive.isPending, pendingLabel: 'Cutting drive…', disabled: travelPending || mineRunning || fleets.isError, onClick: cutTravelDrive }] as const : [] as const),
+      ...(statusFleet?.laneId && !statusFleet.jump && statusFleet.systemId === systemId ? [{ id: 'jump', label: 'Jump through gate', testId: 'travel-jump', pending: travelJump.isPending, pendingLabel: 'Jumping…', disabled: travelPending || mineRunning || fleets.isError, onClick: jumpTravel }] as const : [] as const),
+    ],
+  }
   const showLoading = !interiorFailed && (canvasAvailable || rendererPending) && (interior.isLoading || !firstFrame)
 
   const stationActionsHost = acting && !actingRemote && (dockedFeature?.type === 'station' || acting.attachedTo === stationRead.data?.featureId) ? acting.attachedTo : null
@@ -1027,7 +1048,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               worldTime={worldTime}
               scale={servedScale}
               selection={selection}
-              onSelect={(picked) => { if (travelGuard.held) return; setTravelMode(null); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('objects') }}
+              onSelect={(picked) => { if (travelGuard.held) return; setTravelReviewOpen(false); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('objects') }}
               onAvailabilityChange={setCanvasAvailable}
               onPendingChange={setRendererPending}
               onFirstFrame={handleFirstFrame}
@@ -1092,12 +1113,12 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         className={commandStyles.workspace}
         request={hudRequest}
         panels={[
-          { id: 'objects', label: 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), children: (
+          { id: 'objects', label: 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), footer: travelCard ? <CompactTravelActions {...travelCard.props} /> : undefined, children: (
       <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%' }}>
         <SystemObjectIndex
-          listActions={!travelMode && <div className={commandStyles.objectActions}>
+          listActions={!travelReviewOpen && <div className={commandStyles.objectActions}>
           {selection?.point && <HudButton variant="primary" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</HudButton>}
-          {acting && <HudButton variant="quiet" data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelMode('status'); setTravelError(null); setObjectIndexOpen(true) }}>Fleet status</HudButton>}
+          {acting && <HudButton variant="quiet" data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelReviewOpen(false); setTravelControlsOpen(true); setTravelError(null); requestHudPanel('fleet-status') }}>Fleet status</HudButton>}
         </div>}
           compact
           servicesWithoutDetails={interiorFailed && !!stationActionsHost}
@@ -1130,7 +1151,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           tutorialTarget={guiding ? guide?.phase === 'station' ? guide.stationId : guide?.targetId : null}
           open={objectIndexOpen}
           onOpen={openObjectIndex}
-          onSelect={id => { setTravelMode(null); setInspectedFleetId(null); setSelection({ bodyId: id }) }}
+          onSelect={id => { setTravelReviewOpen(false); setInspectedFleetId(null); setSelection({ bodyId: id }) }}
           onFocus={() => { if (selection?.bodyId) setGuideFocus(previous => ({ bodyId: selection.bodyId!, sequence: (previous?.sequence ?? 0) + 1 })) }}
           canPlot={!!acting && !actingRemote && !!selection?.bodyId && interior.data?.features.find(body => body.id === selection.bodyId)?.type !== 'star'}
           onPlot={reviewTravel}
@@ -1141,7 +1162,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       </div>
           ) },
-
+          { id: 'fleet-status', label: 'Fleet status', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), children: <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: <FleetStatusActions {...fleetStatus} /> },
         ]}
       />
 

@@ -1,0 +1,9 @@
+.content { display: flex; flex-direction: column; gap: 20px; min-width: 0; overflow-wrap: anywhere; }
+.identity { display: flex; align-items: start; gap: 12px; padding-right: 20px; }
+.identity > div { min-width: 0; }
+.activity, .meter { display: grid; gap: 8px; }
+.figures { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.sensor { display: grid; gap: 4px; padding-left: 12px; border-left: 1px solid var(--hud-control-border); }
+.details { display: grid; gap: 8px; }
+.details > button { justify-content: start; width: 100%; }
+.warning { color: #f8ce85; }

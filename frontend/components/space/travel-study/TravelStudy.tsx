@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDownIcon, ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
+import { ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
 import { HudBackButton, HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
 import { HudIcon } from '@/components/hud/HudIcon'
 import { HudCardShell } from '@/components/hud/HudCardShell'
-import { HudActionBand } from '@/components/hud/HudActionBand'
-import { HudProgress } from '@/components/hud/HudProgress'
-import { HudFacts } from '@/components/hud/HudFacts'
-import { HudHeading, HudText, HudValue } from '@/components/hud/HudTypography'
+import { HudText } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
-import { formatTons } from '@/lib/format'
-import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { destinations, fleets, systems, type Concept, type SelectionKind, type StudyItem } from './fixtures'
+import { CompactTravelCard } from '../CompactTravelCard'
+import { FleetStatusCard } from '@/components/fleet/FleetStatusCard'
+import { fleetFixture, fixtureBurn } from '@/components/fleet/fleet-status-study/fixtures'
 import styles from './travel-study.module.css'
 
 function itemArt(item: StudyItem) {
@@ -85,9 +83,8 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchFleet = useRef<HTMLInputElement>(null)
   const searchDestination = useRef<HTMLInputElement>(null)
-  const fleetTrigger = useRef<HTMLButtonElement>(null)
-  const destinationTrigger = useRef<HTMLButtonElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
+  const [controls, setControls] = useState(true)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   useEffect(() => {
     if (!journey || journey.stopped || journey.elapsed >= 180) return
@@ -103,7 +100,7 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
     setSelecting(kind)
     requestAnimationFrame(() => (kind === 'fleet' ? searchFleet : searchDestination).current?.focus())
   }
-  const back = (kind: SelectionKind) => { setSelecting(null); requestAnimationFrame(() => (kind === 'fleet' ? fleetTrigger : destinationTrigger).current?.focus()) }
+  const back = (kind: SelectionKind) => { setSelecting(null); requestAnimationFrame(() => hostRef.current?.querySelector<HTMLButtonElement>(`[aria-label="Change ${kind}"]`)?.focus()) }
   const choose = (kind: SelectionKind, item: StudyItem) => {
     if (kind === 'fleet') setFleet(item); else setDestination(item)
     back(kind); setRecalculating(true); setError(false)
@@ -111,46 +108,34 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
   }
   const start = () => {
     if (blocked || pending || recalculating) return
-    setPending(true); setError(false)
+    setPending(true); setError(false); setControls(true)
     timer.current = setTimeout(() => {
       timer.current = null; setPending(false)
       if (scenario === 'failure') setError(true)
       else { setStatus(true); setJourney({ elapsed: 0, stopped: false }) }
-      requestAnimationFrame(() => contentRef.current?.focus())
+      requestAnimationFrame(() => hostRef.current?.querySelector<HTMLElement>('[data-slot="hud-content"]')?.focus())
     }, 450)
   }
-  const stop = () => { if (!pending) { setJourney(current => current ? { ...current, stopped: true } : null); requestAnimationFrame(() => contentRef.current?.focus()) } }
-  return <div className={styles.instance} onKeyDown={event => { if (event.key === 'Escape' && selecting) { event.stopPropagation(); back(selecting) } }}>
-    {open ? <HudCardShell title={selecting ? `Choose ${selecting}` : status ? 'Fleet status' : 'Travel review'} lighting="none" className={`${styles.card} ${selecting ? styles.choosing : ''}`} contentClassName={styles.shellContent} onClose={() => { if (selecting) back(selecting); else setOpen(false) }} closeLabel={selecting ? 'Close selector and return to trip' : 'Close travel card'}>
-      {(['fleet', 'destination'] as const).map(kind => <div key={kind} hidden={selecting !== kind} className={styles.chooserHost}><Chooser kind={kind} concept={concept} selected={kind === 'fleet' ? fleet : destination} counterpart={kind === 'fleet' ? destination : fleet} onChoose={item => choose(kind, item)} onBack={() => back(kind)} objective={objective} searchRef={kind === 'fleet' ? searchFleet : searchDestination} /></div>)}
-      <div hidden={!!selecting} className={styles.reviewHost}>
-        <div className={styles.review} ref={contentRef} tabIndex={-1}>
-          <HudBackButton destination={status ? 'trip' : 'map'} disabled={pending} onClick={() => status ? setStatus(false) : setOpen(false)} />
-          {status && journey ? <>
-            <HudHeading size="compact">{fieldName(fleet)}</HudHeading><HudText role="status">{journey.stopped ? 'Stopped · Parked in place' : running ? `Travelling · ${destination.name}` : `Arrived · ${destination.name}`}</HudText>
-            {!journey.stopped && <div className={styles.travelProgress}><HudProgress label="Travel progress" value={journey.elapsed} max={180} /><div className={styles.progressFigures}><HudValue>{Math.floor(journey.elapsed / 180 * 100)}%</HudValue><HudText variant="secondary">{running ? <><HudValue>{180 - journey.elapsed}s</HudValue> remaining</> : 'Arrived'}</HudText></div></div>}
-          </> : <>
-            <div className={styles.identities}>{([['fleet', fleet], ['destination', destination]] as const).map(([kind, item]) => <HudButton key={kind} presentation="row" ref={kind === 'fleet' ? fleetTrigger : destinationTrigger} className={styles.identity} aria-label={`Change ${kind}`} disabled={pending || recalculating || running} onClick={() => openChooser(kind)}>
-              <span className={`hud-type-label ${styles.identityLabel}`}>{kind === 'fleet' ? 'Fleet' : 'Destination'}</span><HudObjectThumbnail kind={itemArt(item)} className={styles.identityArt} /><span className={styles.identityText}><span className="hud-type-compact">{fieldName(item)}</span><span className="hud-type-secondary">{kind === 'fleet' ? item.mining ? 'Mining' : 'Ready' : item.type}{item.system !== 'Solace' ? ` · ${item.system}` : ''}</span></span><HudIcon icon={ChevronDownIcon} size={16} className={styles.identityChevron} />
-            </HudButton>)}</div>
-            {recalculating ? <HudText role="status">Recalculating trip…</HudText> : <HudFacts layout="rows" className={styles.facts} items={[
-              { label: 'Travel time', value: <HudValue>{remote ? '—' : '3m 00s'}</HudValue> }, { label: 'Fuel cost', value: <HudValue>{remote ? '—' : '18 t'}</HudValue> }, { label: 'Fuel aboard', value: <HudValue>{fleet.fuel} t</HudValue> },
-              { label: shortfall ? 'Fuel shortfall' : 'Fuel remaining', value: <HudValue>{remote ? '—' : `${shortfall || (fleet.fuel ?? 0) - 18} t`}</HudValue> }, { label: 'Fuel ceiling', value: <HudValue>{remote ? '—' : formatTons(18 * BURN_FUEL_ALLOWANCE)}</HudValue> },
-            ]} />}
-            {remote && <HudText className={styles.warning} role="status">Inter-system journey · route required.</HudText>}
-            {fleet.mining && <HudText className={styles.warning}>Stop mining before travelling.</HudText>}
-            {shortfall > 0 && <HudText className={styles.warning}>Insufficient fuel. Short by {shortfall} t.</HudText>}
-            {error && <HudText className={styles.warning} role="alert">The order failed. No travel started. Try again.</HudText>}
-          </>}
-        </div>
-        <HudActionBand label={status ? 'Fleet travel actions' : 'Trip actions'} actions={status ? [
-          { id: 'stop', label: 'Stop travel', tone: 'danger', disabled: !running, onClick: stop },
-        ] : [
-          { id: 'start', label: 'Start travel', pending, pendingLabel: 'Starting…', disabled: blocked || recalculating, onClick: start },
-        ]} />
-      </div>
-    </HudCardShell> : <div className={styles.closed}><HudText>Card closed. {running ? 'Travel continues.' : 'No order changed.'}</HudText><HudButton onClick={() => setOpen(true)}>Reopen card</HudButton></div>}
+  const stop = () => { if (!pending) { setJourney(current => current ? { ...current, stopped: true } : null); requestAnimationFrame(() => hostRef.current?.querySelector<HTMLElement>('[data-slot="hud-content"]')?.focus()) } }
+  const wireFleet = (item: StudyItem) => fleetFixture({ id: item.id, name: fieldName(item), systemId: item.system, attachedTo: item.mining ? 'site' : undefined,
+    roster: { ships: [{ class: 'seed' }], cargo: { fuel: item.fuel ?? 0 }, cargoCapacity: Math.max(120, item.fuel ?? 0), freeHold: Math.max(0, 120 - (item.fuel ?? 0)), miningRate: 1 },
+  })
+  const currentFleet = wireFleet(fleet)
+  const worldTime = 1000 + (journey?.elapsed ?? 0) * 1000
+  if (journey && !journey.stopped) currentFleet.state = { Mode: 0, Burn: { ...fixtureBurn, DepartMs: 1000, ArriveMs: 181000 }, Park: null, Drift: null }
+  const blocker = recalculating ? 'Recalculating trip…' : remote ? 'Inter-system journey · route required.' : fleet.mining ? 'Stop mining before travelling.' : shortfall > 0 ? 'Insufficient fuel for this trip.' : running ? 'Travel already committed.' : null
+  return <div className={styles.instance} ref={hostRef} onKeyDown={event => { if (event.key === 'Escape' && selecting) { event.stopPropagation(); back(selecting) } }}>
+    {!open ? <div className={styles.closed}><HudText>Card closed. {running ? 'Travel continues.' : 'No order changed.'}</HudText><HudButton onClick={() => setOpen(true)}>Reopen card</HudButton></div>
+      : selecting ? <HudCardShell title={`Choose ${selecting}`} className={styles.card} contentClassName={styles.shellContent} onClose={() => back(selecting)} closeLabel="Close selector and return to trip">
+        <div className={styles.chooserHost}><Chooser kind={selecting} concept={concept} selected={selecting === 'fleet' ? fleet : destination} counterpart={selecting === 'fleet' ? destination : fleet} onChoose={item => choose(selecting, item)} onBack={() => back(selecting)} objective={objective} searchRef={selecting === 'fleet' ? searchFleet : searchDestination} /></div>
+      </HudCardShell>
+      : status && journey ? <FleetStatusCard className={styles.card} fleet={currentFleet} worldTime={worldTime} scale={1} nameOf={id => id} resolveBody={() => ({ kind: 'feature', type: destination.type, id: destination.id, name: fieldName(destination) })}
+        travelControlsOpen={controls} onTravelControls={() => setControls(true)} onBack={() => setControls(false)} onReviewTravel={() => setStatus(false)} onFocus={() => {}} onRetry={() => {}} onStop={stop} onClose={() => setOpen(false)} notice={journey.stopped ? 'Stopped (fixture).' : undefined} />
+        : <CompactTravelCard className={styles.card} fleet={currentFleet} fleets={fleets.map(wireFleet)} systemId="Solace" destination={fieldName(destination)} destinationKind={itemArt(destination)} worldTime={worldTime} mine={fleet.mining ? { eta: worldTime + 180000 } : null} scale={1}
+          quote={recalculating || remote ? null : { controlPoints: [], departMs: worldTime, arriveMs: worldTime + 180000, deltaV: 24, fuelCostTons: 18, affordable: shortfall === 0, strandingWarning: false }}
+          blocker={blocker} pending={pending} error={error ? 'The order failed. No travel started. Try again.' : null}
+          onFleet={() => {}} onChooseFleet={() => openChooser('fleet')} onChooseDestination={() => openChooser('destination')} onStart={start} onRetry={() => {}} onBack={() => setOpen(false)} onClose={() => setOpen(false)} />}
     {journey && <div className={styles.reviewerTools}><HudButton variant="quiet" onClick={() => { setStatus(true); setOpen(true) }}>Open fleet status</HudButton>{running && <HudButton variant="quiet" onClick={() => setJourney(current => current ? { ...current, elapsed: 180 } : null)}>Simulate arrival</HudButton>}</div>}
-    <HudText variant="caption" className={styles.disclaimer}>Fictional data: 240 fleets, 1,200 destinations. Remote selections test context only; route execution is not part of this preview.</HudText>
+    <HudText variant="caption" className={styles.disclaimer}>Production presentation with fictional data and simulated callbacks. Chooser concepts remain under comparison.</HudText>
   </div>
 }

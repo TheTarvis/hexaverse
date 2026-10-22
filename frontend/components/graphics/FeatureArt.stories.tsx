@@ -1,3 +1,4 @@
+import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { useMemo } from 'react'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import * as THREE from 'three'
@@ -26,13 +27,13 @@ function FeatureReview({ kind = 'ruin', comparison = false, animate = true, comp
   }, [kind, comparison, compact])
   return <div style={{ background: '#080e19', minHeight: compact ? 0 : '100dvh', color: '#d6e2ef' }}>
     <WebGPUCanvas label={comparison ? 'Feature art comparison' : kind} createScene={createScene} animate={animate} style={{ height: compact ? 380 : '90dvh', width: '100%' }} />
-    <p style={{ padding: '0 20px' }}>{comparison ? 'Back row: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.' : kind}</p>
+    <HudText className="px-5">{comparison ? 'Back row: anomaly · ruin · nebula. Front row: gravity well · debris · radiation.' : kind}</HudText>
   </div>
 }
 
 const meta = {
-  title: 'Graphics/Feature Art', component: FeatureReview,
-  parameters: { layout: 'fullscreen' },
+  id: 'graphics-feature-art', title: 'Graphics/Feature models', tags: ['catalog'], component: FeatureReview,
+  parameters: { catalog: { purpose: 'scene', status: 'reference', record: 'docs/art-direction.md' }, layout: 'fullscreen' },
   args: { kind: 'ruin', comparison: false, animate: true },
   argTypes: { kind: { control: 'select', options: kinds } },
 } satisfies Meta<typeof FeatureReview>
@@ -50,6 +51,7 @@ export const ReducedMotion: Story = { args: { kind: 'anomaly', animate: false } 
 
 
 export const RuinCandidate: Story = {
+  parameters: { catalog: { status: 'comparison', question: 'Does the generated ruin fit the shared manufactured art direction?' } },
   render: () => <div style={{ background: '#080e19', minHeight: '100dvh' }}>
     <WebGPUModelView src="/models/space/ruin-candidate.glb" label="Generated ruin candidate — raw materials" view="three-quarter" style={{ height: '100dvh', width: '100%' }} />
   </div>,
@@ -57,26 +59,28 @@ export const RuinCandidate: Story = {
 
 /** Same reusable light rig; each model is independently fitted for material/silhouette review. */
 export const RuinProductionComparison: Story = {
+  parameters: { catalog: { status: 'comparison', question: 'Which ruin silhouette and material treatment should replace the current model?' } },
   render: () => <div style={{ background: '#080e19', color: '#d6e2ef', minHeight: '100dvh', padding: 16 }}>
-    <h1 style={{ fontSize: 20, marginBottom: 12 }}>Ruin production review</h1>
-    <p>Compare architectural silhouette, light gray plating, graphite recesses and sparse amber accents against the accepted gate. Raw candidate materials are preserved. No world replacement is implied.</p>
+    <HudHeading level={1} size="compact">Ruin production review</HudHeading>
+    <HudText>Compare architectural silhouette, light gray plating, graphite recesses and sparse amber accents against the accepted gate. Raw candidate materials are preserved. No world replacement is implied.</HudText>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16, marginTop: 20 }}>
-      <section><h2>Local procedural ruin</h2><FeatureReview kind="ruin" animate={false} compact /></section>
-      <section><h2>Generated ruin candidate</h2><WebGPUModelView src="/models/space/ruin-candidate.glb" label="Generated ruin candidate" view="three-quarter" style={{ height: 380 }} /></section>
-      <section><h2>Accepted lane gate</h2><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
+      <section><HudHeading variant="section">Local procedural ruin</HudHeading><FeatureReview kind="ruin" animate={false} compact /></section>
+      <section><HudHeading variant="section">Generated ruin candidate</HudHeading><WebGPUModelView src="/models/space/ruin-candidate.glb" label="Generated ruin candidate" view="three-quarter" style={{ height: 380 }} /></section>
+      <section><HudHeading variant="section">Accepted lane gate</HudHeading><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
     </div>
   </div>,
 }
 
 /** Local authored candidates, shared preview lighting and independent framing. */
 export const ManufacturedFamilyReview: Story = {
+  parameters: { catalog: { status: 'comparison', question: 'Do the ruin and debris silhouettes read consistently beside the accepted gate?' } },
   render: () => <div style={{ background: '#080e19', color: '#d6e2ef', minHeight: '100dvh', padding: 16 }}>
-    <h1 style={{ fontSize: 20, marginBottom: 12 }}>Manufactured family review</h1>
-    <p>Compare the broken architectural spine and detached hull sections against the accepted gate: broad gray armor, graphite structure, sparse amber details and readable negative space.</p>
+    <HudHeading level={1} size="compact">Manufactured family review</HudHeading>
+    <HudText>Compare the broken architectural spine and detached hull sections against the accepted gate: broad gray armor, graphite structure, sparse amber details and readable negative space.</HudText>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16, marginTop: 20 }}>
-      <section><h2>Fractured ruin</h2><FeatureReview kind="ruin" animate={false} compact /></section>
-      <section><h2>Separated hull debris</h2><FeatureReview kind="debris" animate={false} compact /></section>
-      <section><h2>Accepted lane gate</h2><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
+      <section><HudHeading variant="section">Fractured ruin</HudHeading><FeatureReview kind="ruin" animate={false} compact /></section>
+      <section><HudHeading variant="section">Separated hull debris</HudHeading><FeatureReview kind="debris" animate={false} compact /></section>
+      <section><HudHeading variant="section">Accepted lane gate</HudHeading><WebGPUModelView src="/models/space/lane-gate.glb" label="Accepted open lane gate" animation="Open" progress={1} playing={false} createEffect={createLaneGatePortal} view="three-quarter" style={{ height: 380 }} /></section>
     </div>
   </div>,
 }

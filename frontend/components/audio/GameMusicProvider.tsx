@@ -14,6 +14,8 @@ interface GameMusic {
   musicOn: boolean
   waitingForInteraction: boolean
   volume: number
+  playInBackground: boolean
+  setPlayInBackground: (allow: boolean) => void
   ready: boolean
   error: string
   play: () => void
@@ -37,6 +39,8 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
   const blockedRef = useRef(false)
   const [index, setIndex] = useState(0)
   const [volume, updateVolume] = useState(0.35)
+  const [playInBackground, setPlayInBackground] = useState(false)
+  const playInBackgroundRef = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [musicOn, setMusicOn] = useState(true)
   const [waitingForInteraction, setWaitingForInteraction] = useState(false)
@@ -45,7 +49,7 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
 
   const persist = useCallback(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ trackId: GAME_MUSIC_TRACKS[indexRef.current].id, volume: volumeRef.current, musicOn: musicOnRef.current }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ trackId: GAME_MUSIC_TRACKS[indexRef.current].id, volume: volumeRef.current, musicOn: musicOnRef.current, playInBackground: playInBackgroundRef.current }))
     } catch { /* Music remains usable when storage is unavailable. */ }
   }, [])
 
@@ -74,6 +78,10 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
           musicOnRef.current = preferences.musicOn
           setMusicOn(preferences.musicOn)
         }
+        if (typeof preferences.playInBackground === 'boolean') {
+          playInBackgroundRef.current = preferences.playInBackground
+          setPlayInBackground(preferences.playInBackground)
+        }
         const savedIndex = GAME_MUSIC_TRACKS.findIndex(track => track.id === preferences.trackId)
         if (savedIndex >= 0) { indexRef.current = savedIndex; setIndex(savedIndex) }
         if (typeof preferences.volume === 'number' && Number.isFinite(preferences.volume) && preferences.volume >= 0 && preferences.volume <= 1) {
@@ -96,7 +104,7 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
 
   const start = useCallback((next: number, automatic = false) => {
     const element = audio.current
-    if (!element || !enabled || !ready || document.hidden || automatic && !musicOnRef.current) return
+    if (!element || !enabled || !ready || (document.hidden && !playInBackgroundRef.current) || (automatic && !musicOnRef.current)) return
     if (!automatic) { musicOnRef.current = true; setMusicOn(true) }
     blockedRef.current = false
     setWaitingForInteraction(false)
@@ -126,15 +134,18 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
 
   useEffect(() => {
     if (!enabled || !ready) { suspend(); return }
-    const resume = () => { if (!document.hidden && musicOnRef.current) start(indexRef.current, true) }
+    const resume = () => { if ((!document.hidden || playInBackgroundRef.current) && musicOnRef.current) start(indexRef.current, true) }
     const unlock = (event: Event) => {
       // Music controls own their explicit Play/Pause actions, including turning
       // music off before the browser has allowed the first playback.
       if (event.target instanceof Element && event.target.closest('[data-music-controls]')) return
       if (blockedRef.current) resume()
     }
-    const onVisibility = () => { if (document.hidden) suspend(); else resume() }
-    resume()
+    const onVisibility = () => {
+      if (playInBackgroundRef.current) return
+      if (document.hidden) suspend(); else resume()
+    }
+    if (document.hidden && !playInBackground) suspend(); else resume()
     document.addEventListener('click', unlock, true)
     document.addEventListener('keydown', unlock, true)
     document.addEventListener('visibilitychange', onVisibility)
@@ -143,7 +154,7 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
       document.removeEventListener('keydown', unlock, true)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [enabled, ready, start, suspend])
+  }, [enabled, ready, playInBackground, start, suspend])
 
   const setVolume = useCallback((value: number) => {
     if (!Number.isFinite(value)) return
@@ -162,7 +173,12 @@ export function GameMusicProvider({ children, enabled = true }: { children: Reac
       const selected = GAME_MUSIC_TRACKS.findIndex(track => track.id === id)
       if (selected >= 0) start(selected)
     },
-    setVolume,
+    setVolume, playInBackground,
+    setPlayInBackground: allow => {
+      playInBackgroundRef.current = allow
+      setPlayInBackground(allow)
+      persist()
+    },
   }}>
     <audio ref={audio} preload="none" aria-hidden="true" data-testid="game-music-audio"
       onPlay={() => {
