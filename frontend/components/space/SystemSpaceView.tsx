@@ -29,7 +29,7 @@ import { useSubmitGuard } from '@/hooks/use-submit-guard'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { burnErrorCopy, commandErrorReason, isQuotedCapExceeded } from '@/lib/rejection-copy'
 import { jumpErrorCopy } from '@/lib/jump-copy'
-import { CompactTravelActions, CompactTravelCard, type CompactTravelCardProps } from './CompactTravelCard'
+import { CompactTravelActions, CompactTravelCard, travelCardTitle, type CompactTravelCardProps } from './CompactTravelCard'
 import { FleetStatusActions, FleetStatusContent, type FleetStatusProps } from '@/components/fleet/FleetStatusCard'
 import { useMarketBoard, useStation } from '@/hooks/use-market'
 import { useReducedMotion } from '@/hooks/use-reduced-motion'
@@ -1113,7 +1113,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         className={commandStyles.workspace}
         request={hudRequest}
         panels={[
-          { id: 'objects', label: 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), footer: travelCard ? <CompactTravelActions {...travelCard.props} /> : undefined, children: (
+          { id: 'objects', label: 'Objects', title: travelCard ? travelCardTitle(travelCard.props) : 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), footer: travelCard ? <CompactTravelActions {...travelCard.props} /> : undefined, children: (
       <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%' }}>
         <SystemObjectIndex
           listActions={!travelReviewOpen && <div className={commandStyles.objectActions}>

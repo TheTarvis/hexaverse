@@ -1,7 +1,5 @@
 .stage { min-height: 100dvh; padding: 28px; background: #050e17; color: var(--hud-type-body); }
 .intro { display: grid; gap: 8px; max-width: 76ch; }
-.controls { display: flex; margin-block: 24px 28px; }
-.controls label { display: grid; gap: 8px; width: 180px; }
 .example { min-width: 0; max-width: 440px; }
 .card { width: 100%; }
 .figures { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }

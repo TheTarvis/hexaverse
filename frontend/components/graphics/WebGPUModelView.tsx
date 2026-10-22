@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { WebGPUCanvas, type CanvasSceneFactory } from './WebGPUCanvas'
 import { addPreviewLights } from './scene-resources'
+import { ModelPreviewLayout } from './ModelPreviewLayout'
 
 export type ModelViewAngle = 'three-quarter' | 'front' | 'back' | 'side'
 export interface ModelViewEffect {
@@ -34,6 +35,7 @@ export function WebGPUModelView({ src, label, view = 'three-quarter', animation,
   const settings = useRef({ view, animation, progress, playing, wireframe })
   settings.current = { view, animation, progress, playing, wireframe }
   const invalidate = useRef<() => void>(() => {})
+  const reset = useRef<() => void>(() => {})
   const createScene = useCallback<CanvasSceneFactory>(async context => {
     const gltf = await new GLTFLoader().loadAsync(src)
     const scene = new THREE.Scene()
@@ -77,6 +79,8 @@ export function WebGPUModelView({ src, label, view = 'three-quarter', animation,
       controls.target.set(0, 0, 0)
       controls.update()
     }
+    const resetView = () => { fit(); context.invalidate() }
+    reset.current = resetView
     return {
       scene, camera,
       resize(w, h) { width = w; height = h; fit() },
@@ -111,6 +115,7 @@ export function WebGPUModelView({ src, label, view = 'three-quarter', animation,
         }
       },
       dispose() {
+        if (reset.current === resetView) reset.current = () => {}
         controls.removeEventListener('change', context.invalidate)
         controls.dispose()
         mixer.stopAllAction()
@@ -119,5 +124,7 @@ export function WebGPUModelView({ src, label, view = 'three-quarter', animation,
     }
   }, [src, createEffect])
   useEffect(() => { invalidate.current() }, [view, animation, progress, playing, wireframe])
-  return <WebGPUCanvas label={label} createScene={createScene} animate={playing || !!createEffect} className={className} style={style} />
+  return <ModelPreviewLayout className={className} style={style} onReset={() => reset.current()}>
+    <WebGPUCanvas label={label} createScene={createScene} animate={playing || !!createEffect} />
+  </ModelPreviewLayout>
 }

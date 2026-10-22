@@ -99,7 +99,7 @@ export const HudSelect = forwardRef<HTMLSelectElement, ComponentPropsWithoutRef<
 
 type HudBackButtonProps = Omit<HudButtonProps, 'children' | 'presentation' | 'appearance' | 'shape' | 'variant' | 'tone' | 'className'> & { destination: string }
 
-/** Place first at the top-left of the view being left; Back never occupies an action band. */
+/** Standalone labeled navigation. Card tasks use HudCardBack in their owning frame. */
 export const HudBackButton = forwardRef<HTMLButtonElement, HudBackButtonProps>(function HudBackButton({ destination, ...props }, ref) {
   return <HudButton {...props} ref={ref} presentation="chrome" className={styles.backButton} data-hud-back>
     <HudIcon icon={ArrowLeftIcon} size={20} /><span>Back to {destination}</span>

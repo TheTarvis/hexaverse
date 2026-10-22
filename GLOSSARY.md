@@ -64,6 +64,22 @@ _Avoid_: Fleet (when referring to an individual ship).
 **[Fleet](docs/domains/ships-and-fleets.md)**:
 Corporation-owned group of one or more ships that travels and acts together.
 
+**[Fleet relationship](docs/domains/ships-and-fleets.md)**:
+A fleet’s ownership or relationship category relative to the observing corporation.
+
+**[Owned fleet](docs/domains/ships-and-fleets.md)**:
+A fleet belonging to the observing corporation.
+
+**[Friendly fleet](docs/domains/ships-and-fleets.md)**:
+A fleet belonging to another corporation considered friendly by the observing corporation.
+
+**[Enemy fleet](docs/domains/ships-and-fleets.md)**:
+A fleet belonging to another corporation considered hostile by the observing corporation.
+
+**[Unknown burn](docs/domains/sensors-and-stealth.md)**:
+An observed burn that has not been analyzed; the source’s identity and allegiance are unknown.
+_Avoid_: Unknown relationship (when referring to an unanalyzed burn).
+
 **[Command fleet](docs/domains/ships-and-fleets.md)**:
 Owned fleet currently chosen to receive the player's commands; inspecting another object does not change this choice.
 

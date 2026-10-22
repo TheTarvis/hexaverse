@@ -1,15 +1,31 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test'
 import clsx from 'clsx'
-import { HudBackButton } from './HudControls'
 import { HudHeading, HudText } from './HudTypography'
-import { HudCardShell, type HudCardShellProps } from './HudCardShell'
+import { HudCardBack, HudCardShell, type HudCardShellProps } from './HudCardShell'
+import { HudActionBand } from './HudActionBand'
 import styles from './hud-card-shell.stories.module.css'
 import originalChrome from './__fixtures__/original-card-chrome.json'
 
 type StoryArgs = HudCardShellProps & {
   showClose: boolean
+  showBack: boolean
   showContentBounds: boolean
+  mobileOverflow?: boolean
+}
+
+function ShellExample({ showClose, showBack, showContentBounds, onClose, contentClassName, mobileOverflow, children, ...args }: StoryArgs) {
+  return (
+    <HudCardShell
+      {...args}
+      {...(showClose && onClose ? { onClose } : {})}
+      contentClassName={clsx(contentClassName, showContentBounds && styles.contentBounds)}
+    >
+      {showBack && <HudCardBack destination="objects" onClick={fn()} />}
+      {children}
+      {mobileOverflow && Array.from({ length: 12 }, (_, index) => <HudText key={index}>Detail group {index + 1} · Additional settings and explanations inside the scrolling card body.</HudText>)}
+    </HudCardShell>
+  )
 }
 
 const meta = {
@@ -22,6 +38,7 @@ const meta = {
     onClose: fn(),
     closeLabel: 'Close inspector',
     showClose: true,
+    showBack: true,
     showContentBounds: false,
     lighting: 'signal',
     paused: false,
@@ -30,6 +47,7 @@ const meta = {
   argTypes: {
     title: { control: 'text' },
     showClose: { control: 'boolean' },
+    showBack: { control: 'boolean' },
     showContentBounds: { control: 'boolean' },
     lighting: { control: 'radio', options: ['signal', 'none'] },
     paused: { control: 'boolean' },
@@ -41,19 +59,30 @@ const meta = {
   decorators: [
     (Story) => <div className={clsx('dark', styles.stage)}><Story /></div>,
   ],
-  render: ({ showClose, showContentBounds, onClose, contentClassName, ...args }) => (
-    <HudCardShell
-      {...args}
-      {...(showClose && onClose ? { onClose } : {})}
-      contentClassName={clsx(contentClassName, showContentBounds && styles.contentBounds)}
-    />
-  ),
+  render: args => <ShellExample {...args} />,
 } satisfies Meta<StoryArgs>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
 export const Tall: Story = {}
+
+/** Isolated card foundation; workspace navigation is deliberately not composed here. */
+export const Mobile: Story = {
+  globals: { viewport: { value: 'phoneFit', isRotated: false } },
+  args: {
+    title: 'Card foundation', showClose: true, mobileOverflow: false,
+    className: styles.mobileCard,
+    style: { width: '100%', height: '100%' },
+    footer: <HudActionBand actions={[{ id: 'apply', label: 'Apply changes', onClick: fn() }]} />,
+    children: <><HudHeading variant="section">Scrolling body</HudHeading><HudText>Card content sits between the shared header and action footer.</HudText><HudText variant="secondary">The header and footer stay reachable while this body scrolls.</HudText></>,
+  },
+  argTypes: {
+    mobileOverflow: { name: 'Overflowing content', control: 'boolean' },
+    header: { control: false }, footer: { control: false }, style: { control: false },
+  },
+  parameters: { docs: { description: { story: 'The shared card at 414px phone width and the available Storybook canvas height, so header/body/footer fit above the Controls panel. This is a responsive phone-width specimen, not a fixed 414×896 device capture. No workspace panel tabs or Return to map toolbar. Toggle overflow in Storybook Controls. Workspace mobile navigation remains a separate design review.' } } },
+}
 
 // Plain is the standard empty card, including its shared signal lighting.
 export const Plain: Story = {
@@ -78,6 +107,7 @@ export const Headerless: Story = {
     title: '',
     'aria-label': 'Quick actions',
     showClose: false,
+    showBack: false,
     style: { width: 560, maxWidth: '100%', minHeight: 88 },
   },
 }
@@ -89,9 +119,16 @@ export const Narrow: Story = {
 }
 
 export const LongTitle: Story = {
+  parameters: { docs: { description: { story: 'Shared title overflow: the plaque keeps its lettering size and pans overflowing text with pauses at each end. Hover pauses movement; reduced-motion uses static ellipsis. This uses the same shell as every other card.' } } },
   args: {
     title: 'An exceptionally long inspected object title',
   },
+}
+
+export const TaskTitle: Story = {
+  args: { title: { fleet: 'Peregrine', action: 'travel', object: 'Nereid outer belt' } },
+  argTypes: { title: { control: 'object' } },
+  parameters: { docs: { description: { story: 'Task cards supply fleet, action and object as structured title data. The shell owns wording and overflow. Remove fleet to preview entry before selection; change action between travel and mining to preview the shared wording policy.' } } },
 }
 
 export const ScrollingContent: Story = {
@@ -126,51 +163,21 @@ export const ScrollingContent: Story = {
 }
 
 export const SizeComparison: Story = {
-  render: ({ showClose, showContentBounds, onClose, lighting = 'signal', paused = false }) => {
-    const closeProps = showClose && onClose ? { onClose } : {}
-    const contentClassName = showContentBounds ? styles.contentBounds : ''
-
-    return (
-      <div className={styles.comparison}>
-        <HudCardShell
-          title="Inspector"
-          lighting={lighting}
-          paused={paused}
-          {...closeProps}
-          closeLabel="Close inspector"
-          contentClassName={contentClassName}
-          className={styles.tall}
-        />
-        <div className={styles.stack}>
-          <HudCardShell
-            title="Travel review"
-            lighting={lighting}
-            paused={paused}
-            {...closeProps}
-            closeLabel="Close travel review"
-            contentClassName={contentClassName}
-            className={styles.wide}
-          />
-          <HudCardShell
-            aria-label="Quick actions"
-            lighting={lighting}
-            paused={paused}
-            contentClassName={contentClassName}
-            className={styles.strip}
-          />
-        </div>
-      </div>
-    )
-  },
+  render: ({ style: _style, className: _className, ...args }) => <div className={styles.comparison}>
+    <ShellExample {...args} title="Inspector" closeLabel="Close inspector" className={styles.tall} />
+    <div className={styles.stack}>
+      <ShellExample {...args} title="Travel review" closeLabel="Close travel review" className={styles.wide} />
+      <ShellExample {...args} title="" aria-label="Quick actions" showBack={false} showClose={false} className={styles.strip} />
+    </div>
+  </div>,
   args: { showContentBounds: true },
 }
 
 export const NestedSections: Story = {
-  args: { title: 'Command', style: { width: 360, height: 520 } },
-  render: args => <HudCardShell {...args}>
+  args: { title: 'Command', style: { width: 360, height: 520 }, children: <>
     <HudCardShell title="Fleet actions"><HudHeading size="compact">Peregrine</HudHeading><HudText variant="secondary">Mining metals · 40 t free hold</HudText></HudCardShell>
     <HudCardShell title="Travel review"><HudText>One owning frame; travel and action sections retain their own meaning and controls.</HudText></HudCardShell>
-  </HudCardShell>,
+  </> },
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelectorAll('[data-hud-framing="frame"]')).toHaveLength(1)
     await expect(canvasElement.querySelectorAll('[data-hud-framing="section"]')).toHaveLength(2)
@@ -183,7 +190,7 @@ export const OriginalChromeAlignment: Story = {
   args: {
     title: 'Objects',
     paused: true,
-    children: <><HudBackButton destination="objects" /><p>Back is an independent content action. The close control occupies only the right side of the header.</p></>,
+    children: <p>Back and Close share one inset header; the plaque retains the title.</p>,
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
@@ -192,8 +199,11 @@ export const OriginalChromeAlignment: Story = {
     const center = (element: Element) => { const bounds = element.getBoundingClientRect(); return bounds.left + bounds.width / 2 }
     await expect(Math.abs(center(title) - center(card))).toBeLessThan(1)
     const close = canvas.getByRole('button', { name: 'Close inspector' })
-    await expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(close.getBoundingClientRect().left)
-    for (const [node, expected] of [[title, originalChrome.title], [close, originalChrome.close], [close.querySelector('svg')!, originalChrome.icon]] as const) {
+    const back = canvas.getByRole('button', { name: 'Back to objects' })
+    await expect(close.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
+    await expect(back.getBoundingClientRect().top).toBeCloseTo(close.getBoundingClientRect().top, 0)
+    await expect(close.getBoundingClientRect().right).toBeLessThan(card.getBoundingClientRect().right)
+    for (const [node, expected] of [[title, originalChrome.title]] as const) {
       const computed = getComputedStyle(node)
       for (const [property, value] of Object.entries(expected)) await expect(computed[property as keyof CSSStyleDeclaration]).toBe(value)
     }

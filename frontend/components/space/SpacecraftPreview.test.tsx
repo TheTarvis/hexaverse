@@ -65,6 +65,7 @@ describe('SpacecraftPreview controls and lifecycle', () => {
     expect(parent).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Reset view' }))
     expect(c.reset).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Reset view' })).not.toHaveTextContent('Reset view')
     await userEvent.tab()
     expect(screen.getByRole('button', { name: 'Next detail control' })).toHaveFocus()
     parent.mockClear() // Tab intentionally bubbles to preserve ordinary navigation.
@@ -86,6 +87,10 @@ describe('SpacecraftPreview controls and lifecycle', () => {
     fireEvent.click(control); fireEvent.wheel(control, { deltaY: 20 })
     expect(map).not.toHaveBeenCalled()
     expect(control.style.touchAction || getComputedStyle(control).touchAction).toBe('none')
+    await userEvent.click(screen.getByRole('button', { name: 'Reset view' }))
+    expect(c.reset).toHaveBeenCalledTimes(1)
+    expect(c.rotate).toHaveBeenCalledTimes(1)
+    expect(map).not.toHaveBeenCalled()
   })
   it('Scenario: Delayed preview load / Failed asset or unavailable rendering — status scoped to preview', async () => {
     const Preview = await component()

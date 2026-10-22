@@ -119,14 +119,14 @@
 
 /* One shared card owns each panel's chrome and scrolling. */
 .panelCard { flex: 1; width: 100%; min-height: 0; max-height: 100%; }
-.panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: 24px 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
+.panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: max(24px, var(--hud-navigation-inset, 0px)) 16px 16px; gap: 16px; overflow: auto; overscroll-behavior: contain; }
 .panelCard [data-hud-framing='section'] { flex: 0 0 auto; max-height: none; }
 .cardNavigation { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(44px, 56px); width: max-content; max-width: 100%; box-sizing: border-box; gap: 12px; padding: 0; margin-inline: auto; border: 0; background: transparent; pointer-events: auto; }
 .workspace .cardNavigation :is(button, a) { width: 100%; min-width: 44px; max-width: 56px; height: 48px; min-width: 44px; min-height: 44px; padding: 12px; border-radius: 0; }
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .workspace[data-mobile-open='true'] .stage { padding: calc(18px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); box-sizing: border-box; }
   .workspace[data-mobile-open='true'] .recovery[hidden] { display: none; }
-  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: 24px 12px 12px; }
+  .workspace[data-mobile-open='true'] .panelCard > [data-slot='hud-body'] > :is([data-slot='hud-footer-layout'], [data-slot='hud-content-layout']) > .panelContent { padding: max(24px, var(--hud-navigation-inset, 0px)) 12px 12px; }
   .workspace[data-mobile-open='true'] .panelContent > div { flex: 0 0 auto; height: auto; }
   .workspace[data-mobile-open='true'] .panelContent [data-hud-framing='section'] { flex: 0 0 auto; overflow: visible; }
   .workspace[data-mobile-open='true'] .settings { padding-top: calc(18px + env(safe-area-inset-top)); }
@@ -155,7 +155,3 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .cardNavigation { gap: 8px; }
 }
-
-/* Phone dismissal is a labeled map handoff above the persistent panel tabs. */
-.phoneToolbar { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; min-width: 0; }
-.phoneToolbar > button { align-self: flex-start; min-height: 44px; padding: 8px 12px; }

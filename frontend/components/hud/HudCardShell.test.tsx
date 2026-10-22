@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HudCardShell } from './HudCardShell'
+import { HudCardBack, HudCardShell } from './HudCardShell'
 
 const renderer = vi.hoisted(() => ({
   failInit: false,
@@ -25,6 +25,33 @@ vi.mock('@/components/render-guard/renderer-candidate', () => ({
 
 let frames: Map<number, FrameRequestCallback>
 let motion: EventTarget & { matches: boolean }
+
+it('measures shared title overflow again on resize and keeps the full accessible title', () => {
+  let resize = () => {}
+  const disconnect = vi.fn()
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { resize = callback }
+    observe() {}
+    disconnect = disconnect
+  })
+  const title = 'Peregrine · Mining at Nereid outer belt'
+  const { unmount } = render(<HudCardShell title={{ fleet: 'Peregrine', action: 'mining', object: 'Nereid outer belt' }} lighting="none" />)
+  const heading = screen.getByRole('heading', { name: title })
+  const viewport = heading.firstElementChild!
+  const text = viewport.firstElementChild!
+  let available = 180
+  Object.defineProperty(viewport, 'clientWidth', { get: () => available })
+  Object.defineProperty(text, 'scrollWidth', { get: () => 360 })
+  act(() => resize())
+  expect(heading).toHaveAttribute('data-scrolling', 'true')
+  expect(heading.style.getPropertyValue('--title-travel')).toBe('-180px')
+  available = 420
+  act(() => resize())
+  expect(heading).toHaveAttribute('data-scrolling', 'false')
+  expect(heading).toHaveAttribute('title', title)
+  unmount()
+  expect(disconnect).toHaveBeenCalledOnce()
+})
 
 beforeEach(() => {
   renderer.entries = []
@@ -143,6 +170,27 @@ it('allows detached overlays to explicitly own a frame and respects an explicit 
   expect(screen.getByRole('region', { name: 'Fleet details' })).toHaveAttribute('data-hud-framing', 'frame')
 })
 
+it('puts nested task Back beside the owning frame Close and preserves its disabled guard', () => {
+  const back = vi.fn(), close = vi.fn()
+  const card = (disabled: boolean) => <HudCardShell title="Objects" lighting="none" onClose={close}>
+    <HudCardShell title="Travel"><HudCardBack destination="objects" onClick={back} disabled={disabled} /><input aria-label="Trip draft" defaultValue="Keep" /></HudCardShell>
+  </HudCardShell>
+  const view = render(card(false))
+  const control = screen.getByRole('button', { name: 'Back to objects' })
+  const navigation = control.closest('[data-slot="hud-card-navigation"]')!
+  expect(navigation).toContainElement(screen.getByRole('button', { name: 'Close card' }))
+  expect(screen.getByLabelText('Trip draft').closest('[data-slot="hud-content"]')).not.toContainElement(control)
+  fireEvent.click(control)
+  expect(back).toHaveBeenCalledOnce()
+  view.rerender(card(true))
+  expect(screen.getByRole('button', { name: 'Back to objects' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Back to objects' }))
+  expect(back).toHaveBeenCalledOnce()
+  fireEvent.click(screen.getByRole('button', { name: 'Close card' }))
+  expect(close).toHaveBeenCalledOnce()
+  expect(screen.getByLabelText('Trip draft')).toHaveValue('Keep')
+})
+
 
 it('keeps mobile dismissal and navigation outside its content scroll viewport', () => {
   const close = vi.fn()
@@ -152,6 +200,21 @@ it('keeps mobile dismissal and navigation outside its content scroll viewport', 
   expect(content).not.toContainElement(screen.getByRole('navigation', { name: 'Panels' }))
   fireEvent.click(screen.getByRole('button', { name: 'Close card' }))
   expect(close).toHaveBeenCalledOnce()
+})
+
+it('keeps header and footer outside scrolling content without remounting a draft when slots change', () => {
+  const draft = <input aria-label="Mining quantity" defaultValue="24" />
+  const view = render(<HudCardShell title="Mining" lighting="none">{draft}</HudCardShell>)
+  const input = screen.getByLabelText('Mining quantity')
+  fireEvent.change(input, { target: { value: '48' } })
+  view.rerender(<HudCardShell title="Mining" lighting="none" header={<nav aria-label="Mining navigation">Back to resource</nav>} footer={<button>Start mining</button>}>{draft}</HudCardShell>)
+  const content = input.closest('[data-slot="hud-content"]')!
+  expect(content).not.toContainElement(screen.getByRole('navigation', { name: 'Mining navigation' }))
+  expect(content).not.toContainElement(screen.getByRole('button', { name: 'Start mining' }))
+  expect(screen.getByLabelText('Mining quantity')).toBe(input)
+  view.rerender(<HudCardShell title="Mining" lighting="none" header="Mining started">{draft}</HudCardShell>)
+  expect(screen.getByLabelText('Mining quantity')).toBe(input)
+  expect(input).toHaveValue('48')
 })
 
 it('bounds submissions for multiple visible owners and releases all renderers on departure', async () => {

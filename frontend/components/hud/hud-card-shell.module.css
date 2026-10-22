@@ -93,7 +93,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   box-sizing: border-box;
-  max-width: calc(100% - 112px);
+  max-width: calc(100% - 72px);
   margin: 0;
   padding: 4px 19px;
   background: linear-gradient(120deg, #7493a8, #314a5f 55%, #6d8a9e);
@@ -120,33 +120,6 @@
   white-space: nowrap;
 }
 
-.shell .close {
-  position: absolute;
-  z-index: 2;
-  top: -10px;
-  right: -10px;
-  width: 28px;
-  height: 28px;
-  min-width: 0;
-  min-height: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #b1edff;
-  cursor: pointer;
-}
-
-.shell .close svg {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  color: inherit;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 3px rgb(44 194 255 / 65%));
-}
-
-
 .body {
   position: relative;
   display: flex;
@@ -166,7 +139,7 @@
   gap: 16px;
   min-width: 0;
   min-height: 0;
-  padding: calc(var(--hud-content-padding) - var(--hud-frame-width)) calc(var(--hud-content-side-padding) - var(--hud-frame-width));
+  padding: max(calc(var(--hud-content-padding) - var(--hud-frame-width)), var(--hud-navigation-inset, 0px)) calc(var(--hud-content-side-padding) - var(--hud-frame-width));
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: #435d70 #0b1621;
@@ -201,21 +174,34 @@
   .shell input, .shell select, .shell textarea { font-size: max(var(--hud-input-phone-font-size), 1rem); line-height: 1.5; }
 }
 
-/* Original 624c4ff chrome stays identical on every viewport. The existing
-   Catalyst target expands invisibly toward the card interior, where it fits. */
-.shell .close > span[aria-hidden='true'] {
-  display: block;
-  width: 44px;
-  height: 44px;
-  top: 50%;
-  left: auto;
-  right: 0;
-  translate: none;
-  transform: translateY(-50%);
-}
-
 /* The clipped layout owns the lower corners; only its content region scrolls. */
 .contentLayout { display: contents; }
 .footerLayout { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .footerLayout > .content { clip-path: none; }
 .footer { flex: 0 0 auto; min-width: 0; }
+.header { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; min-width: 0; padding: 16px 11px 12px; border-bottom: 1px solid var(--hud-control-border); }
+
+/* Accepted across desktop and phone: inset navigation, plaque title, no header strip. */
+.navigation { position: absolute; top: 9px; left: 16px; right: 16px; z-index: 2; display: flex; align-items: center; justify-content: space-between; min-height: 44px; pointer-events: none; }
+.navigation :is(button, a) { pointer-events: auto; }
+.backHost { display: flex; min-width: 0; }
+.shell:has(> .navigation button) { --hud-navigation-inset: 56px; }
+.content:has(> [data-slot='model-preview']:first-child),
+.content:has(> [data-slot='hud-section']:first-child > [data-slot='model-preview']:first-child) { --hud-navigation-inset: 0px; }
+.shell:has(> .navigation button) > .body > :is(.contentLayout, .footerLayout) > .header { padding-top: 56px; }
+.header + .content { --hud-navigation-inset: 0px; }
+
+/* Shared plaque overflow: retain lettering and pan only when content exceeds it. */
+.scrollingTitle .titleViewport { overflow: hidden; text-overflow: ellipsis; }
+.scrollingTitle .titleText { width: max-content; overflow: visible; }
+.scrollingTitle[data-scrolling='true'] .titleText {
+  animation: titleTravel var(--title-duration) linear infinite;
+}
+.scrollingTitle:is(:hover, :focus-within, [data-paused='true']) .titleText { animation-play-state: paused; }
+@keyframes titleTravel {
+  0%, 18%, 100% { transform: translateX(0); }
+  48%, 66% { transform: translateX(var(--title-travel)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrollingTitle[data-scrolling='true'] .titleText { animation: none; width: auto; overflow: hidden; text-overflow: ellipsis; }
+}

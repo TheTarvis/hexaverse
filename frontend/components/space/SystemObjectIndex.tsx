@@ -1,12 +1,14 @@
 'use client'
 
+import { HudCardBack } from '@/components/hud/HudCardShell'
+
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { planetKind } from './webgl/scene-art'
 import { SpacecraftPreview } from './SpacecraftPreview'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { HudBackButton, HudButton } from '@/components/hud/HudControls'
+import { HudButton } from '@/components/hud/HudControls'
 import { Input } from '@/components/catalyst/input'
 import styles from './system-object-index.module.css'
 
@@ -137,7 +139,7 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         {inspectorBody}
         {servicesWithoutDetails && !detailObject && <header className={styles.detailsHeader}><div><p>Docked station services</p><p className={styles.muted}>System objects are unavailable. Your station services are still connected.</p><HudButton variant="quiet" onClick={onRetry}>Retry system objects</HudButton></div></header>}
         <div hidden={!!inspectorBody} style={{ display: inspectorBody ? 'none' : 'contents' }}>
-        {detailObject && <header className={styles.detailsHeader}><HudBackButton destination="objects" autoFocus data-testid="details-back" onClick={closeDetails} /><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p></header>}
+        {detailObject && !inspectorBody && <header className={styles.detailsHeader}><HudCardBack destination="objects" autoFocus data-testid="details-back" onClick={closeDetails} /><p className={styles.eyebrow}>SELECTED {fleetFacts ? 'FLEET' : detailObject.group === 'Stations' ? 'STATION' : detailObject.group === 'Worlds' ? 'WORLD' : 'OBJECT'}</p></header>}
         <div className={styles.detailsBody}>{detailObject && <><div className={styles.inspectorTitle}><>{!fleetFacts && !selectedPlanet && detailObject.kind !== 'station' && detailObject.kind !== 'star' && <ObjectThumbnail object={detailObject} className={styles.portrait} />}</><div><HudHeading size="compact" level={3}>{detailObject.label ?? detailObject.name}</HudHeading>{detailObject.catalogueRef && <p>{detailObject.catalogueRef}</p>}<p className={styles.muted}>{detailObject.kind}</p></div></div>
         {open && fleetFacts && <SpacecraftPreview key={`fleet:${fleetFacts.id}`} kind="ship" objectId={fleetFacts.id} label={fleetFacts.id} accentColor={fleetFacts.mode === 0 ? 0xffb454 : fleetFacts.mode === 2 ? 0xc4b5fd : 0x4ade80} />}
         {open && !fleetFacts && detailObject.kind === 'station' && <SpacecraftPreview key={`station:${detailObject.name}`} kind="station" objectId={detailObject.name} label={detailObject.label ?? detailObject.name} accentColor={0x67e8f9} />}

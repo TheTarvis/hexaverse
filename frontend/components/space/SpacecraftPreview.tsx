@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState, type PointerEvent } from 'react'
-import { HudButton } from '@/components/hud/HudControls'
+import { ModelPreviewLayout } from '@/components/graphics/ModelPreviewLayout'
 import { WebGPUCanvas, type CanvasSceneFactory } from '@/components/graphics/WebGPUCanvas'
 import type { RendererCandidateFactory } from '@/components/render-guard/renderer-candidate'
 import { createSpacecraftPreviewScene, type PreviewKind, type PreviewAssetStatus, type SpacecraftPreviewScene } from './webgl/spacecraft-preview'
@@ -12,10 +12,11 @@ export interface SpacecraftPreviewProps {
   label: string
   starClass?: string
   accentColor: number
+  showInstructions?: boolean
   rendererFactory?: RendererCandidateFactory
 }
 
-export function SpacecraftPreview({ kind, objectId, label, accentColor, starClass, rendererFactory }: SpacecraftPreviewProps) {
+export function SpacecraftPreview({ kind, objectId, label, accentColor, starClass, rendererFactory, showInstructions = true }: SpacecraftPreviewProps) {
   const controller = useRef<SpacecraftPreviewScene | null>(null)
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
   const [status, setStatus] = useState<PreviewAssetStatus>('loading')
@@ -37,7 +38,8 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
     drag.current = null
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
-  return <div onClick={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}>
+  return <div data-slot="model-preview" onClick={event => event.stopPropagation()} onWheel={event => event.stopPropagation()}>
+    <ModelPreviewLayout style={{ height: 200 }} onReset={() => controller.current?.reset()} resetTestId="spacecraft-preview-reset">
     <div tabIndex={0} aria-label={`3D preview of ${label}`} aria-describedby={instructions}
       data-testid="spacecraft-preview-surface"
       className="relative w-full rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
@@ -67,10 +69,8 @@ export function SpacecraftPreview({ kind, objectId, label, accentColor, starClas
         surface="preview" alpha stencil={false} maxResolution={384} maxFramesPerSecond={30} rendererFactory={rendererFactory}
         style={{ background: 'transparent' }} />
     </div>
+    </ModelPreviewLayout>
     <p role="status" aria-live="polite" className="hud-type-caption text-zinc-600 dark:text-zinc-400">{status === 'loading' ? 'Loading model preview…' : status === 'fallback' ? 'Simplified model preview.' : ''}</p>
-    <div className="flex items-center justify-between gap-2">
-      <p id={instructions} className="hud-type-caption text-zinc-600 dark:text-zinc-400">Drag or use arrow keys to rotate. Home resets.</p>
-      <HudButton variant="quiet" data-testid="spacecraft-preview-reset" onClick={() => controller.current?.reset()}>Reset view</HudButton>
-    </div>
+    <p id={instructions} className={showInstructions ? "hud-type-caption text-zinc-600 dark:text-zinc-400" : "sr-only"}>Drag or use arrow keys to rotate. Home resets.</p>
   </div>
 }

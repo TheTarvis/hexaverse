@@ -34,6 +34,23 @@ Use [glossary verbs](../../GLOSSARY.md): Scan is the former umbrella term, Sweep
 is discovery, Analyze is targeted examination. Existing API names still use scan;
 the terminology does not authorize API renaming or claim a broad sweep is shipped.
 
+## Unknown burns — accepted browser meaning, 2026-10-22
+
+For Objects → Fleets browsing, Travis defined the Unknown category as burns the
+player observed but has not analyzed. Show the observation without revealing a
+fleet name, owner, allegiance, hull model or ship count. Unknown is an observation
+category alongside Owned/Friendly/Enemy in this browser, not a fourth diplomatic
+relationship. Observing a burn does not establish whether its source is friendly
+or hostile. Keep this vocabulary distinct from a known identity with an undecided
+relationship.
+
+This records intended browser behavior, not an implemented Analyze operation or
+new contact-selection/identity contract. A past observation must not imply live
+tracking; use last-observed information when ongoing coverage is absent. Analysis
+outcomes, observation retention and later identified-but-unclassified fleets
+remain open. Current live anonymous contacts and their wire contract remain as
+recorded below; not every current contact is necessarily an observed burn.
+
 ## Current implementation and gaps
 
 Read-only audit, 2026-10-16; code/tests remain authoritative.

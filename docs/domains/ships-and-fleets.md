@@ -16,6 +16,23 @@ The established composition contract pools cargo at fleet level, sums hull hold/
 mining capability, and constrains movement by the limiting hull rates. Current
 code evidence is below; individual ship roles do not imply per-ship cargo UI.
 
+## Fleet relationships — design direction, 2026-10-22
+
+During fleet/object card foundation review, Travis requested Objects → filter by
+Fleets → see fleets, representing owned, friendly, enemy and unknown categories.
+Owned, friendly and enemy are observer-relative relationships; an inspected
+foreign fleet is not thereby an owned command fleet. These are display categories,
+not accepted diplomacy mechanics or combat permissions.
+
+Travis clarified Unknown as observed burns that have not been analyzed, not
+identified fleets of undecided allegiance. It is a knowledge category alongside
+the relationship categories in the Fleets browser; see
+[unknown burns](sensors-and-stealth.md#unknown-burns--accepted-browser-meaning-2026-10-22). Do not collapse
+[sensor knowledge](sensors-and-stealth.md) into allegiance or interpret every
+foreign fleet as an enemy. Neutral relationships, how friendliness/hostility is
+established, and who supplies classification remain open. This direction does not
+claim relationship classification or identified foreign-fleet reads are shipped.
+
 ## Current implementation and gaps
 
 [Fleet model](../../backend/fleet/model.go) stores one kinematic state and

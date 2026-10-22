@@ -3,8 +3,8 @@
 import { useId, useState } from 'react'
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import { HudActionBand, type HudBandAction } from '@/components/hud/HudActionBand'
-import { HudBackButton, HudButton } from '@/components/hud/HudControls'
-import { HudCardShell, HudSection } from '@/components/hud/HudCardShell'
+import { HudButton } from '@/components/hud/HudControls'
+import { HudCardBack, HudCardShell, HudSection } from '@/components/hud/HudCardShell'
 import { HudFacts } from '@/components/hud/HudFacts'
 import { HudIcon } from '@/components/hud/HudIcon'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
@@ -88,7 +88,7 @@ export function FleetStatusContent(props: FleetStatusProps) {
   const counts = new Map<string, number>()
   for (const ship of roster?.ships ?? []) counts.set(ship.class, (counts.get(ship.class) ?? 0) + 1)
   return <div className={styles.content} data-testid="fleet-status-card">
-    {travelControlsOpen && <HudBackButton destination="fleet status" onClick={onBack} disabled={pending} />}
+    {travelControlsOpen && <HudCardBack destination="fleet status" onClick={onBack} disabled={pending} />}
     <div className={styles.identity}><HudObjectThumbnail kind="fleet" /><div><HudHeading size="compact">{fleetLabel(fleet)}</HudHeading><HudText variant="secondary">Command fleet · {status.where}</HudText></div></div>
     <section className={styles.activity} aria-label="Fleet activity">
       <HudHeading variant="section" level={4}>{awaiting ? mine && !burn && !fleet.jump ? 'Awaiting mining confirmation' : 'Awaiting arrival confirmation' : status.activity}</HudHeading>

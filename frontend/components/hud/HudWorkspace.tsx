@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { HudButton } from '@/components/hud/HudControls'
 import { HudActionBand } from './HudActionBand'
 import { HudCardShell } from './HudCardShell'
+import type { HudCardTitle } from './hud-card-title'
 import { HudIcon } from './HudIcon'
 import { MagnifyingGlassIcon, RocketLaunchIcon, QueueListIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 import styles from './hud-workspace.module.css'
@@ -14,7 +15,7 @@ export type HudPanelId = 'objects' | 'fleets' | 'fleet-status'
 const panelIcons = { objects: MagnifyingGlassIcon, fleets: QueueListIcon, 'fleet-status': RocketLaunchIcon }
 type Lane = 'left' | 'right' | 'bottom'
 type Layout = { id: HudPanelId; lane: Lane; visible: boolean }[]
-export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; footer?: ReactNode; suspended?: boolean }
+export interface HudWorkspacePanel { id: HudPanelId; label: string; children: ReactNode; title?: HudCardTitle; header?: ReactNode; footer?: ReactNode; suspended?: boolean }
 export interface HudWorkspaceProps { onPanelDismiss?: (id: HudPanelId) => void; onPanelActivate?: (id: HudPanelId) => void; corporationId: string; panels: HudWorkspacePanel[]; className?: string; request?: { id: HudPanelId; sequence: number }; settingsContent?: ReactNode; navigationAction?: ReactNode }
 const defaults: Layout = [
   { id: 'objects', lane: 'left', visible: true },
@@ -187,12 +188,6 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
     toggle(id)
     workspaceRef.current?.querySelector<HTMLButtonElement>(`[data-workspace-tab="${id}"]`)?.focus({ preventScroll: true })
   }
-  function phoneToolbar(selected: HudPanelId | 'arrange') {
-    return <div className={styles.phoneToolbar}>
-      <HudButton presentation="chrome" data-mobile-close onClick={selected === 'arrange' ? closeSettings : closePanel}>Return to map</HudButton>
-      {navigation(selected)}
-    </div>
-  }
   function closeSettings() { setSettings(false); if (phone) { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) } else recoveryRef.current?.focus({ preventScroll: true }) }
   function closePanel() { if (activeId) onPanelDismiss?.(activeId); restoreMapFocus.current = true; setOpenedPanel(false); setActive(null) }
   function reset() {
@@ -226,7 +221,7 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
       </NavigationFrame>
     </div>
     {settings && <div ref={settingsRef} id={settingsId} className={styles.settings}>
-      <HudCardShell title="Arrange HUD" toolbar={phone ? phoneToolbar('arrange') : undefined} footer={<HudActionBand label="HUD layout actions" actions={[{ id: 'reset-layout', label: 'Reset HUD layout', onClick: reset, disabled: !ready }]} />}>
+      <HudCardShell title="Arrange HUD" onClose={closeSettings} closeLabel={phone ? 'Return to map' : 'Close Arrange HUD'} footer={<HudActionBand label="HUD layout actions" actions={[{ id: 'reset-layout', label: 'Reset HUD layout', onClick: reset, disabled: !ready }]} />}>
         <p className={styles.hint}>Choose what stays on screen. Move panels between docks and change their order.</p>
         {known.map(item => {
           const panel = panels.find(panel => panel.id === item.id)!
@@ -254,8 +249,8 @@ function Workspace({ corporationId, panels, className, request, onPanelDismiss, 
         const index = lanePanels.findIndex(panel => panel.id === item.id)
         const span = 6 / Math.max(1, lanePanels.length)
         return <section key={item.id} ref={element => { if (element) panelRefs.current.set(item.id, element); else panelRefs.current.delete(item.id) }} tabIndex={-1} id={`${panelPrefix}-${item.id}`} aria-label={`${panel.label} panel`} hidden={!item.visible || panel.suspended || phone && (settings || activeId !== item.id)} inert={phone && (settings || activeId !== item.id)} data-panel={item.id} data-lane={item.lane} data-mobile-active={activeId === item.id} className={styles.panel} style={{ gridColumn: item.lane === 'left' ? '1' : item.lane === 'right' ? '3' : '1 / -1', gridRow: item.lane === 'bottom' ? `${7 + index}` : `${index * span + 1} / span ${span}` }}>
-          <HudCardShell title={panel.label} paused={!item.visible || panel.suspended || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
-            toolbar={phone ? phoneToolbar(item.id) : undefined} footer={panel.footer}>
+          <HudCardShell title={panel.title ?? panel.label} paused={!item.visible || panel.suspended || phone && activeId !== item.id} className={styles.panelCard} contentClassName={styles.panelContent}
+            onClose={phone ? closePanel : () => hidePanel(item.id)} closeLabel={phone ? 'Return to map' : `Close ${panel.label}`} header={panel.header} footer={panel.footer}>
             {panel.children}
           </HudCardShell>
         </section>

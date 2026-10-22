@@ -2,10 +2,14 @@ import { PHONE_HUD_QUERY } from '@/hooks/use-phone-sheet'
 import { expect, userEvent, within } from 'storybook/test'
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { FleetStatusHostingStudy } from './FleetStatusStudy'
+import { statusScenarios } from './fixtures'
 
 const meta = {
   id: 'hud-fleet-status-study', title: 'Tasks/Fleet status/Review', tags: ['catalog'],
   component: FleetStatusHostingStudy,
+  args: { scenario: 'travelling' },
+  argTypes: { scenario: { name: 'Situation', control: 'select', options: Object.keys(statusScenarios), description: 'Fictional fleet/action state. Changing it resets the simulated journey.' } },
+  render: args => <FleetStatusHostingStudy key={args.scenario} {...args} />,
   parameters: { catalog: { purpose: 'task', status: 'prototype', record: 'docs/hud.md', task: 'fleet-status', primary: true }, layout: 'fullscreen' },
 } satisfies Meta<typeof FleetStatusHostingStudy>
 export default meta
@@ -13,7 +17,6 @@ type Story = StoryObj<typeof meta>
 
 export const OwnCard: Story = {
   name: 'Journey',
-  render: () => <FleetStatusHostingStudy />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const arrange = canvas.getByRole('button', { name: 'Arrange HUD' })

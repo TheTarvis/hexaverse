@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRightIcon, SparklesIcon, SunIcon } from '@heroicons/react/24/outline'
-import { HudBackButton, HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
+import { HudButton, HudIconButton, HudSearchInput, HudSelect } from '@/components/hud/HudControls'
 import { HudIcon } from '@/components/hud/HudIcon'
-import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudCardBack, HudCardShell } from '@/components/hud/HudCardShell'
 import { HudText } from '@/components/hud/HudTypography'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { destinations, fleets, systems, type Concept, type SelectionKind, type StudyItem } from './fixtures'
@@ -44,7 +44,7 @@ function Chooser({ kind, concept, selected, onChoose, onBack, objective, searchR
   </HudButton>
   return <div className={styles.chooser}>
     <div className={styles.tools}>
-      <div className={styles.backRow}><HudBackButton destination="trip" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
+      <div className={styles.backRow}><HudCardBack destination="trip" onClick={onBack} /><HudText variant="secondary" className={styles.tripContext} title={`${kind === 'fleet' ? 'Destination' : 'Fleet'}: ${counterpart.name} · ${counterpart.system}`}>{kind === 'fleet' ? 'To' : 'Fleet'}: {counterpart.name} · {counterpart.system}</HudText></div>
       <div className={styles.searchRow}>
         <HudSearchInput ref={searchRef} aria-label={`Search ${kind === 'fleet' ? 'fleets' : 'destinations'}`} placeholder={concept === 'A' ? 'Search by name…' : 'Search all known systems…'} value={query} onChange={event => { setQuery(event.target.value); setLimit(20) }} />
         {concept === 'A' && <div className={styles.scopeToggle} role="group" aria-label="Search scope">
@@ -68,8 +68,8 @@ function Chooser({ kind, concept, selected, onChoose, onBack, objective, searchR
   </div>
 }
 
-export function TravelStudy({ concept = 'A', startSelecting = false, objective = false, scenario = 'affordable', initialKind = 'destination' }: {
-  concept?: Concept; startSelecting?: boolean; objective?: boolean; scenario?: string; initialKind?: SelectionKind
+export function TravelStudy({ concept = 'A', startSelecting = false, objective = false, scenario = 'affordable', initialKind = 'destination', arrivalRevision = 0, statusRevision = 0 }: {
+  concept?: Concept; startSelecting?: boolean; objective?: boolean; scenario?: string; initialKind?: SelectionKind; arrivalRevision?: number; statusRevision?: number
 }) {
   const [fleet, setFleet] = useState(fleets[scenario === 'shortfall' ? 1 : scenario === 'unavailable' ? 3 : 0])
   const [destination, setDestination] = useState(destinations[objective ? 100 : 0])
@@ -80,6 +80,16 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
   const [error, setError] = useState(false)
   const [status, setStatus] = useState(false)
   const [journey, setJourney] = useState<{ elapsed: number; stopped: boolean } | null>(null)
+  const [seenArrival, setSeenArrival] = useState(arrivalRevision)
+  const [seenStatus, setSeenStatus] = useState(statusRevision)
+  if (seenArrival !== arrivalRevision) {
+    setSeenArrival(arrivalRevision)
+    setJourney(current => current ? { ...current, elapsed: 180 } : null)
+  }
+  if (seenStatus !== statusRevision) {
+    setSeenStatus(statusRevision)
+    if (journey) { setStatus(true); setOpen(true) }
+  }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchFleet = useRef<HTMLInputElement>(null)
   const searchDestination = useRef<HTMLInputElement>(null)
@@ -135,7 +145,5 @@ export function TravelStudy({ concept = 'A', startSelecting = false, objective =
           quote={recalculating || remote ? null : { controlPoints: [], departMs: worldTime, arriveMs: worldTime + 180000, deltaV: 24, fuelCostTons: 18, affordable: shortfall === 0, strandingWarning: false }}
           blocker={blocker} pending={pending} error={error ? 'The order failed. No travel started. Try again.' : null}
           onFleet={() => {}} onChooseFleet={() => openChooser('fleet')} onChooseDestination={() => openChooser('destination')} onStart={start} onRetry={() => {}} onBack={() => setOpen(false)} onClose={() => setOpen(false)} />}
-    {journey && <div className={styles.reviewerTools}><HudButton variant="quiet" onClick={() => { setStatus(true); setOpen(true) }}>Open fleet status</HudButton>{running && <HudButton variant="quiet" onClick={() => setJourney(current => current ? { ...current, elapsed: 180 } : null)}>Simulate arrival</HudButton>}</div>}
-    <HudText variant="caption" className={styles.disclaimer}>Production presentation with fictional data and simulated callbacks. Chooser concepts remain under comparison.</HudText>
   </div>
 }

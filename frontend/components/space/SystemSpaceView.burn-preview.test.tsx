@@ -378,6 +378,7 @@ describe('compact production travel', () => {
     mount([ready()]); await flush()
     await click('mock-select-point'); await click('travel-review-entry')
     expect(screen.getByTestId('compact-travel-card')).toHaveTextContent('Point in space')
+    expect(screen.getByRole('heading', { name: / · Travel to Point in space$/ })).toHaveAttribute('data-slot', 'hud-title')
     expect(screen.getByTestId('travel-start')).toBeEnabled()
     const startFooter = screen.getByTestId('travel-start').closest('[data-slot="hud-footer"]')!
     expect(startFooter).not.toBeNull()

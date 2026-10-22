@@ -128,6 +128,97 @@ Current ownership after the 2026-10-21 shared-card adoption:
   foundation. [Art direction](art-direction.md) governs object assets; decorative
   illumination carries no gameplay meaning.
 
+## Fleet and object card review — 2026-10-22
+
+Fleet/object foundations are being reviewed before further mining refinement.
+Travis selected the model-first owned-fleet direction and the direct two-column
+action grid, then accepted Cargo / Actions / Ship stats views for the lower
+section. The model, location, activity and compact fuel/free-hold/ship summary
+remain above; the lower content changes without replacing that context. Shared object
+structure with type-specific information and named commands leading to target
+selection are accepted directions, not completed production integration.
+
+The next reviewed entry is Objects → filter object type to Fleets → inspect a
+fleet. Fleets initially includes all visible categories, with a secondary
+All / Owned / Friendly / Enemy / Unknown filter. Unknown means an observed burn
+that has not been analyzed, not a known fleet with an undecided relationship;
+[sensors](domains/sensors-and-stealth.md#unknown-burns--accepted-browser-meaning-2026-10-22)
+owns that distinction. Unknown rows/cards reveal no name, owner, hull art or ship
+composition, and last-observed data does not imply current tracking. Browsing or
+inspecting foreign fleets does not make them command fleets.
+
+[Objects / Fleet card review](http://127.0.0.1:20203/?path=/story/hud-fleet-object-review--browse)
+is a simulated browse/detail comparison using HudCardShell and existing shared
+controls, facts and previews. Friendly/enemy identified rows are future disclosure
+fixtures. The accepted lower section replaces the Commands footer and Ships &
+cargo disclosure. Cargo shows pooled contents and capacity; Actions shows a
+2-column grid with visible reasons on unavailable actions; Ship stats shows
+composition and aggregate capabilities. Actions defaults for a newly inspected
+owned fleet. Remember its selected tab per fleet through close/reopen within the
+mounted session. Tabs remain visible and support direct selection, keyboard
+arrows/Home/End, and horizontal swipe over the lower content. No automatic page
+advance. Vertical scrolling, pinch zoom and model orbit remain independent.
+
+HudCardTabs owns this reusable controlled tab/swipe interaction; callers own tab
+content and per-fleet selection. A swipe must not also activate an action button.
+The prototype's enabled commands open a fixture target picker; selecting a target
+opens its inspector without issuing an order. Future command handoffs and live
+capability/eligibility rules remain separate work. Do not treat the sample Attack
+and Jump disabled reasons as implemented combat or generalized eligibility rules.
+Discarded activity-first/compact stories redirect to the selected model-first
+example. Object/category/search and card tabs belong to the player-facing UI;
+review entry configuration stays in Storybook Controls. Production FleetStatusCard
+and workspace integration, actual browser/touch verification and in-game review
+remain open.
+
+## Mining action review — accepted scope, 2026-10-22
+
+Travis accepted mining as the first consumer of a reusable **card-contained action
+scene**. Selected setup: a focused mining task with stationary Start mining
+commitment. The contextual alternative is retired; the task uses a temporary
+model until animation is reviewed. Resource inspection and Fleet status should
+enter one shared setup. Existing production resource-host setup is currently
+unreachable; the selected mining flow is prototyped but not integrated or accepted in-game yet.
+
+Fleet/location context lives in the shared structured plaque title, with ship
+details expandable below the model. Resource and editable tonnage come before secondary facts. Max fills
+free hold; a new draft defaults to free hold, and subsequent edits update ETA
+and survive dismissal. The [setup decision](../.scratch/hud-action-review/mining-setup-accepted.md)
+records this acceptance separately from animation and production behavior.
+
+The scene foregrounds mining participants supplied by the server, separately
+from the whole fleet roster. Representative ships plus accurate counts keep
+large fleets readable; supporting ships need their own deliberately designed
+roles. Do not infer capability from names or models. Automatic staging should be
+entertaining without interaction, with optional orbit inspection. Future combat,
+docking and gate scenes are intended consumers; their implementation and canvas
+effects are outside this first phase. Composition and choreography remain open.
+
+Preserve drafts for the same fleet/target through dismissal, revalidating fresh
+limits; changing either resets choices. Accepted mining shows a quantity/ETA
+status within the same card, without automatically opening another card.
+The accepted single-card journey is fleet overview → action setup → action
+status. Mine here transitions the existing fleet card into setup, and acceptance
+transitions it to mining status. Back from setup returns to its fleet/resource
+entry view; Back from mining status returns to fleet overview, where View mining
+returns to the action. The review journeys begin earlier: fleet list → fleet
+overview → choose object → object inspection → Mine here; or object list → object
+inspection → choose fleet → fleet overview → Mine here. Both then enter the same
+setup with fleet and object selected. Back follows the actual selection path. Close retains the draft/action; reopening restores
+the current view. This supersedes the separate setup/receipt plus Fleet status
+prototype layout. The Storybook journey isolates one shared shell, with a fixture
+launcher for reopening; production workspace navigation is not wired yet. The working visual loops until
+terminal server confirmation, independent of the countdown. Notification and
+fallback reads reconcile the same action without duplicate completion payoff;
+failed checks retain the loop with explicit connection uncertainty. Use the
+existing ETA + 400 wall ms cushion and 20-second retry cadence initially, resolving
+through a fleet refresh before reading the exact action's outcome. These are
+accepted requirements, not claims about current notification wiring.
+
+The [review brief](../.scratch/hud-action-review/mining-brief.md) maps shared
+foundations, current gaps and the next comparison. Placement review:
+[Mining / Review / Fleet journey](http://127.0.0.1:20203/?path=/story/hud-mining-review--placement).
+
 ## Map palette setting
 
 Accepted direction, 2026-10-19: offer a **Map palette** setting with previewable
@@ -137,7 +228,7 @@ simulation. Route outlines, heavier strokes, dash patterns, direction markers
 and destination shapes remain available in every palette. Color alone must not
 carry route/state meaning. [Art direction](art-direction.md) owns visual choices;
 the [canvas design record](../.scratch/galaxy-canvas/galaxy-canvas-design.md) tracks review.
-Map palette is implemented as a synchronized on-canvas/Controls selector in
+Map palette is available in Storybook Controls in
 [Galaxy Map / Overview](http://127.0.0.1:20203/?path=/story/graphics-galaxy-map--overview)
 for art review, including route-state, progress, zoom and vision-preview controls.
 Gameplay settings placement and persistence remain unimplemented; exact palette
@@ -176,6 +267,19 @@ The travel selection prototype adopts these defaults. Older HUD controls still
 have local overrides and require deliberate migration; changing a token updates
 its consumers, not every legacy control. This section owns UI implementation
 guidance; `GLOSSARY.md` remains game vocabulary.
+
+### Interactive model and action preview layout — 2026-10-22
+
+Use `ModelPreviewLayout` from `components/graphics` as the shared layout template.
+Reset view is a small crosshair icon floating at the bottom-right inside the canvas,
+using `HudIconButton` chrome with a 44px hit target and accessible label. Keep
+the overlay separate from the scene's drag/orbit input surface. Instructions and
+asset status sit below the viewport; no text reset button or separate control
+row. `SpacecraftPreview` and `WebGPUModelView` share this layout, covering the
+object inspector, mining placeholder and raw-model/art previews. New interactive
+action scenes should compose the same owner. See the [graphics foundation
+template](../frontend/components/graphics/README.md) and [consumer
+audit](../.scratch/hud-action-review/preview-layout-audit.md).
 
 ### Determinate progress
 
@@ -238,20 +342,55 @@ any confirmation required for irreversible loss. `HUD/Buttons/Smoked Crystal`
 shows these tones, pending/disabled examples and a destructive footer for review.
 Travis accepted the warning/danger and working-state preview on 2026-10-19.
 
-### Back navigation — 2026-10-21
+### Card navigation — accepted 2026-10-22, all viewports
 
-Use `HudBackButton` from `HudControls` for in-card Back navigation. Place it first
-at the top-left of the view content, before identity, context or search. It uses
-one unframed left-arrow plus “Back to …” label, shared secondary typography,
-content width and a minimum 44px hit target on desktop and phone. Its ordinary
-keyboard focus outline remains visible; it is not a persistent framed button.
-Name the destination explicitly, such as objects, fleet status or trip.
+Travis selected refined option A and explicitly applied it to **all cards**, on
+both desktop and phone: task title in the frame plaque, inset Back left and
+Close X right, aligned on one stationary overlay row. Controls have 44px targets.
+The old outside-frame corner X and separate Back header row are superseded.
 
-Back does not belong in the command footer, at the top-right of an inspector or
-as a full-width Lens action. Keep Close separate. Preserve the owning flow's
-callback, pending guard, browsing state and focus restoration. Cancel remains an
-action with its existing semantics. `HudActionBand` supports a single full-width
-command when navigation has moved out of the footer.
+Title overflow is foundational in HudCardShell across all framed cards. Plaques
+retain the shared lettering size and allow a wider title (card width minus 72px).
+Only overflowing text slowly pans, pausing at each end and on hover; suspended
+cards pause too. Reduced-motion uses static ellipsis. The complete title remains
+the accessible heading and tooltip. Nested section headings wrap normally.
+Foundations/Cards/Shell/Long Title demonstrates this default; consumers do not
+opt in or implement their own scrolling title.
+
+Task identity is also shared: pass `title={{ fleet, action, object }}` to
+HudCardShell or a HudWorkspace panel. `hud-card-title.ts` owns the typed action
+wording: mining produces “Peregrine · Mining at Nereid outer belt”; travel produces
+“Peregrine · Travel to Nereid outer belt”. Missing fleet omits that prefix, and
+missing object omits the relation and target. Plain strings remain appropriate
+for utility titles such as Objects and Settings. Features supply current display
+names from their selected/served data; the foundation does not infer selection,
+resolve identifiers or claim action state. Add future action wording in this
+shared module rather than assembling sentences at each call site.
+
+Mining's prototype and CompactTravelCard use this contract. Production embedded
+travel passes the same task identity to the owning workspace frame, so both
+standalone stories and the live travel review update with fleet/destination
+selection. This changes title presentation only; running Fleet status activity
+selection and future combat/docking/gate consumers remain separate integrations.
+
+HudCardShell owns Close through its existing onClose/closeLabel callback. Use
+`HudCardBack` from HudCardShell inside task content; it renders its icon in the
+owning frame's left navigation slot even through nested sections. Supply the
+actual destination, callback, ref and pending/disabled guard. Nested sections do
+not create duplicate Close controls. A root task without a parent omits Back;
+non-dismissible utility frames do not invent a Close action.
+
+Navigation does not add a blank strip above a model-first body. Text-first bodies
+reserve safe room beneath the overlay; model previews retain their top space and
+put Reset view at the canvas bottom-right. Back returns within the task; Close
+hides it without cancelling an order. HudBackButton remains the standalone labeled
+navigation control specimen; card consumers use HudCardBack.
+
+Workspace panels compose this same shell on every viewport. Phone Close retains
+the accessible name Return to map and focus/draft behavior; the separate labeled
+Return to map row and panel tabs inside an opened card have been removed. Dismiss
+to the map to choose another panel. Desktop launchers, Escape and layout settings
+remain available. Do not add unrelated utility icons merely to fill a row.
 
 ### Shared action interface and ownership
 
@@ -321,6 +460,23 @@ and Stationary Actions reference use this shared capability. Production travel's
 the owning workspace footer; callers pass action data rather than button markup.
 The shell preserves mounted content when a footer appears or disappears, so
 returning from travel retains the Objects browsing context.
+
+`HudCardShell.header` remains an optional stationary context slot above the
+scrolling body, complementing the footer; navigation is owned by the shared frame
+and does not require a consumer-made header. Header/footer changes preserve
+mounted body state. The Stationary actions foundation uses the same navigation.
+
+[Cards / Shell / Mobile](http://127.0.0.1:20203/?path=/story/hud-card-shell--mobile)
+and [Cards / Task header / Accepted](http://127.0.0.1:20203/?path=/story/hud-mobile-header--compare)
+show the accepted shared arrangement. The latter preserves the reviewed URL;
+discarded executable options were retired. Long-title and overflow controls
+remain in Storybook Controls. [Acceptance and integration evidence](../.scratch/mobile-card-header/accepted.md)
+distinguishes selected appearance from rendered/in-game verification.
+
+Mining's focused comparison places Back/Close in the shared frame and Mine resources in its plaque, then
+the model first in the body, followed by resource/fleet context and setup. Its
+running placeholder likewise precedes fleet identity. This visual ordering was
+requested in screenshot feedback on 2026-10-22; focused mining placement is accepted; animation and production integration remain open.
 
 ## Acceptance checks
 
@@ -842,6 +998,10 @@ MobileHeaderAlignment story exercises the same shared shell.
 
 ## Workspace dismissal — 2026-10-21
 
+Historical checkpoint: the 2026-10-22 accepted card navigation above supersedes
+the phone tabs/Return to map row and outside-X rules below. Draft/order retention
+and focus-restoration requirements still apply.
+
 Arrange HUD's Reset action and Recovery's guide actions use the shared stationary
 footer/action band. The body scrolls above the footer, including on short screens.
 Show/hide, dock and reorder controls remain contextual configuration fields;
@@ -867,6 +1027,9 @@ Dismissal never submits Stop/Cut or changes ongoing travel, mining or scanning.
 Existing explicit owner activation requests can reveal a hidden panel again.
 
 ## Standalone header and close contract: original Storybook chrome — 2026-10-18
+
+Historical checkpoint: the plaque remains; close placement and dimensions are
+superseded by the 2026-10-22 accepted inset navigation above.
 
 The visual source is HudCardShell and its Plain story from commit 624c4ff. This
 supersedes the inset mobile-header refinements above. Standalone cards use the
@@ -1116,7 +1279,7 @@ maintains the viewing angle relative to the target's parent as the target orbits
 targets without an orbit use Steady direction. Surface locking is outside this
 design because the simulation has no body surface-rotation data.
 
-Storybook also exposes glide duration (initially 600 ms) and a Replay focus button
+Storybook also exposes glide duration (initially 600 ms) and a Replay focus revision control in Storybook Controls
 that repeats the glide from the same starting view for comparison. Framing,
 orientation and duration controls are Storybook tuning controls, not gameplay UI.
 

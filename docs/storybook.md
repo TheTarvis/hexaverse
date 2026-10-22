@@ -4,6 +4,35 @@ Storybook exposes shared building blocks and provides reproducible reviews of th
 experiences built from them. Shared executable code owns visual values and behavior.
 Change that owner directly to update all consumers; revert unwanted changes.
 Story controls select specimen/scenario state, not a second set of saved defaults.
+Size/content variants such as Shell Wide, Tall and Narrow use one shared story
+renderer and the same production component; vary args for dimensions or body
+content. Do not wire their headers independently. Shell examples enable Back
+and Close in that common renderer, with explicit utility-frame exceptions.
+
+Put review-only scenario selectors in Storybook's Controls panel, using args and
+argTypes. Keep the canvas focused on the rendered experience; extra review
+headings, selectors and tabs must not push a phone card outside its viewport.
+In-product fields remain in the card. The Stationary actions reference follows
+this pattern with height/content/state/label and phone action-count controls.
+
+Apply this rule to helper components imported by stories as well: fixture
+configuration must not be hidden in Arrange HUD or a private review toolbar.
+Keep actual widgets under review interactive in the canvas. For simulated events
+such as arrival or replay, expose a documented numeric revision arg to increment;
+use Storybook's Reset controls for ordinary defaults. The
+[catalog-wide audit](../.scratch/storybook-controls/audit.md) records the reviewed
+surfaces, retained specimen controls and verification limits.
+
+Phone-specific stories select their viewport through story `globals`, for example
+`globals: { viewport: { value: 'mobile2', isRotated: false } }`. Let the real
+viewport activate production media queries and phone hooks; do not imitate a phone
+by narrowing a container inside a desktop viewport. The obsolete
+`parameters.viewport.defaultViewport` setting is not used. A foundation Narrow
+specimen may still intentionally test container width without claiming phone mode.
+The shared `phoneFit` viewport keeps a real 414px phone width while its height is
+100% of the available preview canvas. Cards / Shell / Mobile uses it to keep both
+header and footer visible above the Controls panel. Use fixed device presets for
+exact device-dimension review; a fitted-height specimen is not an exact device capture.
 
 ## Catalog
 
@@ -54,9 +83,12 @@ configuration remain beside their content. Helper-generated layouts still need
 rendered review: source checks cannot infer every command's purpose.
 
 Workspace examples use production dismissal: desktop launcher toggles and focused
-Escape, phone Return to map above the tabs. Hiding retains mounted panel state and
-ongoing orders. Standalone Shell examples retain the corner-X capability; nested
-sections do not render a second close control.
+Escape, and the shared inset Close on desktop and phone. Phone Close is named
+Return to map; choose another panel from map launchers after dismissing. Every
+card uses the accepted plaque/Back-left/Close-right frame. Nested sections render
+Back into their owning frame and do not add another Close. Hiding retains mounted
+state and ongoing orders. The Task header reference preserves the reviewed
+comparison URL after retiring the discarded variants.
 
 For a foundation change, exercise representative consuming tasks at desktop and
 portrait-phone widths, including relevant pending/disabled states, long names and

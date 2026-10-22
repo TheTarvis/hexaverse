@@ -5,12 +5,13 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import { rosterRowStatus, type RunningMine } from '@/components/fleet/roster-status'
 import { fleetLabel } from '@/lib/fleet-label'
 import { HudActionBand, type HudBandAction } from '@/components/hud/HudActionBand'
-import { HudBackButton, HudButton, HudSelect } from '@/components/hud/HudControls'
+import { HudButton, HudSelect } from '@/components/hud/HudControls'
 import { HudFacts } from '@/components/hud/HudFacts'
-import { HudCardShell } from '@/components/hud/HudCardShell'
+import { HudCardBack, HudCardShell } from '@/components/hud/HudCardShell'
 import { HudIcon } from '@/components/hud/HudIcon'
 import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { HudText, HudValue } from '@/components/hud/HudTypography'
+import type { HudTaskTitle } from '@/components/hud/hud-card-title'
 import { BURN_FUEL_ALLOWANCE } from '@/lib/space-quote'
 import { formatByUnit } from '@/lib/format'
 import type { BurnPreview, Fleet } from '@/lib/types/fleet'
@@ -47,6 +48,11 @@ export function CompactTravelActions({ quote, blocker, pending, onStart, onRetry
   return <HudActionBand label="Trip actions" actions={quote ? [start] : [retry, start]} />
 }
 
+/** Share the same task identity with the workspace when it owns this card's frame. */
+export function travelCardTitle({ fleet, destination }: Pick<CompactTravelCardProps, 'fleet' | 'destination'>): HudTaskTitle {
+  return { fleet: fleet ? fleetLabel(fleet) : null, action: 'travel', object: destination }
+}
+
 /** The production review and fixture reviews share this presentation and selection controls. */
 export function CompactTravelCard(props: CompactTravelCardProps) {
   const { fleet, fleets, systemId, destination, destinationKind = 'unknown', quote, worldTime, mine, scale, blocker, error, pending, onFleet, onChooseFleet, onChooseDestination, onBack, onClose, footerHost = 'card', className } = props
@@ -56,9 +62,9 @@ export function CompactTravelCard(props: CompactTravelCardProps) {
   const tons = (value: number | undefined) => formatByUnit(value ?? NaN, scale, 'tons')
   const duration = (time: number) => formatByUnit(Math.max(0, time), scale, 'world-ms-span-bare')
   const finishFleetChoice = () => { setChoosingFleet(false); requestAnimationFrame(() => fleetTrigger.current?.focus()) }
-  return <HudCardShell title="Travel review" onClose={onClose} closeLabel="Close travel card" className={`${styles.card} ${className ?? ''}`} footer={footerHost === 'card' ? <CompactTravelActions {...props} /> : undefined}>
+  return <HudCardShell title={footerHost === 'workspace' ? undefined : travelCardTitle(props)} onClose={onClose} closeLabel="Close travel card" className={`${styles.card} ${className ?? ''}`} footer={footerHost === 'card' ? <CompactTravelActions {...props} /> : undefined}>
     <div className={styles.content} data-testid="compact-travel-card">
-      <HudBackButton destination="objects" onClick={onBack} disabled={pending} />
+      <HudCardBack destination="objects" onClick={onBack} disabled={pending} />
       <div className={styles.identities}>
         <HudButton presentation="row" ref={fleetTrigger} className={styles.identity} aria-label="Change fleet" disabled={pending} onClick={onChooseFleet ?? (() => setChoosingFleet(value => !value))}>
           <span className={`hud-type-label ${styles.identityLabel}`}>Fleet</span>

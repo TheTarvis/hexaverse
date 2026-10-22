@@ -216,8 +216,10 @@ it('uses a modal page sheet on phones, returns to map, and retains mounted draft
     expect(screen.getByText('Map action')).toHaveAttribute('inert')
     expect(screen.getByRole('button', { name: 'Return to map' })).toHaveFocus()
     fireEvent.change(screen.getByLabelText('Command draft'), { target: { value: 'Saved local draft' } })
-    fireEvent.click(within(sheet).getByRole('button', { name: /^Objects$/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Objects$/ }))
     expect(screen.getByRole('dialog', { name: 'Objects panel' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
     fireEvent.click(screen.getByRole('button', { name: /^Fleets$/ }))
     expect(screen.getByLabelText('Command draft')).toHaveValue('Saved local draft')
     fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
@@ -299,13 +301,15 @@ it('keeps all three phone destinations and one sheet owner through Arrange hando
   fireEvent.click(screen.getByRole('button', { name: 'Objects' }))
   const search = screen.getByLabelText('Object search')
   fireEvent.change(search, { target: { value: 'Keep search' } })
-  const go = (name: string) => fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name }))
+  const go = (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
+    fireEvent.click(screen.getByRole('button', { name }))
+  }
   for (const name of ['Arrange HUD', 'Fleets', 'Arrange HUD', 'Objects']) {
     go(name)
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    const navigation = screen.getByRole('navigation', { name: 'HUD panels' })
-    expect(within(navigation).getAllByRole('button')).toHaveLength(3)
-    expect(within(navigation).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('navigation', { name: 'HUD panels' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Return to map' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByText('Map background')).toHaveAttribute('inert')
   }
   expect(search).toHaveValue('Keep search')
@@ -335,14 +339,14 @@ it('offers direct labeled phone icons with one visible navigation and restores i
   }
   const trigger = within(navigation).getByRole('button', { name: 'Fleets' })
   trigger.focus(); fireEvent.click(trigger)
-  const panelFrame = screen.getByRole('navigation', { name: 'HUD panels' }).closest('[data-slot="hud-card"]')!
+  const panelFrame = screen.getByRole('button', { name: 'Return to map' }).closest('[data-slot="hud-card"]')!
   expect(panelFrame).toHaveAttribute('data-hud-framing', 'frame')
-  expect(panelFrame.className).toBe(mapFrame.className)
   expect(activate).toHaveBeenCalledWith('fleets')
-  expect(screen.getAllByRole('navigation', { name: 'HUD panels' })).toHaveLength(1)
-  expect(within(screen.getByRole('navigation')).getByRole('button', { name: 'Fleets' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.queryByRole('navigation', { name: 'HUD panels' })).toBeNull()
   fireEvent.change(screen.getByLabelText('Command draft'), { target: { value: 'Preserve icon navigation draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
   fireEvent.click(screen.getByRole('button', { name: 'Arrange HUD' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Return to map' }))
   fireEvent.click(screen.getByRole('button', { name: 'Fleets' }))
   expect(screen.getByLabelText('Command draft')).toHaveValue('Preserve icon navigation draft')
   fireEvent.keyDown(screen.getByRole('button', { name: 'Return to map' }), { key: 'Escape' })

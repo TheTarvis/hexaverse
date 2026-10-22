@@ -5,6 +5,29 @@ raw-GLB review scene with camera framing, orbit controls and optional animation
 playback. The game's `SpacecraftPreview` also uses this canvas; there is one
 preview render loop. Review these under **Graphics** in Storybook.
 
+`ModelPreviewLayout` is the shared layout template for interactive model and
+action previews. It positions a small crosshair Reset view icon at the bottom-right
+inside the canvas area, with the shared chrome control's 44px hit target,
+accessible name and keyboard focus treatment. The overlay is a sibling of the
+orbit/drag surface so resetting cannot start an orbit gesture. Instructions and
+asset status stay below the viewport. SpacecraftPreview can set
+`showInstructions={false}` for compact tasks; its rotation instructions remain
+available through the preview's accessible description. Both `SpacecraftPreview` and
+`WebGPUModelView` compose this owner; their consumers inherit it automatically.
+
+For a custom interactive action scene, compose the same layout:
+
+```tsx
+<ModelPreviewLayout style={{ height: 200 }} onReset={resetCamera}>
+  <WebGPUCanvas label="Action preview" createScene={createScene} />
+</ModelPreviewLayout>
+```
+
+The scene owns `resetCamera` (restore its intended framing and invalidate the
+canvas); the layout owns placement and control presentation. Do not add a second
+reset below the canvas. Fixed-camera graphics specimens and full game maps use
+their own scene/navigation contracts rather than a nonfunctional preview reset.
+
 Standalone canvas and raw-model stories fill the Storybook viewport and resize
 with it. Narrow and HUD-card stories retain their explicit container sizes;
 the production detail-preview stories retain the game's compact panel layout.
@@ -13,10 +36,9 @@ the production detail-preview stories retain the game's compact panel layout.
 game scene renderers at full viewport size with fixed local fixtures and no
 backend/sign-in. Galaxy's existing **Overview** uses the in-app Stellar
 art pass: the same surrounding sky and distant-star shell as Solar System, spectral stars
-and a fixed 13-hop journey using existing fixture lanes. Its on-canvas controls
-and Storybook Controls stay synchronized: palette, proposed/active/hidden route,
+and a fixed 13-hop journey using existing fixture lanes. Storybook Controls configure palette, proposed/active/hidden route,
 completed hops, wide/close framing, vision preview and original/Stellar art.
-The text itinerary mirrors the route's system order. Stars Only and Original
+The fixture itinerary defines the route's system order. Stars Only and Original
 stories isolate the scenery and prior look. Solar System includes spectral-class
 and animation controls plus Frozen/Close stories. Both retain production camera
 interactions. The in-app Galaxy and System views now use this shared sky with
@@ -24,9 +46,8 @@ the surrounding Dark seams lattice at distance 16, brightness 0 and 0.5px width.
 The live galaxy also uses Stellar spheres and silver-blue lane filaments.
 
 Both overview stories offer the surrounding hex lattice, ground grid
-and no grid. Galaxy exposes the switch directly on canvas. Surrounding-grid
-distance, brightness and thickness are adjustable on the Galaxy review panel
-and in Storybook Controls for both scenes; Reset grid restores the current
+and no grid. The switch is in Storybook Controls. Surrounding-grid
+distance, brightness and thickness are adjustable in Storybook Controls for both scenes; Reset controls restores the
 review defaults. Distance controls shell radius and angular cell density so it
 has a visible effect from inside the camera-centered shell. Brightness is
 opacity; thickness is a real screen-space pixel width through Three's node-based
@@ -37,7 +58,7 @@ update the existing sky; they do not reset the map camera or renderer.
 thickness 0.5px. Zero brightness deliberately draws black seams in this mode;
 raising brightness lifts their ink color. **Luminous lines** retains the earlier
 opacity-based treatment, where zero brightness hides the grid. The treatment
-selector is available on canvas and in both stories' Controls.
+selector is available in both stories' Controls.
 
 `space-sky.ts` is the shared camera-centered backdrop/starfield factory. Its
 orientation adapts System's Y-up and Galaxy's Z-up. The enclosing lattice is a

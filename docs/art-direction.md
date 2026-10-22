@@ -77,7 +77,7 @@ concept images remain historical references. Travis then proposed an enclosing
 hex lattice, liked the first view and requested it feel farther away. The
 surrounding lattice is available as a Storybook prototype alongside ground/off
 variants. Both scenes expose distance, brightness and line-thickness controls;
-Galaxy also offers them directly on canvas. Exact settings and final lattice
+Galaxy offers them in Storybook Controls. Exact settings and final lattice
 appearance remain under review. These remain decorative, not world cells.
 
 Preferred treatment, 2026-10-19: Travis liked black borders at 0.5px because
