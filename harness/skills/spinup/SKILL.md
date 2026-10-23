@@ -1,6 +1,6 @@
 ---
 name: spinup
-description: Clean-restart this checkout's dev stack (dev Firebase emulators, backend, frontend, and agent) in GoLand Run tabs. Use for /spinup, $spinup, or a request to start or restart the local dev environment.
+description: Clean-restart this checkout's dev stack (dev Firebase emulators, backend, frontend, agent, and Storybook) in GoLand Run tabs. Use for /spinup, $spinup, or a request to start or restart the local dev environment.
 ---
 
 # Spinup — restart the dev stack in GoLand
@@ -22,7 +22,7 @@ configurations and ports untouched during spinup.
    configure Codex's MCP connections.
 3. Call `get_run_configurations` for this project before stopping processes.
    Confirm these configurations exist: `firebase:emulators`, `dev:backend`,
-   `dev:frontend`, and `dev:agent`.
+   `dev:frontend`, `dev:agent`, and `storybook`.
    If the MCP is unavailable, the project is not open in GoLand, or a required
    configuration is missing, report the specific blocker before killing
    anything. Preserve IDE Run tabs; do not silently switch to shell servers.
@@ -37,7 +37,7 @@ configurations and ports untouched during spinup.
 
 ## Stop the services being restarted
 
-Build an exact port list from `$PORT_FRONTEND`, `$PORT_BACKEND`, `$PORT_AGENT`,
+Build an exact port list from `$PORT_FRONTEND`, `$PORT_BACKEND`, `$PORT_AGENT`, `$PORT_STORYBOOK`,
 and the enabled dev emulator ports, including their UI (when enabled),
 hub, logging, and Firestore websocket ports (when Firestore is enabled).
 The Firebase hub and logging ports come from the lane even if implicit in
@@ -65,10 +65,10 @@ port is still held. Do not launch over a surviving listener.
    `fullOutputPath` for diagnostics. Poll each enabled dev emulator's service
    port with `nc -z localhost <port>` for up to 60 seconds before launching
    dependent services. A failed dependency stops dependent launches.
-3. Launch `dev:backend`, `dev:frontend`, and `dev:agent`
+3. Launch `dev:backend`, `dev:frontend`, `dev:agent`, and `storybook`
    in parallel using the current client's tools.
    Pass `waitForExit: false` and the same `projectPath` for each launch.
-4. Poll `$PORT_BACKEND`, `$PORT_FRONTEND`, and `$PORT_AGENT`
+4. Poll `$PORT_BACKEND`, `$PORT_FRONTEND`, `$PORT_AGENT`, and `$PORT_STORYBOOK`
    for up to 90 seconds. Use short polling calls
    so progress updates remain possible. A successful launch response alone
    does not prove readiness.
@@ -76,5 +76,5 @@ port is still held. Do not launch over a surviving listener.
    `fullOutputPath` and report the actual error. Do not relaunch blindly.
 
 Report a short service/port/status table, any killed PIDs, and failures with
-their reasons. Include the resolved frontend URL and dev emulator UI URL
+their reasons. Include the resolved frontend URL, Storybook URL, and dev emulator UI URL
 when enabled.
