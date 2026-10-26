@@ -1,6 +1,9 @@
 package fleet
 
-import "math"
+import (
+	"hexaverse/tuning"
+	"math"
+)
 
 // ClassStats is one ship class's stat contribution — looked up by
 // ShipEntry.Class from configuration, never stored per-ship on the fleet
@@ -66,10 +69,10 @@ func DefaultClassStats() map[ShipClass]ClassStats {
 	mp := DefaultMovementParams()
 	return map[ShipClass]ClassStats{
 		ClassSeed: {
-			MiningRate:   defaultSeedMiningRate,
-			HoldCapacity: defaultSeedHoldCapacity,
-			Accel:        defaultSeedAccel,
-			DriveOutput:  defaultSeedDriveOutput,
+			MiningRate:   tuning.Number("hulls.miningRate", defaultSeedMiningRate),
+			HoldCapacity: tuning.Number("hulls.holdCapacity", defaultSeedHoldCapacity),
+			Accel:        tuning.Number("hulls.acceleration", defaultSeedAccel),
+			DriveOutput:  tuning.Number("hulls.driveOutput", defaultSeedDriveOutput),
 			LaneRate:     1.0 / mp.LaneMsPerDistance,
 		},
 	}

@@ -32,11 +32,6 @@
   pointer-events: auto;
 }
 .settings > section { max-height: 100%; width: 100%; }
-.hint { margin: 0; color: #91a3b7; font: var(--hud-secondary-font); }
-.settingRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border: 0; padding: 8px 0; margin: 0; border-top: 1px solid #435d7066; }
-.settingRow legend { padding-right: 8px; color: #d5e7f1; }
-.moves { display: flex; gap: 2px; }
-.moves button { padding: 4px 7px; }
 .stage {
   position: absolute;
   inset: var(--workspace-panels-top, var(--workspace-default-panels-top)) 16px var(--workspace-panels-bottom, 112px);
@@ -48,7 +43,7 @@
 }
 .panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; align-self: start; max-height: 100%; pointer-events: auto; }
 .panel[hidden] { display: none; }
-.panel[data-lane='bottom'] { max-height: min(26vh, 240px); }
+.panel { max-height: min(26vh, 240px); }
 .panelToolbar { display: flex; flex-shrink: 0; gap: 12px; align-items: center; justify-content: space-between; color: #91a3b7; font: var(--hud-caption-font); background: #09131ef0; padding-left: 10px; border-bottom: 1px solid #435d7066; }
 .panelToolbar button { padding: 3px 8px; }
 .panelContent { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; overflow: auto; padding-top: 16px; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #435d70 #09131e; }
@@ -58,7 +53,7 @@
   .launchers { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; }
   .launchers button { white-space: nowrap; }
   .stage { inset: 168px 12px 12px; display: block; }
-  .panel, .panel[data-lane='bottom'] { height: 100%; max-height: 100%; }
+  .panel, .panel { height: 100%; max-height: 100%; }
   .panel[data-mobile-active='false'] { display: none; }
   .settings { top: 168px; left: 12px; width: calc(100% - 24px); max-height: calc(100% - 180px); }
 }
@@ -68,8 +63,6 @@
   .workspace button:not([data-slot='hud-close']) { min-width: 44px; min-height: 44px; }
   .workspace input, .workspace select { min-height: 44px; }
   .panelToolbar { min-height: 44px; }
-  .settingRow { gap: 6px; }
-  .moves { flex-wrap: wrap; }
 }
 
 /* Shared phone bands leave the heading, navigation and vitals outside the drawer. */
@@ -80,7 +73,7 @@
   .launchers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; min-width: 0; overflow: visible; }
   .launchers button { min-width: 0; min-height: 44px; white-space: normal; overflow-wrap: anywhere; padding-inline: 4px; }
   .stage { inset: var(--phone-panel-top, 200px) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); display: block; }
-  .panel, .panel[data-lane='bottom'] { width: 100%; height: 100%; max-height: 100%; }
+  .panel, .panel { width: 100%; height: 100%; max-height: 100%; }
   .panel[data-mobile-active='false'] { display: none; }
   .panelContent { overscroll-behavior: contain; overflow-x: hidden; overflow-wrap: anywhere; }
   .panelContent > * { max-width: 100%; min-width: 0; }
@@ -136,7 +129,7 @@
 .launchers > a, .launchers > button[aria-label] { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 48px; padding: 12px; }
 
 /* Desktop settings uses the same direct, labeled target size as phone icons. */
-.workspace .arrangeControl { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 48px; min-width: 44px; min-height: 44px; padding: 12px; }
+.workspace .settingsControl { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 48px; min-width: 44px; min-height: 44px; padding: 12px; }
 
 .launchers.cardNavigation { margin-inline: 0; background: transparent; }
 
@@ -155,3 +148,12 @@
 @media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
   .cardNavigation { gap: 8px; }
 }
+
+/* Shared search owns a bounded results viewport inside a phone panel. */
+@media (max-width: 760px), (max-height: 500px) and (max-width: 1024px) {
+  .workspace[data-mobile-open='true'] .panelContent > div:has([data-slot='object-search']) { flex: 1; height: 100%; }
+  .workspace[data-mobile-open='true'] .panelContent [data-hud-framing='section']:has([data-slot='object-search']) { flex: 1; overflow: hidden; }
+}
+
+.settingsTabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.settingsTabs [aria-selected="true"] { color: var(--hud-accent, #83d7ed); text-decoration: underline; }

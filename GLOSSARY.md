@@ -42,6 +42,12 @@ Procedurally generated graph of systems and inter-system lanes.
 **[System](docs/domains/world.md)**:
 Local continuous 3D space containing stars, orbiting bodies and features.
 
+**[Body](docs/domains/world.md)**:
+A natural planetary object or collection within a system: a planet, moon, asteroid or belt. Its physical kind is independent of whether it is a resource site.
+
+**[Structure](docs/domains/world.md)**:
+A manufactured installation within a system, including a station or lane gate.
+
 **[Lane](docs/domains/travel.md)**:
 Inter-system travel connection; corporations chart lanes through observation or travel.
 
@@ -176,6 +182,9 @@ The movement and exchange of resources, cargo, fuel, credits and intelligence be
 
 **[Station](docs/domains/stations.md)**:
 Dockable trading venue, distinct from mineable interior features.
+
+**[Resource site](docs/domains/economy.md)**:
+A location that hosts resources for extraction, independently of its physical kind; planets, moons, asteroids and belts can be resource sites.
 
 **[Credits](docs/domains/economy.md)**:
 The currency held and spent by corporations.

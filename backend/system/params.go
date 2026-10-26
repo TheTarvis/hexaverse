@@ -1,6 +1,9 @@
 package system
 
-import "hexaverse/common"
+import (
+	"hexaverse/common"
+	"hexaverse/tuning"
+)
 
 // CharacterDial is the per-region tuning that makes a star_rich interior
 // visibly denser and richer than a dead one from the same generator. Per the
@@ -58,7 +61,7 @@ func DefaultParams() GenerationParams {
 		Radius:           common.Tuning().MaxOrbitalIndex,
 		InnerMaxRing:     5,
 		MidMaxRing:       11,
-		RetrogradeChance: 0.1,
+		RetrogradeChance: tuning.Number("generation.retrogradeChance", 0.1),
 		ByCharacter: map[string]CharacterDial{
 			"star_rich": {ExtraPlanets: 3, Belts: 2, Specials: 2, Hazards: 2, RichnessMult: 1.0},
 			"normal":    {ExtraPlanets: 1, Belts: 1, Specials: 1, Hazards: 1, RichnessMult: 0.65},

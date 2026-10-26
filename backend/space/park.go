@@ -193,7 +193,7 @@ func StationKeepUpkeep(rate float64, fromMs, toMs common.WorldMillis) float64 {
 // components, or DefaultPhaseIndex if both are zero (space-kinematics:
 // "Releasing a Station-Keep Hold Re-Circularizes at the Held Offset's
 // Planar Radius").
-func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis) Park {
+func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis, period ...common.WorldMillis) Park {
 	planarRadius := math.Sqrt(float64(offset.X*offset.X) + float64(offset.Z*offset.Z)) // determinism:allow(pinned) family:parkPosition — sqrt is correctly-rounded and identical across Go build targets; pinned by fixtures/space/cases.json's parkPosition family via three recorded released holds (HAND CASES ONLY: no sweep draws a release — recorded as such in fixtures/space/mirror-map.json's coverage entry for ReleaseStationkeep)
 	radius := planarRadius
 	if radius < MinOrbitRadius {
@@ -205,7 +205,7 @@ func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis
 	} else {
 		phase, _ = PhaseIndexOf(Vec3{X: offset.X, Z: offset.Z})
 	}
-	return Park{
+	park := Park{
 		Kind:     ParkOrbit,
 		BodyId:   bodyId,
 		Radius:   radius,
@@ -213,6 +213,10 @@ func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis
 		Phase:    phase,
 		EpochMs:  releaseMs,
 	}
+	if len(period) > 0 && period[0] > 0 {
+		park.PeriodMs = period[0]
+	}
+	return park
 }
 
 // StarClearanceRadius is the documented function of a star's size that
@@ -221,4 +225,14 @@ func ReleaseStationkeep(bodyId string, offset Vec3, releaseMs common.WorldMillis
 // to Clear the Star").
 func StarClearanceRadius(starSize float64) float64 {
 	return float64(starClearanceFactor * starSize)
+}
+
+// InsertionPeriodFor uses the period law explicitly supplied by the body source.
+func InsertionPeriodFor(b Bodies, radius float64) common.WorldMillis {
+	if law, ok := b.(interface {
+		ParkingPeriod(float64) common.WorldMillis
+	}); ok {
+		return law.ParkingPeriod(radius)
+	}
+	return InsertionPeriod(radius)
 }

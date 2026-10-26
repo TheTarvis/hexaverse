@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite'
-import { ArrowLeftIcon, ChevronDownIcon, FunnelIcon, InformationCircleIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, ChevronDownIcon, FunnelIcon, InformationCircleIcon, MagnifyingGlassIcon, RocketLaunchIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { HudCardShell } from './HudCardShell'
 import { HudIcon } from './HudIcon'
 import { HudHeading, HudText } from './HudTypography'
@@ -8,6 +8,7 @@ import styles from './hud-icon.stories.module.css'
 const utilities = [
   { label: 'Back', icon: ArrowLeftIcon },
   { label: 'Search', icon: MagnifyingGlassIcon },
+  { label: 'Fleet', icon: RocketLaunchIcon },
   { label: 'Filter', icon: FunnelIcon },
   { label: 'Expand', icon: ChevronDownIcon },
   { label: 'Info', icon: InformationCircleIcon },

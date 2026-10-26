@@ -7,6 +7,7 @@ package mine
 
 import (
 	"fmt"
+	"hexaverse/tuning"
 	"math"
 
 	"hexaverse/system"
@@ -103,10 +104,15 @@ const (
 // validateMineParams asserts the ceiling this comment claims "by construction"
 // actually holds, at construction time — see its doc comment.
 func DefaultMineParams() MineParams {
+	minRun := tuning.Number("mining.minRunTons", defaultMinRunTons)
+	tonsPerRichness := tuning.Number("mining.tonsPerRichness", defaultTonsPerRichness)
 	ceil := defaultMaxLedgerDeltasCeil
+	if tuning.Enabled() {
+		ceil = max(ceil, int(math.Ceil(tonsPerRichness/minRun)))
+	}
 	p := MineParams{
-		MinRunTons:        defaultMinRunTons,
-		TonsPerRichness:   defaultTonsPerRichness,
+		MinRunTons:        minRun,
+		TonsPerRichness:   tonsPerRichness,
 		MaxFeatureIdBytes: defaultMaxFeatureIdBytes,
 		MaxLedgerDeltas: map[system.FeatureType]int{
 			system.FeatureBelt:     ceil,

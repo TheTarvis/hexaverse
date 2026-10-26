@@ -156,7 +156,7 @@ func FocusedScan(w World, scanner space.Vec3, hostId string, ships map[string]Sh
 	if err != nil {
 		return nil, err
 	}
-	if !WithinRange(scanner, hostPos, FocusedScanRange) {
+	if !WithinRange(scanner, hostPos, w.params().FocusedScanRange) {
 		return nil, ErrScanOutOfRange
 	}
 	occluded, err := w.starOccludes(scanner, hostPos, t)

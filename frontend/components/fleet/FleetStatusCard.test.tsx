@@ -49,12 +49,18 @@ it('hides stale facts and commands on failed reads, then restores disclosure sta
 it('keeps Stop in the travel task footer, with busy state and Back owned by the same presentation', () => {
   const input = { ...props(), travelControlsOpen: true }
   const view = render(<FleetStatusCard {...input} />)
+  expect(screen.queryByRole('button', { name: /^Cargo/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /^Ships/ })).toBeNull()
+  expect(screen.queryByText('Combined hold')).toBeNull()
   expect(screen.getByRole('button', { name: 'Stop travel' }).closest('[data-slot="hud-footer"]')).not.toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Stop travel' }))
   expect(input.onStop).toHaveBeenCalledOnce()
   view.rerender(<FleetStatusCard {...input} pending stopPending />)
   expect(screen.getByRole('button', { name: 'Stopping…' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Back to fleet status' })).toBeDisabled()
+  view.rerender(<FleetStatusCard {...input} travelControlsOpen={false} />)
+  expect(screen.getByRole('button', { name: /^Cargo/ })).toBeVisible()
+  expect(screen.getByRole('button', { name: /^Ships/ })).toBeVisible()
 })
 
 

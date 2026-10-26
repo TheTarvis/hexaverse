@@ -5,12 +5,13 @@ import { queryClient } from '@/lib/query-client'
 import { AccountProvider } from './account-provider'
 import { CorporationProvider } from './corporation-provider'
 import { AppMusicProvider } from './audio/AppMusicProvider'
+import { LocalTuningProvider } from './tuning/LocalTuningContext'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <CorporationProvider><AppMusicProvider>{children}</AppMusicProvider></CorporationProvider>
+        <LocalTuningProvider><CorporationProvider><AppMusicProvider>{children}</AppMusicProvider></CorporationProvider></LocalTuningProvider>
       </AccountProvider>
     </QueryClientProvider>
   )

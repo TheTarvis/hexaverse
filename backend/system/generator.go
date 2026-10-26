@@ -100,7 +100,7 @@ func Generate(seed int64, region string, skeleton galaxy.Skeleton, params Genera
 		}
 		parentSize := featureSizeById(features, gid)
 		localRadius := MoonOrbitLocalRadius(space.Body{Id: gid, Size: parentSize}, r2.Float64())
-		period := space.InsertionPeriod(localRadius)
+		period := (&BodyTable{}).ParkingPeriod(localRadius)
 		// A moon's side comes from the system's dominant direction directly
 		// (design.md Decision 17) — it is disk-born around its parent.
 		incl := inclinationFor(sysDir < 0, r2.Float64())

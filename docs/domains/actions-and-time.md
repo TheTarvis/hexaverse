@@ -10,12 +10,33 @@ an ETA and resolves through its registered domain resolver. Presentation clocks,
 decoration and HUD preferences cannot change gameplay state or substitute for
 server acceptance. Movement/economy/sensors pages own their verb-specific rules.
 
+## Local clock tuning — accepted direction, 2026-10-26
+
+Travis approved changing clock speed in the running local simulation while
+preserving current world time, positions and committed action timestamps. The
+new speed governs advancement from the change onward. This continuity must also
+survive backend restarts. A remaining ten world-minute action takes five wall
+minutes at scale 2. While the backend is stopped, world time continues advancing
+at its last active speed. On restart, account for that elapsed time before
+applying any newly imported speed continuously.
+
+The local [profile store](../../backend/tuning/store.go) now persists a world-time,
+wall-time and scale anchor. Apply reanchors at the current world time; startup
+advances downtime at the old speed before adopting the saved startup speed.
+[Clock tests](../../backend/tuning/store_test.go) cover live edits, staged import
+and restart continuity. Production and explicitly injected clocks retain the
+fixed-epoch implementation. [Developer tuning](../hud.md#developer-tuning-workspace--accepted-direction-2026-10-26)
+owns the local-only UI and startup-profile workflow. Tuning does not authorize
+rewriting committed action ETAs.
+
 ## Current implementation and gaps
 
 - [World time](../../backend/common/worldtime.go) derives scaled elapsed
-  milliseconds from an epoch. Gameplay timestamps use `WorldMillis`; account
+  milliseconds from an epoch for production/injected clocks and from a durable
+  anchor for local tuning. Gameplay timestamps use `WorldMillis`; account
   administration also has wall-clock timestamps, so not all persistence uses
-  simulation time. Changing world scale reinterprets the time mapping.
+  simulation time. Changing scale on the fixed-epoch implementation reinterprets
+  timestamps; local tuning uses the continuous anchored implementation instead.
 - [Action model](../../backend/action/model.go) and [service](../../backend/action/service.go)
   implement running → done/cancelled, frozen ETA, channel claiming and registered
   resolution. `ResolveDue`/`ResolveActive` settle due work on reads; push/scheduler

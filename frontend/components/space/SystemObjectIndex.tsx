@@ -9,7 +9,9 @@ import { planetKind } from './webgl/scene-art'
 import { SpacecraftPreview } from './SpacecraftPreview'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { HudButton } from '@/components/hud/HudControls'
-import { Input } from '@/components/catalyst/input'
+import { ObjectSearch, emptyObjectSearch, type ObjectSearchEntry } from './ObjectSearch'
+import { resolveHudObjectKind } from '@/components/hud/HudObjectThumbnail'
+import type { ResourceKind } from '@/lib/types/system-space'
 import styles from './system-object-index.module.css'
 
 export interface IndexedObject {
@@ -24,6 +26,9 @@ export interface IndexedObject {
   starClass?: string
   className?: string
   knownFrom?: string
+  category?: ObjectSearchEntry['category']
+  resourceKinds?: ResourceKind[]
+  resourceSite?: boolean
   resources?: string
   fleets?: string[]
   fleet?: {
@@ -45,7 +50,7 @@ function ObjectThumbnail({ object, className }: { object: IndexedObject; classNa
 }
 
 /** Shared object browser. Opening details never issues a command. */
-export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, onFocus, offscreen, onOffscreen, canPlot = false, onPlot, systemName = 'System', listActions, detailContent, inspectorBody, compact = false, servicesWithoutDetails = false, detailContentFor, tutorialTarget, plotHint, loading = false, failed = false, onRetry, disabled = false, selectedFleetId, onSelectFleet, onFocusFleet, fleetsLoading = false, fleetsFailed = false, onRetryFleets }: {
+export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, onFocus, offscreen, onOffscreen, canPlot = false, onPlot, onMine, onMineFleet, listActions, detailContent, inspectorBody, compact = false, servicesWithoutDetails = false, detailContentFor, tutorialTarget, plotHint, loading = false, failed = false, onRetry, disabled = false, selectedFleetId, onSelectFleet, onFocusFleet, fleetsLoading = false, fleetsFailed = false, onRetryFleets }: {
   selectedFleetId?: string | null
   onSelectFleet?: (fleetId: string) => void
   onFocusFleet?: (fleetId: string) => void
@@ -66,6 +71,8 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
   failed?: boolean
   onRetry?: () => void
   disabled?: boolean
+  onMine?: () => void
+  onMineFleet?: (id: string) => void
   canPlot?: boolean
   onPlot?: () => void
   objects: IndexedObject[]
@@ -103,36 +110,48 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
     setDetails(null)
     if (details) requestAnimationFrame(() => (expandButtons.current.get(details) ?? searchRef.current)?.focus())
   }
-  const [search, setSearch] = useState('')
-  const matches = available.filter(object => `${object.label ?? object.name} ${object.catalogueRef ?? ""} ${object.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
+  const [search, setSearch] = useState(emptyObjectSearch)
+  const entries: ObjectSearchEntry[] = available.map(object => {
+    const kind = object.kind.trim().toLowerCase().replaceAll(' ', '_')
+    return {
+      id: rowKey(object), category: object.category, name: object.label ?? object.name,
+      kind: object.fleet ? 'fleet' : kind === 'fleet' ? 'other' : object.group === 'Lane gates' ? 'gate'
+        : kind === 'asteroid_belt' ? 'belt' : kind === 'asteroid' || kind === 'belt' ? kind : resolveHudObjectKind(object.kind) ?? 'other',
+      analyzed: !['contact', 'unresolved_contact'].includes(kind),
+      resourceSite: object.resourceSite ?? object.group === 'Resource sites', resources: object.resourceKinds,
+      subtitle: [object.enclosingStar, object.catalogueRef, object.kind, object.fleet?.activity, object.fleet?.systemLabel, object.name === tutorialTarget ? 'Tutorial destination' : null].filter(Boolean).join(' · '),
+    }
+  })
   return <div className={`${styles.indexShell} ${compact ? styles.compact : ''}`}>
     {/* Rows stay visible; `open` controls expensive detail previews, not disclosure. */}
     <div className={styles.indexPanels} data-details={!!detailObject || servicesWithoutDetails} onKeyDown={event => {
       if (event.key === 'Escape' && details) { event.stopPropagation(); closeDetails() }
     }}>
       <aside id="system-index" className={styles.systemIndex} aria-label="System index" style={inspectorBody ? { display: 'none' } : undefined}>
-        <div className={styles.searchHeader} data-testid="system-index-search-header">
-        <HudText variant="label">{systemName} / Known objects</HudText>
-        {listActions}
-        <Input ref={searchRef} type="search" autoComplete="off" spellCheck={false} enterKeyHint="search" data-testid="system-index-search" aria-label="Find a system object" placeholder="Find a world, station, fleet…" value={search} onChange={event => setSearch(event.target.value)} />
-        </div>
-        <div data-testid="system-index-results">
+        {listActions && <div className={styles.searchHeader}>{listActions}</div>}
+        <div className={styles.searchBody} data-testid="system-index-results">
         {loading && <HudText variant="secondary" role="status">Loading system objects…</HudText>}
         {failed && <div role="alert"><HudText variant="secondary">System objects are unavailable.</HudText><HudButton variant="quiet" data-testid="index-retry" onClick={onRetry}>Retry</HudButton></div>}
         {fleetsLoading && <HudText variant="secondary" role="status">Loading fleets…</HudText>}
         {fleetsFailed && <div role="alert"><HudText variant="secondary">Fleet telemetry is unavailable.</HudText><HudButton variant="quiet" data-testid="index-fleets-retry" onClick={onRetryFleets}>Retry fleets</HudButton></div>}
-        {Array.from(new Set(available.map(object => object.group))).map(group => {
-          const rows = matches.filter(object => object.group === group)
-          return rows.length > 0 && <section key={group}><HudHeading variant="section" level={3}>{group}</HudHeading>{rows.map(object => <div key={rowKey(object)} className={styles.indexRow} data-selected={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name}>
-            <HudButton presentation="row" ref={el => { if (el) expandButtons.current.set(rowKey(object), el); else expandButtons.current.delete(rowKey(object)) }} data-testid={object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`} aria-pressed={object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name} aria-expanded={!!detailObject && rowKey(detailObject) === rowKey(object)} aria-controls="object-details" onClick={() => { if (!open) onOpen(true); if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name); setDetails(detailObject && rowKey(detailObject) === rowKey(object) ? null : rowKey(object)) }}>
-              <ObjectThumbnail object={object} />
-              <span className={styles.rowCopy}><span className="hud-type-compact">{object.label ?? object.name}</span><small>{object.enclosingStar && `${object.enclosingStar} · `}{object.catalogueRef && `${object.catalogueRef} · `}{object.kind}{object.name === tutorialTarget ? ' · Tutorial destination' : ''}</small></span>
-              <span aria-hidden="true" className={styles.rowChevron}>{detailObject && rowKey(detailObject) === rowKey(object) ? '‹' : '›'}</span>
-            </HudButton>
-          </div>)}</section>
-        })}
-        {!loading && !failed && !fleetsLoading && !fleetsFailed && matches.length === 0 && <HudText variant="secondary" role="status">{available.length ? 'No known objects match. Try a name or type.' : 'No objects have been disclosed in this system.'}</HudText>}
-        <small className={styles.muted}>Select an object to open or close its details.</small>
+        <ObjectSearch items={entries} value={search} onChange={setSearch} inputRef={searchRef} inputTestId="system-index-search"
+          onSelect={id => {
+            const object = available.find(object => rowKey(object) === id)
+            if (!object) return
+            if (!open) onOpen(true)
+            if (object.fleet) onSelectFleet?.(object.fleet.id); else onSelect(object.name)
+            setDetails(detailObject && rowKey(detailObject) === id ? null : id)
+          }}
+          resultProps={item => {
+            const object = available.find(object => rowKey(object) === item.id)!
+            return {
+              ref: el => { if (el) expandButtons.current.set(item.id, el); else expandButtons.current.delete(item.id) },
+              'data-testid': object.fleet ? `index-fleet-${object.fleet.id}` : `index-${object.name}`,
+              'aria-pressed': object.fleet ? selectedFleetId === object.fleet.id : !fleetDetail && selected === object.name,
+              'aria-expanded': !!detailObject && rowKey(detailObject) === item.id,
+              'aria-controls': 'object-details',
+            }
+          }} />
         </div>
       </aside>
       {(detailObject || detailContent || inspectorBody) && <aside style={!detailObject && !inspectorBody && !servicesWithoutDetails ? { display: 'none' } : inspectorBody ? { padding: 0, border: 0, background: 'transparent', overflow: 'visible' } : undefined} id="object-details" className={styles.objectDetails} aria-label={detailObject ? `Details for ${detailObject.label ?? detailObject.name}` : servicesWithoutDetails ? 'Docked station services' : undefined}>
@@ -158,6 +177,8 @@ export function SystemObjectIndex({ objects, selected, open, onOpen, onSelect, o
         </div>
         {detailObject && <div className={styles.indexActions}>
           <HudButton variant="quiet" data-testid="index-focus" disabled={disabled} onClick={() => { if (fleetFacts) onFocusFleet?.(fleetFacts.id); else onFocus() }}>Focus {detailObject.label ?? detailObject.name} ⌖</HudButton>
+          {fleetFacts && onMineFleet && <HudButton variant="quiet" disabled={disabled} onClick={() => onMineFleet(fleetFacts.id)}>Mine</HudButton>}
+          {!fleetFacts && onMine && <HudButton variant="quiet" disabled={disabled} onClick={onMine}>Mine here</HudButton>}
           {!fleetFacts && (canPlot ? <HudButton variant="primary" className={styles.primary} data-testid="details-plot" disabled={disabled} onClick={onPlot}>Travel here</HudButton> : plotHint ? <small className={styles.muted}>{plotHint}</small> : null)}
           {!fleetFacts && onOffscreen && <HudButton variant="quiet" data-testid="simulate-offscreen" aria-pressed={offscreen} onClick={onOffscreen}>Preview off-screen locator</HudButton>}
         </div>}

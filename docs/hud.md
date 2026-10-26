@@ -28,6 +28,73 @@ prototype. Its historical exclusions remain accurate for that slice. Travis's
 2026-10-16 authorization expands the current assignment to production integration;
 it does not turn fixture estimates into production physics or authorize new rules.
 
+## Developer tuning workspace — accepted direction, 2026-10-26
+
+Travis approved local-only developer tuning for game speed, travel, body and ship
+orbits, hull stats, fuel, sensors, mining, markets and generation. Reuse the
+default Storybook card foundation (`HudCardShell`). Cards with tunable items
+provide header buttons for their controls; global controls belong in the Settings
+card. Settings has Audio, Account and Tuning tabs, with Tuning available only
+locally. Remove the Layout controls and their corresponding code. This supersedes
+the earlier user-arrangeable HUD direction below: remove dock selection, ordering,
+layout persistence and Reset Layout. Preserve ordinary opening/closing, the mobile
+card switcher and mounted hidden content. Fixed positions are Objects left and
+Fleets/Fleet status right, when those panels are supplied by the view. This also
+supersedes the proposed dedicated Developer → Tuning page. Camera and visual
+controls remain in their existing Storybook stories for the first version.
+
+A contextual tuning button replaces its card's content with tuning controls;
+Back restores the previous card state. Apply changes the running local simulation
+where supported. Controls that require a restart or regeneration explicitly say
+so. Orbital-law and generation edits are staged until an explicit Regenerate
+local world action. Clock speed remains live. Contextual controls edit shared
+gameplay rules, such as a ship class's stats across the local world; they do not
+create individual-object overrides. Clock
+continuity follows the [actions and time contract](domains/actions-and-time.md#local-clock-tuning--accepted-direction-2026-10-26).
+
+Show current settings and whether applying a change requires a restart or world
+regeneration. Export downloads one versioned JSON profile containing all gameplay
+tuning. Apply also saves accepted values to the local startup profile, so tuning
+survives a restart. Import JSON in Settings validates and stages a locally saved
+startup profile. The backend loads it on restart before service construction or
+world generation; generation/orbital-law changes still require regeneration.
+
+Each tuning section has Restore defaults; Settings → Tuning also has Restore all
+tuning defaults. These populate the form and require Apply to save. Regeneration
+requirements still apply to restored values. [World](domains/world.md#local-tuning--accepted-direction-2026-10-26)
+owns the gameplay reset scope; [economy](domains/economy.md#local-capacity-tuning--accepted-direction-2026-10-26)
+owns cargo truncation. Travis emphasized keeping this a simple local dev tool,
+without elaborate UX or cargo-priority policies.
+The local implementation now uses [TunableHudCard](../frontend/components/tuning/TunableHudCard.tsx)
+for contextual entry and [TuningCard](../frontend/components/tuning/TuningCard.tsx)
+for the shared editor. Original task content stays mounted while tuning is open;
+its header/footer commands are hidden along with its body. The
+[workspace](../frontend/components/hud/HudWorkspace.tsx) uses fixed docks and
+transient visibility, with no layout preferences, migrations or arrangement UI.
+The historical Arrange story URL now displays Settings.
+
+Local backend startup enables tuning only with `ENV=LOCAL` and a loopback
+Firestore emulator. Start/restart the backend normally, then use a card's Tune
+header button or Settings → Tuning. The server supplies the editable catalogue,
+units, limits, defaults and application requirements; the client does not own a
+second gameplay configuration. [Devtools](../backend/devtools/) registers the
+authenticated `/v1/dev/tuning` endpoints only in that local environment. Tests
+and nonlocal deployments do not expose those mutation routes.
+
+Apply saves the profile and activates live values. Import JSON saves a profile
+for the next backend restart; Export JSON downloads the saved profile. The local
+state file is `.scratch/local-tuning/state.json`, resolved from the usual backend
+working directory; `HEXAVERSE_TUNING_FILE` can select a different path. It also
+holds the clock anchor and the generation settings of the current world. Keep
+that state file across restarts to retain continuity; exported profiles contain
+tuning values only. Orbital laws, generation, resource richness, fuel efficiency
+and station-keeping reserve wait for Regenerate local world, avoiding changes to
+stored geometry or accrued upkeep. Other exposed values apply live.
+
+The [Local tuning stories](../frontend/components/tuning/LocalTuning.stories.tsx)
+exercise the real editor and contextual header/Back flow with served-state
+fixtures. Domain owners retain authority over gameplay rules and time semantics.
+
 ## Card rebuild direction — 2026-10-20
 
 Travis considers the reviewed travel-card direction sufficient for integration,
@@ -49,8 +116,7 @@ Travel review replaces the Objects body, with contextual entries in its list
 header. Fleet status now has its own card and launcher in System and Galaxy.
 Real estimates, Start/Stop, Cut drive, eligible Jump, accepted-receipt handoff
 and native fleet selection remain. Station services,
-inspection, discovery and world/settlement reads remain. Sensors and general
-nonstation mining setup have no HUD entry during this staged rebuild; sensor
+inspection, discovery and world/settlement reads remain. Sensors have no HUD entry during this staged rebuild; sensor
 onboarding cannot complete until its replacement exists. Their services and
 reusable task components remain for deliberate reintegration. The removal pass
 is not completion of the full card rework.
@@ -84,9 +150,9 @@ Each shows thumbnail/name and activity or object type, with a right-side dropdow
 chevron replacing a separate Change button. Each identity is a selection target.
 Trip facts use left-aligned labels and right-aligned values. Production and
 fixture journeys render the same `CompactTravelCard`. Its fleet identity opens
-the existing eligible-fleet native selection; its destination identity returns
-to Objects. The fixture A/B/C chooser comparison remains unresolved for larger
-collections and has not been adopted as a live global search. The
+the shared search restricted to local, non-transit owned fleets; its destination
+identity returns to Objects, which uses the same search foundation. The former
+fixture A/B/C chooser comparison is retired by the 2026-10-24 consolidation. The
 [travel controls design record](../.scratch/hud-travel-card/controls-design.md)
 preserves comparisons and review evidence.
 
@@ -115,8 +181,8 @@ Current ownership after the 2026-10-21 shared-card adoption:
   It consumes served fleet, running mine/scan and settled scan reads; missing
   readings remain unavailable. Changing fleets resets disclosures; hiding a
   panel preserves them. Stop/Cut drive/Jump remain explicit task actions supplied
-  by each view's existing hooks and synchronous guards. Summary exposes focus
-  and travel entry; mining/sensor setup remains outside this adoption.
+  by each view's existing hooks and synchronous guards. Summary exposes focus, travel and eligible mining entry. Mining now uses the
+  shared task below; sensor setup remains outside this adoption.
 - Accepted travel opens Fleet status with travel controls available. Back returns
   to its summary. Objects browsing remains independent. Accepted mutation reads
   remain visible until the next fleet read supersedes them; dismissing a panel
@@ -161,7 +227,11 @@ advance. Vertical scrolling, pinch zoom and model orbit remain independent.
 
 HudCardTabs owns this reusable controlled tab/swipe interaction; callers own tab
 content and per-fleet selection. A swipe must not also activate an action button.
-The prototype's enabled commands open a fixture target picker; selecting a target
+The prototype's enabled commands reuse the same ObjectSearch as its Objects
+browser. Features supply disclosed eligible targets; ObjectSearch owns the common
+query, type/category filters, result rows and empty state. Keep browsing and each
+action's search state separately so a retained fleet-only filter does not hide
+travel destinations; Back restores the prior view and filters. Selecting a target
 opens its inspector without issuing an order. Future command handoffs and live
 capability/eligibility rules remain separate work. Do not treat the sample Attack
 and Jump disabled reasons as implemented combat or generalized eligibility rules.
@@ -171,14 +241,117 @@ review entry configuration stays in Storybook Controls. Production FleetStatusCa
 and workspace integration, actual browser/touch verification and in-game review
 remain open.
 
+### Shared object search direction — 2026-10-23
+
+Travis confirmed Storybook review followed by integration of one shared object
+search component across browsing and target-selection consumers. Storybook keeps
+using the integrated component with fixtures/callbacks; remove superseded UI.
+Callers define and expose the search scope. Browsing opens inspection; action
+target selection returns to its originating flow without issuing an order.
+
+The first review assumes small collections: one text input, an object grid,
+primary object-type icon presets and one relevant secondary preset level.
+Tiles show a thumbnail, name and short context line; detailed facts belong in
+inspection. Back and close/reopen preserve query, filters and scroll separately
+per flow. Fleet secondary presets are All / Owned / Friendly / Enemy / Unknown;
+Unknown means unanalyzed burns. Structures combines stations and gates, with
+All / Stations / Gates / Owned stations presets; resource-site
+presets are All / disclosed resource kind. Sites without disclosed contents
+remain under All. One secondary preset is active at a time. Action callers supply
+eligible candidates; editable presets only narrow that set. Friendly/enemy/unknown
+scenarios remain simulated until production disclosure supports them.
+Switching object types preserves the text query and remembers each type's
+secondary preset within that flow. Match names and disclosed context text;
+alphabetically order results without a sort control. Distinguish loading,
+failed reads and no matches. Retry handles failures; Clear filters handles no
+matches while preserving caller scope and eligibility restrictions. Browsing
+may show remembered objects with explicit last-observed context; action callers
+decide whether that knowledge is sufficient for selection. Remembered positions
+must not imply live tracking. The visual comparison remains open.
+
+Physical categories clarified on 2026-10-23: **Bodies** replaces the former
+Worlds/Moons split, with All / Planets / Moons / Asteroids / Belts secondary
+presets. **Resource sites** is an overlapping role, not a physical kind. A moon
+with disclosed water appears under both Bodies → Moons and Resource sites →
+Water; the All objects grid still shows it once. An explicitly disclosed resource
+host with unknown contents remains under Resource sites → All. Merely being a
+body does not establish resource contents or action eligibility. Stars remain
+separate. Existing shared search journeys include planet/moon/asteroid/belt
+fixtures to exercise the overlap; their mining eligibility remains simulated.
+Main filter labels are **All**, **Fleets**, **Structures**, **Resources** and
+**Bodies**, with Stars/Systems/Other available when relevant. Resources is the
+short UI label for the resource-site role; it does not rename the glossary term.
+Structures replaces the separate Stations and Gates primary filters; Owned
+stations preserves the previously accepted station ownership narrowing at the
+same secondary level.
+
+The [search brief](../.scratch/object-search-card/brief.md)
+records feedback and foundation gaps. This is accepted direction, not production
+integration or visual acceptance.
+
+The shared foundation is now implemented as ObjectSearch with an ObjectSearchCard
+shell wrapper. Its Storybook foundation and browse/travel/mining-target/fleet-choice
+journeys consume the same components. Travel returns to CompactTravelCard with
+the selected destination/fleet; mining demonstrates target handoff without an
+order. Compact and image-led grids remain an active comparison. Shared thumbnails
+own the added large size; phone type presets use a horizontal strip. Targeted
+desktop/phone Chromium checks and render inspection passed; physical-touch,
+visual and in-game acceptance remain open. Production consumer migration is
+recorded in the selection audit below.
+
+Search header correction, 2026-10-23: the fleet filter uses the shared Heroicons
+rocket through HudIcon. Search cards use only HudCardShell's title plaque and
+inset Back/Close row; the extra scope/context header band is removed. Scope and
+optional fleet/target context are structured search-title data formatted by
+the shared title owner, including overflow behavior. Search body styling owns
+only layout, not a replacement header or title.
+
+Latest search comparison, 2026-10-23: Travis requested slimmer single-column
+rows. The compact layout now uses one full-width target per row, 32px shared
+thumbnails and tighter vertical spacing. Shared row focus/hover and minimum
+touch targets remain. The image-led grid stays available for comparison;
+this is a requested trial, not final visual acceptance.
+
+## Selection-card consolidation — 2026-10-24
+
+Travis requested an audit of HUD selection cards and replacement of private
+selectors with the foundational search/object card. `ObjectSearch` owns the
+search field, type/preset filtering, ordering, results and filter state contract;
+`ObjectSearchCard` hosts it in the shared shell. Workspace consumers compose the
+same search body within their existing owning frame.
+
+| Surface | Shared owner / disposition |
+| --- | --- |
+| Travel review: command fleet | `CompactTravelCard` uses `ObjectSearchCard`; native dropdown removed. Local/non-transit eligibility remains caller-owned. Workspace title changes to selection context and commitment footer is absent during choice. |
+| Travel review fixtures: fleet/destination | `TravelStudy` starts with `ObjectSearchCard`: choose fleet then destination, or destination then fleet, before entering review. Each choice retains its own search state; review identities reopen shared search. Private A/B/C chooser, styles and comparison story removed; its URL redirects to the shared travel journey. |
+| Mining review: fleet/object, both entry paths | `MiningPlacementStudy` uses `ObjectSearchCard`; private one-row lists removed. Back history, setup draft and simulated acceptance remain in the journey owner. |
+| System Objects: browse/inspect | `SystemObjectIndex` uses `ObjectSearch`, retaining body/fleet identity separation, anonymous contacts, independent read recovery, inspector/services and focus return. Resources use disclosed kinds supplied by the caller. |
+| Galaxy Objects: browse/inspect | `GalaxyObjectBrowser` uses `ObjectSearch`, retaining catalogue/region/star-class matching, inspection and focus return. |
+| Fleet status review: Objects | `FleetStatusHostingStudy` uses `ObjectSearch`; private text search and result row removed. |
+| Fleet/object review: browse and Travel/Mine/Dock/Analyze targets | `FleetObjectStudy` uses `ObjectSearchCard` for every selection view; private wrapper/context band removed. Each command retains its own filters. |
+| Shared-search review | `ObjectSearchStudy` uses `ObjectSearchCard` for browse, travel, mining-target and command-fleet selection. |
+| Workspace foundation examples | `HudWorkspace` examples use `ObjectSearch` within their owning frame; mock search field and static object rows removed. |
+
+The Galaxy fleet roster remains an active fleet management surface with status
+and commands, rather than a competing object selection card. Resource/quantity
+fields and cargo/ship disclosures remain task controls. Map picking still uses
+its spatial selection model. The subsequent production adoption below connects mining setup; Storybook
+controllers continue to simulate outcomes while sharing its presentation.
+
+Search simplification confirmed 2026-10-24: travel and mining action searches
+omit the secondary preset row (resource kinds and fleet relationship categories).
+They retain text search and main object-type filters. Caller-supplied eligibility
+still limits candidates; hidden secondary presets never filter them. General
+Objects browsing retains secondary presets.
+
 ## Mining action review — accepted scope, 2026-10-22
 
 Travis accepted mining as the first consumer of a reusable **card-contained action
 scene**. Selected setup: a focused mining task with stationary Start mining
 commitment. The contextual alternative is retired; the task uses a temporary
 model until animation is reviewed. Resource inspection and Fleet status should
-enter one shared setup. Existing production resource-host setup is currently
-unreachable; the selected mining flow is prototyped but not integrated or accepted in-game yet.
+enter one shared setup. Production now uses the merged setup/status presentation through the journey
+controller described below. In-game acceptance remains pending Travis’s walkthrough.
 
 Fleet/location context lives in the shared structured plaque title, with ship
 details expandable below the model. Resource and editable tonnage come before secondary facts. Max fills
@@ -197,17 +370,19 @@ effects are outside this first phase. Composition and choreography remain open.
 Preserve drafts for the same fleet/target through dismissal, revalidating fresh
 limits; changing either resets choices. Accepted mining shows a quantity/ETA
 status within the same card, without automatically opening another card.
-The accepted single-card journey is fleet overview → action setup → action
-status. Mine here transitions the existing fleet card into setup, and acceptance
-transitions it to mining status. Back from setup returns to its fleet/resource
-entry view; Back from mining status returns to fleet overview, where View mining
-returns to the action. The review journeys begin earlier: fleet list → fleet
-overview → choose object → object inspection → Mine here; or object list → object
-inspection → choose fleet → fleet overview → Mine here. Both then enter the same
-setup with fleet and object selected. Back follows the actual selection path. Close retains the draft/action; reopening restores
+Consolidation confirmed 2026-10-24: after selecting fleet and object, show one
+combined fleet/mining review with the ship preview, attachment/location context,
+resource, quantity, ETA and expandable ships. Its footer commits **Start mining**;
+remove the intermediate fleet overview → Mine here → setup step. Fleet-first
+entry may still show fleet overview to choose an object; object-first entry may
+still show object inspection to choose a fleet. Selecting the second participant
+opens the combined review directly. Acceptance transitions it to mining status.
+Back from mining status returns to fleet overview, where View mining returns
+to the action. Back follows the actual selection path. Close retains the draft/action; reopening restores
 the current view. This supersedes the separate setup/receipt plus Fleet status
 prototype layout. The Storybook journey isolates one shared shell, with a fixture
-launcher for reopening; production workspace navigation is not wired yet. The working visual loops until
+launcher for reopening; production mounts the same mining presentation in the
+Fleet status workspace panel. The working visual loops until
 terminal server confirmation, independent of the countdown. Notification and
 fallback reads reconcile the same action without duplicate completion payoff;
 failed checks retain the loop with explicit connection uncertainty. Use the
@@ -218,6 +393,60 @@ accepted requirements, not claims about current notification wiring.
 The [review brief](../.scratch/hud-action-review/mining-brief.md) maps shared
 foundations, current gaps and the next comparison. Placement review:
 [Mining / Review / Fleet journey](http://127.0.0.1:20203/?path=/story/hud-mining-review--placement).
+
+Travel controls simplification, 2026-10-24: cargo contents and ship-composition
+disclosures belong to fleet overview only. The travel controls/status view omits
+those sections while retaining activity/progress, compact fuel/hold facts and
+travel commands. Back to fleet overview restores its disclosures.
+
+## Production mining, travel and search adoption — 2026-10-25
+
+Travis authorized integration items 1–4 and reserved the in-app walkthrough and
+legacy cleanup in item 5. Implementation and automated verification below do not
+claim that manual acceptance has happened.
+
+- `MiningCardContent` / `MiningCardActions` own the merged presentation used by
+  both production and the mining review fixtures. Resource kinds, limits,
+  fleet composition and ETA come from served data in production. The preview
+  remains a temporary ship model; it does not infer per-class mining participants
+  or implement extraction choreography.
+- `useMiningJourney` owns fleet/target selection, drafts keyed by their IDs,
+  synchronous submit protection and accepted receipts. Fleet status opens target
+  search; a resource inspector opens eligible-fleet search. Selecting the other
+  participant opens the merged review directly. Back follows the source path;
+  workspace dismissal retains the draft/current action and never cancels it.
+- Owner-only `GET /v1/fleets/:fleetId/mining-options` prices prerequisites against
+  the current resource ledger and exposes available kinds, remaining tons,
+  free hold, mining rate, minimum run, movement occupant and exact commit host.
+  Belt-member commit IDs remain distinct from their resolved parent target.
+  The controller refreshes prerequisites before committing; the server repeats
+  all checks. Stale quantities stay visible for correction instead of silently
+  clamping or changing the chosen resource.
+- Acceptance uses the real action ID and frozen ETA. Exact-action reads follow
+  a successful fleet refresh that can settle due work. ETA + 400 wall ms,
+  20-second recovery, reconnect and matching `action.completed` SSE nudges
+  reconcile that same action. Zero remaining time alone never completes it.
+  Failed checks retain the working status with explicit uncertainty and Retry;
+  confirmed clean/depleted/full/cancelled results are distinct. Cancellation
+  requires its own explicit command. Notifications do not directly grant success.
+- Travel's Change destination opens scoped shared search and returns directly
+  to the same review with a fresh quote; Change fleet retains the destination.
+  Fleet-first entry opens destination search, while object-first entry can choose
+  an eligible local command fleet. Point picking, served quotes, Stop/Cut drive/
+  Jump and accepted-response handoff retain their existing owners.
+- Galaxy Mine/Travel actions navigate to the appropriate system with an owned
+  fleet intent. The System view validates that fleet against its live reads
+  before opening the task. No order is issued by navigation or inspection.
+- Action search consumes disclosed data and caller eligibility. Mining narrows
+  candidates using authoritative prerequisites; travel excludes foreign, remote,
+  transit and occupied stationary fleets while retaining burn retargeting.
+  Owned-fleet reads now expose `activeActionId` for movement eligibility;
+  sensors remain separate. Simulated relationship/unknown-burn fixtures do not
+  become production disclosure.
+
+The remaining acceptance gate is Travis’s real-app/phone walkthrough, including
+refresh/reopen, changed readings, unavailable connections and terminal mining
+results. Superseded mining controls are retained pending that item-5 pass.
 
 ## Map palette setting
 
@@ -366,6 +595,12 @@ for utility titles such as Objects and Settings. Features supply current display
 names from their selected/served data; the foundation does not infer selection,
 resolve identifiers or claim action state. Add future action wording in this
 shared module rather than assembling sentences at each call site.
+
+Selection cards pass `title={{ search, scope, fleet?, object? }}` through the
+same foundation. Search variants are objects, travel-destination, mining-target
+and command-fleet. The shared formatter owns their wording, fleet prefix, optional
+target and scope suffix; the plaque owns overflow and Back/Close stay in the
+existing frame row. Foundations/Cards/Shell/Search Title demonstrates this path.
 
 Mining's prototype and CompactTravelCard use this contract. Production embedded
 travel passes the same task identity to the owning workspace frame, so both

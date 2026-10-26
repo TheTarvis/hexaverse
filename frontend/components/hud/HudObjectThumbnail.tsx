@@ -28,7 +28,7 @@ export type HudObjectKind = keyof typeof thumbnails
 /** Resolve disclosed categories only; unknown types never inherit another object's art. */
 export function resolveHudObjectKind(kind: string): HudObjectKind | null {
   const normalized = kind.trim().toLowerCase().replaceAll(' ', '_')
-  if (normalized === 'belt' || normalized === 'asteroid_belt') return 'resource-site'
+  if (normalized === 'belt' || normalized === 'asteroid_belt' || normalized === 'asteroid') return 'resource-site'
   if (normalized === 'lane_gate') return 'gate'
   return Object.hasOwn(thumbnails, normalized) ? normalized as HudObjectKind : null
 }
@@ -42,11 +42,13 @@ type HudObjectThumbnailProps = ({
 }) & {
   alt?: string
   className?: string
+  size?: 'compact' | 'large'
 }
 
 /** Callers supply disclosed analysis state; this component never infers detection. */
 export function HudObjectThumbnail(props: HudObjectThumbnailProps) {
-  const { alt = '', className } = props
+  const { alt = '', size = 'compact' } = props
+  const className = clsx(props.className, size === 'large' && styles.large)
   if (props.analyzed === false) {
     return (
       <span

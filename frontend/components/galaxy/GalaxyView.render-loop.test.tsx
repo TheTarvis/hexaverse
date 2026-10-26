@@ -75,6 +75,7 @@ vi.mock('@/components/galaxy/GalaxyGraph', async () => {
 vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
+  useMiningOptions: () => ({ data: undefined, isLoading: false, isError: false }),
   useCutDrive: vi.fn(),
   useStop: vi.fn(),
   useJump: vi.fn(),
@@ -259,7 +260,7 @@ describe('GalaxyView + the coarse clock — task 3.4a', () => {
     mockUseMyFleets.mockReturnValue({ data: [parkedFleet()], scale: 1, worldTime: T0 } as unknown as ReturnType<typeof useMyFleets>)
     renderView()
     fireEvent.click(screen.getByTestId('fleet-cmd-burn-fleet_1'))
-    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0?task=travel&fleet=fleet_1')
   })
 
   // A roster row SELECTION for a fleet in another system issues no

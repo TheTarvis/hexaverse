@@ -385,3 +385,45 @@ describe('explicit phone-preview API origin', () => {
     expect(fetch).toHaveBeenLastCalledWith('https://normal-api.example/v1/account', expect.anything())
   })
 })
+
+describe('authenticated action invalidation stream', () => {
+  const streams: FakeStream[] = []
+  class FakeStream extends EventTarget {
+    onerror: ((event: Event) => void) | null = null
+    closed = false
+    constructor(readonly url: string) { super(); streams.push(this) }
+    close() { this.closed = true }
+  }
+  beforeEach(() => {
+    vi.useFakeTimers(); streams.length = 0
+    vi.stubGlobal('EventSource', FakeStream)
+    ;(auth as any).currentUser = mockUser
+    mockUser.getIdTokenResult.mockResolvedValue({ token: 'fixture-token', expirationTime: new Date(Date.now() + 3600000).toISOString() })
+  })
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); (auth as any).currentUser = null })
+  it('dispatches invalidation data, refreshes credentials on reconnect, and cancels pending retries on teardown', async () => {
+    const client = new ApiClient({ baseURL: 'https://api.example.com' })
+    const notify = vi.fn(), connect = vi.fn()
+    const stop = client.subscribe('/v1/channels/system/stream', 'action.completed', notify, connect)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(streams).toHaveLength(1)
+    expect(new URL(streams[0].url).searchParams.get('token')).toBe('fixture-token')
+    streams[0].dispatchEvent(new Event('connected'))
+    streams[0].dispatchEvent(new MessageEvent('action.completed', { data: '{"actionId":"mine"}' }))
+    expect(connect).toHaveBeenCalledOnce()
+    expect(notify).toHaveBeenCalledWith({ actionId: 'mine' })
+    streams[0].dispatchEvent(new MessageEvent('action.completed', { data: 'malformed' }))
+    expect(notify).toHaveBeenCalledOnce()
+    mockUser.getIdTokenResult.mockResolvedValue({ token: 'renewed-fixture-token', expirationTime: new Date(Date.now() + 3600000).toISOString() })
+    streams[0].onerror?.(new Event('error'))
+    expect(streams[0].closed).toBe(true)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(streams).toHaveLength(2)
+    expect(new URL(streams[1].url).searchParams.get('token')).toBe('renewed-fixture-token')
+    streams[1].onerror?.(new Event('error'))
+    stop()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(streams).toHaveLength(2)
+    expect(streams[1].closed).toBe(true)
+  })
+})

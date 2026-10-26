@@ -24,6 +24,7 @@ func (h *Handler) RegisterRoutes(authorized *gin.RouterGroup) {
 	g := authorized.Group("/fleets")
 	{
 		g.POST("/:fleetId/mine", h.Commit)
+		g.GET("/:fleetId/mining-options", h.Options)
 	}
 }
 
@@ -97,5 +98,20 @@ func (h *Handler) Commit(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	default:
 		c.JSON(http.StatusOK, mineResponseDTO{ActionId: a.Id, Eta: a.Eta, WorldTime: h.clock.Now()})
+	}
+}
+
+func (h *Handler) Options(c *gin.Context) {
+	options, err := h.svc.Options(c.Request.Context(), common.ActorCorp(c), common.RequiredHttpParam(c, "fleetId"))
+	switch {
+	case errors.Is(err, ErrUnauthenticated):
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	case errors.Is(err, ErrForeignFleet):
+		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case err != nil:
+		log.Error().Ctx(c).Err(err).Msg("mine options failed")
+		c.AbortWithStatus(http.StatusInternalServerError)
+	default:
+		c.JSON(http.StatusOK, options)
 	}
 }

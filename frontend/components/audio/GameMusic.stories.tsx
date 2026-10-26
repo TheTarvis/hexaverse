@@ -8,7 +8,7 @@ function GameMusicPreview({ scene }: { scene: 'Galaxy' | 'Serais' }) {
     <GameViewHeading title={scene} />
     <GameViewWorkspace key={scene} corporationId="music-story" panels={[
       { id: 'objects', label: 'Objects', children: <HudCardShell title="Music integration" lighting="none">
-        <p>Open Arrange HUD to find Music. Change scene in Storybook Controls or close settings while a track plays.</p>
+        <p>Open Settings to find Music. Change scene in Storybook Controls or close settings while a track plays.</p>
       </HudCardShell> },
     ]} />
   </GameViewShell></GameMusicProvider>

@@ -3,6 +3,7 @@ package galaxy
 import (
 	"errors"
 	"fmt"
+	"hexaverse/tuning"
 )
 
 // MaxTransactionWrites is the storage transaction's write ceiling. A block's
@@ -152,7 +153,7 @@ func (p GenerationParams) Validate() error {
 // Callers clone and tweak.
 func DefaultParams() GenerationParams {
 	return GenerationParams{
-		HalfHeightZ: 80,
+		HalfHeightZ: tuning.Number("generation.halfHeight", 80),
 		MinGapByRegion: map[string]float64{
 			string(RegionStarRich): 26,
 			string(RegionNormal):   40,
@@ -164,7 +165,7 @@ func DefaultParams() GenerationParams {
 		BridgeSearchHorizon:       3,
 		StartAreaBlockRadius:      1,
 		MinOriginComponentSystems: 8,
-		NoiseFrequency:            0.0016,
+		NoiseFrequency:            tuning.Number("generation.noiseFrequency", 0.0016),
 		NoiseOctaves:              3,
 		StarRichThreshold:         0.26,
 		DeadThreshold:             -0.32,
@@ -172,9 +173,9 @@ func DefaultParams() GenerationParams {
 		StarClassWeights: map[string]int{
 			"O": 1, "B": 3, "A": 8, "F": 14, "G": 20, "K": 26, "M": 34,
 		},
-		MinBodies: 1,
-		MaxBodies: 7,
-		MaxRings:  12,
+		MinBodies: int(tuning.Number("generation.minBodies", 1)),
+		MaxBodies: int(tuning.Number("generation.maxBodies", 7)),
+		MaxRings:  int(tuning.Number("generation.maxRings", 12)),
 	}
 }
 

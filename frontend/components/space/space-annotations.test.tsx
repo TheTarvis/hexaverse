@@ -151,12 +151,13 @@ describe('SpaceStage — annotation placement', () => {
     expect(screen.getByTestId('space-annotation-world-11')).toBeVisible()
   })
 
-  it('tracks camera movement without losing touch and keyboard selection', async () => {
+  it('tracks camera zoom without losing touch and keyboard object activation', async () => {
     await stage()
     const label = screen.getByTestId('space-annotation-feat-body-0')
     await waitFor(() => expect(label).toBeVisible())
     const before = label.style.transform
-    fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'ArrowRight' })
+    // Camera keyboard shortcuts were removed; vertical wheel remains the zoom input.
+    fireEvent.wheel(screen.getByTestId('space-canvas-region'), { deltaY: 120 })
     await waitFor(() => expect(label.style.transform).not.toBe(before))
     const hit = screen.getByTestId('body-hit-feat-body-0')
     // Shared controls own touch through Pointer Events. jsdom does not derive

@@ -4,16 +4,4 @@
 .launcher { align-self: start; }
 .identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .identity > div { min-width: 0; overflow-wrap: anywhere; }
-.stack, .field { display: grid; gap: 8px; min-width: 0; }
 .model { min-width: 0; }
-.formFields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 12px; min-width: 0; }
-.quantityRow { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.quantityRow > :first-child { flex: 1; min-width: 0; }
-.quantityRow > button { flex: 0 0 auto; }
-.estimate { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-@media (max-width: 340px) { .formFields { grid-template-columns: minmax(0, 1fr); } }
-.expandedChevron { transform: rotate(180deg); }
-
-.awaitingFleet { min-height: 200px; display: grid; place-items: center; padding: 44px 12px 12px; }
-
-.choiceText { display: grid; gap: 4px; min-width: 0; text-align: left; }

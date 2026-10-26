@@ -1,5 +1,7 @@
 package fleet
 
+import "hexaverse/tuning"
+
 // FuelParams holds fuel-currency tuning constants (add-fuel-as-cargo
 // design.md's "Fuel is a reserved cargo kind" decision family). "Tuning is
 // data" — DefaultFuelParams sources these three placeholders; a future
@@ -57,7 +59,7 @@ type FuelParams struct {
 // instruction.
 func DefaultFuelParams() FuelParams {
 	return FuelParams{
-		DeltaVPerTon: 5.0,
+		DeltaVPerTon: tuning.Number("fuel.deltaVPerTon", 5.0),
 		// 100 tons comfortably affords a fresh hull's default (ceiling-
 		// priced) spawn-to-home-station burn (observed ~25-36 tons across a
 		// generated sample at this generation's typical spawn-to-station
@@ -68,11 +70,11 @@ func DefaultFuelParams() FuelParams {
 		// own generated-sample reachability test; a failing sample is a
 		// signal to retune this constant, per that requirement's own
 		// instruction.
-		StartingFuelTons: 100.0,
-		PricePerTon:      10.0,
+		StartingFuelTons: tuning.Number("fuel.startingTons", 100.0),
+		PricePerTon:      tuning.Number("fuel.pricePerTon", 10.0),
 		// Placeholder, pending Travis's ruling — see the field's own doc
 		// comment. Strictly positive is the only property this change
 		// specifies, and the only one any test asserts.
-		StationKeepReserveTons: 5.0,
+		StationKeepReserveTons: tuning.Number("fuel.reserveTons", 5.0),
 	}
 }

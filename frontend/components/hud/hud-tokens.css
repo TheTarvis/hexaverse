@@ -41,13 +41,13 @@
   --hud-band-height: 52px;
   --hud-crystal-glow: #48d5ff35;
   --hud-crystal-haze: #86e7ff1a;
-  --hud-crystal-edge: #526f80;
-  --hud-crystal-surface: #101e2d;
-  --hud-crystal-hover-surface: #193348;
-  --hud-crystal-primary-surface: #0c3044;
-  --hud-crystal-primary-edge: #75e5ff;
+  --hud-crystal-edge: #56859b;
+  --hud-crystal-surface: #122c3d;
+  --hud-crystal-hover-surface: #1d4257;
+  --hud-crystal-primary-surface: #1b4559;
+  --hud-crystal-primary-edge: #85dce9;
   --hud-crystal-primary-text: #c5f5ff;
-  --hud-crystal-disabled-text: #8197a6;
+  --hud-crystal-disabled-text: #a0b4c2;
   --hud-crystal-warning-edge: #e4b66e;
   --hud-crystal-warning-surface: #352719;
   --hud-crystal-warning-text: #ffe0aa;
@@ -55,8 +55,8 @@
   --hud-crystal-danger-edge: #ff8a92;
   --hud-crystal-danger-surface: #501f29;
   --hud-crystal-danger-text: #ffe0e4;
-  --hud-crystal-cut: 5px;
+  --hud-crystal-cut: 4px;
   --hud-crystal-button-font: 400 13px/1.5 var(--hud-font-identity);
   --hud-crystal-button-tracking: var(--hud-compact-tracking);
-  --hud-crystal-button-end: 5px;
+  --hud-crystal-button-end: 4px;
 }

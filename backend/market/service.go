@@ -125,7 +125,7 @@ func (s *Service) GetBoard(ctx context.Context, corpID string) (*Board, error) {
 	out := &Board{
 		Venues:           []VenueQuotes{},
 		WorldTime:        now,
-		RefreshCadenceMs: int64(s.params.BoardRefreshCadence),
+		RefreshCadenceMs: int64(s.currentParams().BoardRefreshCadence),
 	}
 	if corpID == "" {
 		// A corpless requester has no visible set to fan out over. An empty board
@@ -138,7 +138,7 @@ func (s *Service) GetBoard(ctx context.Context, corpID string) (*Board, error) {
 		return nil, err
 	}
 	for systemID, tier := range tiers {
-		if !tier.AtLeast(s.params.MinVisibilityTier) {
+		if !tier.AtLeast(s.currentParams().MinVisibilityTier) {
 			continue
 		}
 		vq, err := s.venueQuotes(ctx, systemID, now)
@@ -167,8 +167,8 @@ func (s *Service) venueQuotes(ctx context.Context, systemID string, now common.W
 	}
 
 	vq := &VenueQuotes{Venue: st.SystemId, SystemId: st.SystemId, Quotes: []Quote{}}
-	for _, kind := range s.params.TradableKinds {
-		entries, tradable := s.params.DemandFor(st, region, kind, now)
+	for _, kind := range s.currentParams().TradableKinds {
+		entries, tradable := s.currentParams().DemandFor(st, region, kind, now)
 		if !tradable {
 			// Not tradable in this region — omitted entirely rather than quoted at
 			// a nonsensical zero.
@@ -186,7 +186,7 @@ func (s *Service) ensureProvisioned(ctx context.Context, systemID string, now co
 	if err != nil || st == nil {
 		return nil, err
 	}
-	epoch := s.params.EpochAt(now)
+	epoch := s.currentParams().EpochAt(now)
 	if st.RequestEpoch == epoch {
 		return st, nil
 	}
@@ -199,7 +199,7 @@ func (s *Service) ensureProvisioned(ctx context.Context, systemID string, now co
 		return nil, err
 	}
 	return s.stations.EnsureRequests(ctx, systemID, epoch, func() []stations.Request {
-		return s.params.ProvisionRequests(meta.Seed, systemID, region, epoch, now)
+		return s.currentParams().ProvisionRequests(meta.Seed, systemID, region, epoch, now)
 	})
 }
 
@@ -309,7 +309,7 @@ func (s *Service) Sell(ctx context.Context, accountID, corpID, fleetID string, r
 	if f.Cargo[req.Kind] < req.Tons {
 		return nil, ErrInsufficientCargo
 	}
-	if _, tradable := s.params.FloorFor(region, req.Kind); !tradable {
+	if _, tradable := s.currentParams().FloorFor(region, req.Kind); !tradable {
 		return nil, ErrNotTradableHere
 	}
 
@@ -382,7 +382,7 @@ func (s *Service) settle(ctx context.Context, in settleInput) (*SellResult, erro
 		}
 		live := stSnapPlan.Station
 
-		entries, tradable := s.params.DemandFor(&live, in.region, in.req.Kind, in.now)
+		entries, tradable := s.currentParams().DemandFor(&live, in.region, in.req.Kind, in.now)
 		if !tradable {
 			return ErrNotTradableHere
 		}
@@ -420,7 +420,7 @@ func (s *Service) settle(ctx context.Context, in settleInput) (*SellResult, erro
 			}
 			decrements = append(decrements, stations.Decrement{RequestId: fl.RequestId, Tons: fl.Tons})
 		}
-		if err := s.params.BudgetCheck(&live, in.req.Kind, floorSpend, floorTons); err != nil {
+		if err := s.currentParams().BudgetCheck(&live, in.req.Kind, floorSpend, floorTons); err != nil {
 			return err
 		}
 

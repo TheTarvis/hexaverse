@@ -2,7 +2,7 @@
 
 import { createContext, forwardRef, lazy, Suspense, useContext, useEffect, useId, useRef, useState, type CSSProperties, type Ref, type ReactNode, type ComponentPropsWithoutRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeftIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { AdjustmentsHorizontalIcon, ArrowLeftIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import clsx from 'clsx'
 import { HudIconButton, type HudIconButtonProps } from '@/components/hud/HudControls'
 import { formatHudCardTitle, type HudCardTitle } from './hud-card-title'
@@ -42,6 +42,8 @@ function CardTitle({ id, title, scroll, paused }: { id: string; title: string; s
 
 export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title'> & {
   title?: HudCardTitle
+  onTune?: () => void
+  tuneButtonRef?: Ref<HTMLButtonElement>
   onClose?: () => void
   closeLabel?: string
   contentClassName?: string
@@ -62,6 +64,8 @@ export type HudCardShellProps = Omit<ComponentPropsWithoutRef<'section'>, 'title
 export function HudCardShell({
   title: titleInput,
   onClose,
+  onTune,
+  tuneButtonRef,
   closeLabel = 'Close card',
   contentClassName,
   lighting = 'signal',
@@ -115,8 +119,11 @@ export function HudCardShell({
       {chrome}
       {!section && <div className={styles.navigation} data-slot="hud-card-navigation">
         <div ref={setBackHost} className={styles.backHost} data-slot="hud-card-back" />
+        <div className={styles.headerActions}>
+        {onTune && <HudIconButton ref={tuneButtonRef} presentation="chrome" icon={AdjustmentsHorizontalIcon} label="Tune" onClick={onTune} />}
         {onClose && <HudIconButton ref={closeButtonRef} data-testid={closeTestId} data-slot="hud-close" data-mobile-close
           presentation="chrome" icon={XMarkIcon} label={closeLabel} onClick={onClose} />}
+        </div>
       </div>}
       {toolbar && <div className={styles.toolbar} data-slot="hud-toolbar">{toolbar}</div>}
       <CardFrameContext.Provider value={true}>

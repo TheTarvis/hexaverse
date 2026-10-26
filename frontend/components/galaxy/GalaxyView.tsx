@@ -41,7 +41,7 @@ import { HudHeading } from '@/components/hud/HudTypography'
 import { HudButton } from '@/components/hud/HudControls'
 import { Text } from '@/components/catalyst/text'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMyFleets, useStop, useMiningOptions } from '@/hooks/use-fleets'
 import { useMarketBoard } from '@/hooks/use-market'
 import type { Quote } from '@/lib/types/market'
 import { useCoarseWorldTime, useWorldClock } from '@/lib/client-clock'
@@ -142,6 +142,7 @@ export function GalaxyView() {
   const { fleet: activeFleet, select: setActiveFleetId } = useSelectedFleet(ownFleets, null, fleetsFailed)
   const activeFleetId = activeFleet?.id ?? null
   const mineRead = useRunningMine(activeFleetId)
+  const miningOptions = useMiningOptions(!isStartArea ? activeFleetId : null)
   const scanReportRead = useSettledScan(activeFleetId)
   const scanRead = useRunningScan(activeFleetId)
   const statusReadCount = qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount
@@ -260,8 +261,7 @@ export function GalaxyView() {
     (fleet: Fleet) => {
       if (commandGuard.held || fleetsFailed) return
       setActiveFleetId(fleet.id)
-      toast.error('Open the system view to choose a target')
-      router.push(`/systems/${fleet.systemId}`)
+      router.push(`/systems/${encodeURIComponent(fleet.systemId)}?task=travel&fleet=${encodeURIComponent(fleet.id)}`)
     },
     [router, setActiveFleetId, commandGuard, fleetsFailed],
   )
@@ -334,6 +334,9 @@ export function GalaxyView() {
   // identify one, with no cross-reference against any charted set.
   const isGateBody = (bodyId: string) => bodyId.startsWith('gate-')
   const fleetStatus: FleetStatusProps = {
+    miningAction: statusFleet && !fleetsFailed && !statusFleet.jump && ((!miningOptions.isError && miningOptions.data?.eligible) || mineRead.data)
+      ? { id: 'mining', label: mineRead.data ? 'View mining' : 'Mine', disabled: commandPending,
+        onClick: () => { setActiveFleetId(statusFleet.id); router.push(`/systems/${encodeURIComponent(statusFleet.systemId)}?task=mine&fleet=${encodeURIComponent(statusFleet.id)}`) } } : undefined,
     fleet: statusFleet, worldTime, scale: servedScale, nameOf: id => systemNames[id] ?? id,
     mine: !mineRead.isError ? mineRead.data : null, scan: !scanRead.isError ? scanRead.data : null,
     scanReport: !scanReportRead.isError ? scanReportRead.data : null,
@@ -405,7 +408,7 @@ export function GalaxyView() {
 
       </GameViewScene>
       <GameViewWorkspace navigationAction={!isStartArea && selected ? <SceneNavigationAction destination="system" systemName={selected.name} onEnter={() => handleEnterSystem(selected.id)} /> : undefined} corporationId={isStartArea ? 'guest' : session.corporation?.id ?? 'unavailable'} panels={[
-        { id: 'objects', label: 'Objects', children: <GalaxyObjectBrowser nodes={galaxy.nodes} selectedId={selectedId} onSelect={handleSelectSystemId}>
+        { id: 'objects', label: 'Objects', tuningGroups: ['Orbits', 'Generation', 'Travel', 'Sensors', 'Mining', 'Markets'], children: <GalaxyObjectBrowser nodes={galaxy.nodes} selectedId={selectedId} onSelect={handleSelectSystemId}>
           <Inspector
             node={selected}
             connections={selected ? (laneCountById.get(selected.id) ?? 0) : 0}
@@ -414,7 +417,7 @@ export function GalaxyView() {
             hasOwnFleet={ownFleets.length > 0}
           />
         </GalaxyObjectBrowser> },
-        { id: 'fleets', label: 'Fleets', children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
+        { id: 'fleets', label: 'Fleets', tuningGroups: ['Ships', 'Travel', 'Fuel', 'Sensors', 'Mining'], children: <div className="flex min-w-0 flex-col gap-4" data-testid="galaxy-command-column">
           <FleetRoster
             worldTime={worldTime}
             scale={servedScale}
@@ -438,7 +441,7 @@ export function GalaxyView() {
 
           {isStartArea && <Text>Sign in to command a fleet.</Text>}
         </div> },
-        ...(!isStartArea ? [{ id: 'fleet-status' as const, label: 'Fleet status', children: <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: <FleetStatusActions {...fleetStatus} /> }] : []),
+        ...(!isStartArea ? [{ id: 'fleet-status' as const, label: 'Fleet status', tuningGroups: ['Ships', 'Travel', 'Fuel', 'Sensors', 'Mining'], children: <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: <FleetStatusActions {...fleetStatus} /> }] : []),
       ]} />
       {isStartArea && <GameViewFooter><div data-testid="signin-prompt" className="flex min-h-16 items-center justify-center gap-4 bg-[#08121d] px-4 pb-[env(safe-area-inset-bottom)]"><Text>Explore the frozen start area</Text><HudButton href="/login" variant="primary">Sign in</HudButton></div></GameViewFooter>}
 

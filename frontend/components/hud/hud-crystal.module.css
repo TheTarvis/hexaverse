@@ -1,11 +1,13 @@
-/* Shared smoked-crystal material. Callers own button/band geometry and sizing. */
+/* Shared button trial: fine rim, illuminated edge and restrained glass depth. */
 .surface.surface {
+  --action-edge: var(--hud-crystal-edge);
+  --action-face: var(--hud-crystal-surface);
   position: relative;
   isolation: isolate;
   color: var(--hud-type-body);
-  background: linear-gradient(180deg, #a1c3d41c, transparent 14%, #0007 100%), var(--hud-crystal-surface);
-  box-shadow: inset 0 1px 0 #d7f4ff66, inset 0 -2px 0 #000a, inset 1px 0 0 #afdfef25, inset -1px 0 0 #afdfef25;
-  border-color: var(--hud-crystal-edge);
+  background: linear-gradient(135deg, var(--hud-crystal-primary-edge), var(--action-edge) 24% 65%, var(--hud-crystal-edge));
+  box-shadow: none;
+  border: 0;
   border-radius: 0;
   clip-path: polygon(var(--hud-crystal-cut) 0, calc(100% - var(--hud-crystal-cut)) 0, 100% var(--hud-crystal-cut), 100% calc(100% - var(--hud-crystal-cut)), calc(100% - var(--hud-crystal-cut)) 100%, var(--hud-crystal-cut) 100%, 0 calc(100% - var(--hud-crystal-cut)), 0 var(--hud-crystal-cut));
 }
@@ -13,52 +15,80 @@
   content: '';
   position: absolute;
   z-index: -1;
-  inset: 2px;
+  inset: 1px;
   pointer-events: none;
-  background: linear-gradient(126deg, #b9e5fa24 0 12%, transparent 12.4% 51%, #a0dfff0b 51.4% 74%, transparent 74.4%), linear-gradient(24deg, transparent 0 36%, #0005 36.4% 66%, transparent 66.4%);
+  clip-path: inherit;
+  background:
+    linear-gradient(148deg, #b5e9ff0e 0 25%, transparent 25.5%),
+    radial-gradient(ellipse at 15% 0%, var(--hud-crystal-haze), transparent 70%),
+    linear-gradient(180deg, #c3ebff08, transparent 55%, #00000026),
+    var(--action-face);
+  box-shadow: inset 0 1px 0 #d1f3ff1c, inset 0 -1px 0 #04121b66;
 }
-.surface:nth-child(even)::before { transform: scaleX(-1); }
-.surface::after { content: ''; position: absolute; inset: 3px; pointer-events: none; border: 1px solid #a4d4e422; box-shadow: inset 0 0 14px #0005; }
+.surface::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: var(--hud-crystal-cut);
+  bottom: var(--hud-crystal-cut);
+  width: 2px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--hud-crystal-primary-edge) 20% 80%, transparent);
+  box-shadow: 0 0 7px var(--hud-crystal-glow);
+}
+.surface svg { color: var(--hud-crystal-primary-edge); }
 .standalone.standalone {
-  --lens-rim: var(--hud-crystal-edge);
-  --lens-face: var(--hud-crystal-surface);
   font: var(--hud-crystal-button-font);
   letter-spacing: var(--hud-crystal-button-tracking);
   padding-inline: calc(var(--hud-control-padding-x) + var(--hud-crystal-button-end));
-  clip-path: polygon(var(--hud-crystal-button-end) 0, calc(100% - var(--hud-crystal-button-end)) 0, 100% 50%, calc(100% - var(--hud-crystal-button-end)) 100%, var(--hud-crystal-button-end) 100%, 0 50%);
 }
-.standalone.primary { --lens-rim: var(--hud-crystal-primary-edge); --lens-face: var(--hud-crystal-primary-surface); }
-.standalone.quiet { --lens-rim: #526f8066; }
-.standalone.standalone::before {
-  inset: 0;
+.surface.primary {
+  --action-edge: var(--hud-crystal-primary-edge);
+  --action-face: var(--hud-crystal-primary-surface);
+  color: var(--hud-crystal-primary-text);
+}
+.surface.quiet { --action-face: var(--hud-control-bg); }
+.surface.surface:hover:not(:disabled):not([aria-disabled='true']) {
+  --action-face: var(--hud-crystal-hover-surface);
+  --action-edge: var(--hud-crystal-primary-edge);
+  filter: none;
+}
+.surface.surface:focus-visible, .surface.surface[data-focus] {
+  outline: 2px solid var(--hud-control-focus);
+  outline-offset: -3px;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.surface.surface[aria-pressed='true'] { --action-edge: var(--hud-control-focus); --action-face: var(--hud-crystal-primary-surface); }
+.surface.surface:active:not(:disabled):not([aria-disabled='true']), .surface.surface[data-active]:not(:disabled):not([aria-disabled='true']) {
+  --action-face: var(--hud-crystal-primary-surface);
+  --action-edge: var(--hud-control-focus);
+  box-shadow: inset 0 0 0 1px var(--hud-control-focus);
+}
+.surface.surface:disabled, .surface.surface[aria-disabled='true'] {
+  --action-edge: #435b6c;
+  --action-face: #172936;
   opacity: 1;
-  transform: none;
-  clip-path: inherit;
-  background: linear-gradient(120deg, #e1f8ffb0, transparent 17% 80%, #c0f1ff70), linear-gradient(0deg, var(--lens-rim), #07121d 35% 65%, var(--lens-rim));
+  color: var(--hud-crystal-disabled-text);
+  filter: none;
+  background: var(--action-edge);
+  cursor: not-allowed;
 }
-.standalone.standalone::after {
-  z-index: -1;
-  inset: 1px 3px;
-  border: 0;
-  clip-path: polygon(calc(var(--hud-crystal-button-end) - 2px) 0, calc(100% - var(--hud-crystal-button-end) + 2px) 0, 100% 50%, calc(100% - var(--hud-crystal-button-end) + 2px) 100%, calc(var(--hud-crystal-button-end) - 2px) 100%, 0 50%);
-  background: linear-gradient(120deg, #c5efff25, transparent 16% 83%, #8bddff20), radial-gradient(ellipse at 50% 110%, var(--hud-crystal-glow), transparent 65%), linear-gradient(180deg, #c1eaff20, transparent 22%, #0007), var(--lens-face);
-  box-shadow: inset 0 1px 0 #d4f4ff18, inset 0 -1px 0 #74c8e024;
+.surface.surface:disabled::before, .surface.surface[aria-disabled='true']::before { background: linear-gradient(180deg, #d6f4ff05, transparent), var(--action-face); box-shadow: none; }
+.surface.surface:disabled::after, .surface.surface[aria-disabled='true']::after { display: none; }
+.surface.surface:disabled svg, .surface.surface[aria-disabled='true'] svg { color: inherit; }
+.surface.pending:disabled, .surface.pending[aria-disabled='true'] {
+  --action-edge: var(--hud-crystal-edge);
+  --action-face: var(--hud-crystal-surface);
+  color: var(--hud-type-body);
+  cursor: progress;
 }
-.standalone:hover:not(:disabled):not([aria-disabled='true']) { --lens-face: var(--hud-crystal-hover-surface); }
-.standalone.primary:hover:not(:disabled):not([aria-disabled='true']) { --lens-face: var(--hud-crystal-primary-surface); }
-.surface.primary { color: var(--hud-crystal-primary-text); background: radial-gradient(ellipse at 50% 0%, var(--hud-crystal-glow), transparent 75%), linear-gradient(180deg, var(--hud-crystal-haze), transparent 25%, #0006 100%), var(--hud-crystal-primary-surface); box-shadow: inset 0 2px 0 var(--hud-crystal-primary-edge), inset 0 0 18px #26c6f51c, inset 0 -2px 0 #0009; }
-.primary::after { border-color: #67e3ff55; }
-.surface.quiet { background-color: transparent; box-shadow: inset 0 -1px 0 var(--hud-crystal-edge); border-color: transparent; }
-.quiet::before { opacity: 0.35; }
-.quiet::after { border-color: transparent; box-shadow: none; }
-.surface.surface:hover:not(:disabled):not([aria-disabled='true']) { background-color: var(--hud-crystal-hover-surface); filter: brightness(1.18); }
-.surface.primary:hover:not(:disabled):not([aria-disabled='true']) { background-color: var(--hud-crystal-primary-surface); }
-.surface.surface:focus-visible, .surface.surface[data-focus] { outline: none; box-shadow: inset 0 0 0 2px var(--hud-control-focus), inset 0 0 0 4px #03131a, inset 0 0 20px #4cdcff38; text-decoration: underline; text-underline-offset: 4px; }
-.surface.surface[aria-pressed='true'] { box-shadow: inset 0 0 0 1px var(--hud-crystal-primary-edge), inset 0 0 14px #26c6f530; }
-.surface.surface:active:not(:disabled):not([aria-disabled='true']), .surface.surface[data-active]:not(:disabled):not([aria-disabled='true']) { filter: brightness(0.82); box-shadow: inset 0 3px 10px #000c, inset 0 1px 0 var(--hud-crystal-primary-edge); }
-.surface.surface:disabled, .surface.surface[aria-disabled='true'] { opacity: 1; color: var(--hud-crystal-disabled-text); filter: saturate(0.2) brightness(0.8); cursor: not-allowed; }
-.surface.pending:disabled, .surface.pending[aria-disabled='true'] { color: var(--hud-type-body); filter: none; cursor: progress; }
-.surface.primary.pending:disabled, .surface.warning.pending:disabled, .surface.danger.pending:disabled, .surface.primary.pending[aria-disabled='true'], .surface.warning.pending[aria-disabled='true'], .surface.danger.pending[aria-disabled='true'] { color: var(--hud-crystal-primary-text); }
+.surface.primary.pending:disabled, .surface.warning.pending:disabled, .surface.danger.pending:disabled, .surface.primary.pending[aria-disabled='true'], .surface.warning.pending[aria-disabled='true'], .surface.danger.pending[aria-disabled='true'] {
+  --action-edge: var(--hud-crystal-primary-edge);
+  --action-face: var(--hud-crystal-primary-surface);
+  color: var(--hud-crystal-primary-text);
+}
 .pendingContent { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--hud-control-gap); }
 /* The sweep is decorative; busy semantics and labels carry the working state. */
 .workingHighlight {

@@ -34,7 +34,7 @@ func StationContinuousOrbit(galaxySeed int64, systemId string, skeleton galaxy.S
 		return space.Orbit{
 			ParentId:    "feat-star",
 			Radius:      StationFallbackRadius,
-			PeriodMs:    space.InsertionPeriod(StationFallbackRadius),
+			PeriodMs:    (&BodyTable{}).ParkingPeriod(StationFallbackRadius),
 			Inclination: incl,
 		}
 	}
@@ -47,7 +47,7 @@ func StationContinuousOrbit(galaxySeed int64, systemId string, skeleton galaxy.S
 	return space.Orbit{
 		ParentId:    fmt.Sprintf("feat-body-%d", k),
 		Radius:      localRadius,
-		PeriodMs:    space.InsertionPeriod(localRadius),
+		PeriodMs:    (&BodyTable{}).ParkingPeriod(localRadius),
 		Inclination: incl,
 	}
 }

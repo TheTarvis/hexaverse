@@ -11,7 +11,7 @@ export function GameAccountSettings() {
   return <AccountSettingsContent email={session.account?.email ?? session.user.email} onSignOut={session.signOut} />
 }
 
-/** Account actions belong to the existing Arrange/settings card, never the map footer. */
+/** Account actions belong to the Settings card, never the map footer. */
 export function AccountSettingsContent({ email, onSignOut }: { email: string | null; onSignOut: () => void }) {
   return <HudSection aria-label="Account settings">
     <HudHeading variant="section" level={3}>Account</HudHeading>

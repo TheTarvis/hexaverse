@@ -7,7 +7,7 @@ import { SystemObjectIndex } from './SystemObjectIndex'
 const meta: Meta<typeof SystemObjectIndex> = {
   id: 'hud-objects-search', title: 'Tasks/Objects/Current app', tags: ['catalog'],
   component: SystemObjectIndex,
-  parameters: { catalog: { purpose: 'task', status: 'reference', record: 'docs/hud.md', task: 'objects' }, layout: 'fullscreen', docs: { description: { component: 'The actual Objects card opens directly to all disclosed rows. Text search stays pinned during internal scrolling; typing filters and clearing restores the full list. No disclosure or hidden category filter.' } } },
+  parameters: { catalog: { purpose: 'task', status: 'reference', record: 'docs/hud.md', task: 'objects' }, layout: 'fullscreen', docs: { description: { component: 'The actual Objects card opens directly to all disclosed rows. Shared object search supplies category presets and text filtering. Its results scroll independently; inspection and command ownership remain separate.' } } },
 }
 export default meta
 type Story = StoryObj<typeof meta>
@@ -31,7 +31,7 @@ export const AlwaysVisibleSearch: Story = {
   render: () => <SearchCard />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const search = canvas.getByRole('searchbox', { name: 'Find a system object' })
+    const search = canvas.getByRole('searchbox', { name: 'Find an object' })
     await expect(canvas.queryByTestId('system-index-toggle')).not.toBeInTheDocument()
     await expect(canvas.getByTestId('index-site-30')).toBeInTheDocument()
     await userEvent.type(search, 'Known site 03')
@@ -39,18 +39,18 @@ export const AlwaysVisibleSearch: Story = {
     await expect(canvas.queryByTestId('index-site-1')).not.toBeInTheDocument()
     await userEvent.clear(search)
     await userEvent.type(search, 'no known match')
-    await expect(canvas.getByText('No known objects match. Try a name or type.')).toBeVisible()
+    await expect(canvas.getByText('No matching objects.')).toBeVisible()
     await userEvent.clear(search)
     await expect(canvas.getByTestId('index-site-30')).toBeInTheDocument()
-    const header = canvas.getByTestId('system-index-search-header')
-    let viewport = header.parentElement!
-    while (viewport.parentElement && !/(auto|scroll)/.test(getComputedStyle(viewport).overflowY)) viewport = viewport.parentElement
-    viewport.scrollTop = 200
+    const results = canvas.getByRole('region', { name: 'Search results' })
+    const pinned = search.getBoundingClientRect().top
+    await expect(results.scrollHeight).toBeGreaterThan(results.clientHeight)
+    results.scrollTop = 200
     await new Promise(requestAnimationFrame)
-    const pinned = header.getBoundingClientRect().top
-    viewport.scrollTop = 600
+    await expect(results.scrollTop).toBeGreaterThan(0)
+    results.scrollTop = 600
     await new Promise(requestAnimationFrame)
-    await expect(Math.abs(header.getBoundingClientRect().top - pinned)).toBeLessThan(1)
+    await expect(Math.abs(search.getBoundingClientRect().top - pinned)).toBeLessThan(1)
     await expect(search).toBeVisible()
   },
 }

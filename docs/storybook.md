@@ -51,6 +51,15 @@ outcomes”. Detailed acceptance remains in the linked decision record. Selected
 appearance, interaction acceptance, implementation and in-game acceptance remain
 separate facts; an executable story is not evidence that a feature ships.
 
+Travel / Review is a manual journey when opened in Storybook: its interaction
+walkthrough is enabled only in Vitest's test mode, for both entry paths. Opening
+or switching the example must leave search idle until the reviewer acts.
+
+Mining review fixtures now render the production `MiningCardContent` and
+`MiningCardActions`; their controller data/acceptance remain simulated. The
+production controller owns live prerequisites, commitment and exact-action
+settlement. Shared presentation does not establish in-game acceptance.
+
 ## Adding and changing examples
 
 Story metadata has a stable explicit `id`, the `catalog` tag and
@@ -124,8 +133,9 @@ unused branches and styles are removed, not retained as hidden variants.
 
 At the cleanup checkpoint, Travel's selected review and production component were
 distinct and Fleet interaction was simulated. The subsequent adoption below
-replaces their competing presentations. The A/B/C travel chooser and model/material
-comparisons remain active where selection is unresolved.
+replaces their competing presentations. Model/material comparisons remain active where selection is unresolved. The
+A/B/C travel chooser was subsequently retired in the 2026-10-24 shared-search
+consolidation; its review URL redirects to the shared travel search journey.
 Useful shell, thumbnail, renderer-recovery and responsive state coverage remains.
 Audio and unrelated gameplay work are unchanged.
 
@@ -140,8 +150,8 @@ without claiming integration at that checkpoint.
 The subsequent shared-card adoption makes `CompactTravelCard` the production and
 fixture travel-review presentation, and `FleetStatusCard` the production and
 fixture Fleet status presentation. Study modules now own fixture data/callbacks,
-journey controls and the unresolved chooser comparison rather than private card
-layouts. System and Galaxy mount Fleet status in its own workspace panel; the
+journey controls rather than private card layouts. Selection now uses the
+shared search foundation, including both mining entry paths. System and Galaxy mount Fleet status in its own workspace panel; the
 Galaxy roster remains separate. The older Galaxy location/status panel is deleted.
 Travel / States preserves the distinct review-state examples. The old travelling
 state URL redirects to Fleet status / Review / Journey instead of retaining a

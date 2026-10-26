@@ -168,3 +168,10 @@ func IsLocal() bool {
 
 	return false
 }
+
+// LocalTuningAllowed never enables dev mutation routes in tests or a real GCP project.
+func LocalTuningAllowed() bool {
+	host := os.Getenv("FIRESTORE_EMULATOR_HOST")
+	return strings.EqualFold(ServiceConfig.Env, "LOCAL") &&
+		(strings.HasPrefix(host, "localhost:") || strings.HasPrefix(host, "127.0.0.1:") || strings.HasPrefix(host, "[::1]:"))
+}

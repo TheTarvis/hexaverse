@@ -87,3 +87,13 @@ func scanEmissionRadius(d float64) float64 {
 	}
 	return r
 }
+
+// Params are supplied by the caller; disclosure never reads runtime configuration.
+type Params struct{ PlumeFloor, PlumePerDriveOutput, FocusedScanRange, ScanEmissionFloor, ScanEmissionPerRange float64 }
+
+func (w World) params() Params {
+	if w.Params != nil {
+		return *w.Params
+	}
+	return Params{PlumeFloor, PlumePerDriveOutput, FocusedScanRange, ScanEmissionFloor, ScanEmissionPerRange}
+}

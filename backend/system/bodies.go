@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hexaverse/rules"
 	"sort"
 
 	"hexaverse/disclosure"
@@ -111,7 +112,7 @@ var _ space.Bodies = (*BodyTable)(nil)
 // (contacts.go, tasks.md 4.4/4.5 of replace-observation-with-sightings) is
 // this package's first real consumer.
 func asDisclosureWorld(t *BodyTable) disclosure.World {
-	return disclosure.World{Bodies: t, StarId: t.StarId(), StarSize: t.StarSize()}
+	return disclosure.World{Params: rules.SensorParams(), Bodies: t, StarId: t.StarId(), StarSize: t.StarSize()}
 }
 
 // BodyTable composes, in one pass, the system's persisted interior

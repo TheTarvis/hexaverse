@@ -205,3 +205,5 @@
 @media (prefers-reduced-motion: reduce) {
   .scrollingTitle[data-scrolling='true'] .titleText { animation: none; width: auto; overflow: hidden; text-overflow: ellipsis; }
 }
+
+.headerActions { display: flex; align-items: center; gap: 4px; }

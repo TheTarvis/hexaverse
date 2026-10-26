@@ -14,6 +14,7 @@ import type {
   Fleet,
   FleetList,
   JumpRequest,
+  MiningOptions,
   MineCommit,
   MineRequest,
   OrderRequest,
@@ -119,6 +120,11 @@ class FleetService {
   // run. Rides the movement channel: rejected 409 while burning or already
   // mining. Every rejection carries a distinguishable `error` reason, which
   // apiClient surfaces as the thrown error's message.
+  async miningOptions(fleetId: string): Promise<MiningOptions> {
+    const response = await apiClient.get<MiningOptions>(`/v1/fleets/${encodeURIComponent(fleetId)}/mining-options`)
+    return response.data
+  }
+
   async mine(fleetId: string, request: MineRequest): Promise<MineCommit> {
     const response = await apiClient.post<MineCommit>(`/v1/fleets/${fleetId}/mine`, request)
     return response.data

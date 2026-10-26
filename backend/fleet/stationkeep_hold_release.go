@@ -207,7 +207,7 @@ func isExpiredHold(p space.Park, now common.WorldMillis) bool {
 // INSTANT — never as of the observation time (space-kinematics "A
 // Station-Keeping Park Past Its Dry Instant Is Its Released Orbit").
 func releasedParkOf(p space.Park) space.Park {
-	return space.ReleaseStationkeep(p.BodyId, p.Offset, p.DryInstantMs)
+	return space.ReleaseStationkeep(p.BodyId, p.Offset, p.DryInstantMs, p.PeriodMs)
 }
 
 // parkedState wraps a park as a stored kinematic state.
@@ -272,10 +272,10 @@ func (s *Service) StationKeepUpkeepRate(ctx context.Context, f *Fleet) (tonsPerS
 	if p.BodyId == "" {
 		return 0, false, nil
 	}
-	if s.fuelParams.DeltaVPerTon <= 0 {
+	if s.currentFuelParams().DeltaVPerTon <= 0 {
 		return 0, false, nil
 	}
-	return stationKeepRateFor(bt, p.BodyId) / s.fuelParams.DeltaVPerTon, true, nil
+	return stationKeepRateFor(bt, p.BodyId) / s.currentFuelParams().DeltaVPerTon, true, nil
 }
 
 // --- the verbs --------------------------------------------------------------
@@ -355,7 +355,7 @@ func (s *Service) Hold(ctx context.Context, id string) (*Fleet, error) {
 		}
 
 		rate := stationKeepRateFor(bt, host)
-		dry := dryInstantFor(now, cur.Cargo["fuel"], rate, s.fuelParams)
+		dry := dryInstantFor(now, cur.Cargo["fuel"], rate, s.currentFuelParams())
 		if dry <= now {
 			return nil, ErrHoldWithoutFuel
 		}
@@ -367,6 +367,7 @@ func (s *Service) Hold(ctx context.Context, id string) (*Fleet, error) {
 			HoldStartMs:  now,
 			DryInstantMs: dry,
 		}
+		held.PeriodMs = space.InsertionPeriodFor(bt, space.ReleaseStationkeep(host, held.Offset, now).Radius)
 		cur.State = parkedState(held)
 		cur.UpdatedAt = now
 		out = cur
@@ -427,12 +428,12 @@ func (s *Service) Release(ctx context.Context, id string) (*Fleet, error) {
 		}
 
 		rate := stationKeepRateFor(bt, p.BodyId)
-		fuel := cur.Cargo["fuel"] - upkeepTons(rate, p.HoldStartMs, now, s.fuelParams)
+		fuel := cur.Cargo["fuel"] - upkeepTons(rate, p.HoldStartMs, now, s.currentFuelParams())
 		if fuel < 0 {
 			fuel = 0
 		}
 
-		cur.State = parkedState(space.ReleaseStationkeep(p.BodyId, p.Offset, now))
+		cur.State = parkedState(space.ReleaseStationkeep(p.BodyId, p.Offset, now, p.PeriodMs))
 		if cur.Cargo == nil {
 			cur.Cargo = map[string]float64{}
 		}
@@ -581,7 +582,7 @@ func (s *Service) openHoldUpkeep(f *Fleet, rate float64, now common.WorldMillis)
 	if !ok || p.DryInstantMs <= p.HoldStartMs || now >= p.DryInstantMs {
 		return 0
 	}
-	return upkeepTons(rate, p.HoldStartMs, now, s.fuelParams)
+	return upkeepTons(rate, p.HoldStartMs, now, s.currentFuelParams())
 }
 
 // storedStationkeepParkFromDoc is storedStationkeepPark's form for a fleet

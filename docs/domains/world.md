@@ -11,6 +11,34 @@ content. Objects carry resources/effect data; geometric representation is not
 itself a mining, visibility or hazard rule. Go owns authoritative physics; clients
 render served geometry. Historical hex/ring cells are not the current world model.
 
+Terminology confirmed by Travis on 2026-10-23: **Body** groups planets, moons,
+asteroids and belts. **Resource site** is an overlapping resource-host role,
+not a mutually exclusive physical kind. A planet or moon can be both a body
+and a resource site. Stars and manufactured structures retain their separate
+player-facing categories. Stations and lane gates are **Structures**, the shared
+manufactured-installation category confirmed on 2026-10-23. This grouping does
+not grant gates station services or station ownership rules. The glossary owns these definitions;
+[economy](economy.md) owns extraction rules. This classification does not make
+every body mineable or establish current action eligibility.
+
+## Local tuning — accepted direction, 2026-10-26
+
+Travis approved shared orbital-law and generation tuning staged until an explicit
+Regenerate local world action. These controls must identify their regeneration
+requirement. Existing bodies, stored fleet parking periods and derived station
+orbits must not silently acquire inconsistent laws during ordinary play or a
+restart. Regeneration starts fresh gameplay state: world, corporations, fleets,
+actions and economy. Retain login accounts, tuning settings and audio preferences.
+The local [reset DAO](../../backend/devtools/dao.go) recursively removes gameplay
+collections, including orphaned subcollections, while preserving account
+documents and leaving Firebase Auth alone. The service then promotes staged
+generation settings and seeds a fresh live galaxy. World time retains its anchor;
+signed-in players create a new corporation. The isolated
+[emulator test](../../backend/devtools/dao_test.go) verifies the preservation and
+recursive-deletion boundary. [HUD](../hud.md#developer-tuning-workspace--accepted-direction-2026-10-26)
+owns the local-only controls and profile workflow; [actions/time](actions-and-time.md#local-clock-tuning--accepted-direction-2026-10-26)
+owns live clock-speed continuity, which changes the pace of the whole simulation.
+
 ## Current implementation and gaps
 
 - [Galaxy field](../../backend/galaxy/field.go) is an unbounded coordinate-pure
@@ -41,6 +69,10 @@ render served geometry. Historical hex/ring cells are not the current world mode
 - Hazard scan/movement modifier fields are generated data. The audit found no
   corresponding consumers in fleet/disclosure/mine/space; art and payload presence
   alone do not establish working hazard mechanics.
+
+The existing served `SpaceBody` container is broader than the player-facing
+Body category: it also carries stars and stations, with gates served as bodies.
+The accepted vocabulary does not rename that transport type or change generation.
 
 ## Galaxy view and knowledge boundary
 

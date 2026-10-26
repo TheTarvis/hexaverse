@@ -95,6 +95,7 @@
     { "go": "Park.Position", "coverage": "family:parkPosition" },
     { "go": "Park.Velocity", "coverage": "family:parkPosition", "note": "recorded as the second component of every parkPosition sweep line" },
     { "go": "InsertionStandoff", "coverage": "family:solveBurn", "note": "indirect: the intercept's standoff" },
+    { "go": "InsertionPeriodFor", "coverage": "family:solveBurn", "note": "Pure body-source period-law seam; custom-law arrival is also tested in period_params_test.go." },
     { "go": "InsertionPeriod", "coverage": "family:solveBurn", "note": "indirect: the settled park's period" },
     { "go": "StarClearanceRadius", "coverage": "family:buildCurve", "note": "indirect: the hand cases resolve their clearance through it" },
     { "go": "ReleaseStationkeep", "coverage": "family:parkPosition", "note": "hand cases only: three released holds are recorded as parkPosition inputs, but no sweep draws a release" },

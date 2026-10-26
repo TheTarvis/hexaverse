@@ -32,6 +32,7 @@ export interface FleetStatusProps {
   failed?: boolean
   notice?: string | null
   error?: string | null
+  miningAction?: HudBandAction
   travelControlsOpen: boolean
   onTravelControls: () => void
   onBack: () => void
@@ -56,6 +57,7 @@ export function FleetStatusActions(props: FleetStatusProps) {
   if (failed || !fleet) return <HudActionBand label="Fleet status actions" actions={[{ id: 'retry', label: failed ? 'Retry readings' : 'Refresh fleets', onClick: onRetry }]} />
   const hasTravelControls = canStop(props) || !!fleet.jump || !!additionalActions?.length
   if (!travelControlsOpen) return <HudActionBand label="Fleet status actions" actions={[
+    ...(props.miningAction ? [props.miningAction] as const : [] as const),
     { id: 'focus', label: focusLabel ?? 'Focus fleet', onClick: onFocus, disabled: focusDisabled || pending },
     { id: 'task', label: canStop(props) || fleet.jump ? 'Return to travel' : hasTravelControls ? 'Travel controls' : 'Review travel', onClick: hasTravelControls ? onTravelControls : onReviewTravel, disabled: pending },
   ]} />
@@ -103,7 +105,7 @@ export function FleetStatusContent(props: FleetStatusProps) {
       { label: 'Fuel', value: <HudValue>{tons(roster?.cargo?.fuel)}</HudValue> },
       { label: 'Hold used', value: <HudValue>{tons(roster ? roster.cargoCapacity - roster.freeHold : undefined)} / {tons(roster?.cargoCapacity)}</HudValue> },
     ]} />
-    <div className={styles.details}>
+    {!travelControlsOpen && <div className={styles.details}>
       <HudButton presentation="row" aria-expanded={cargo} aria-controls={`${id}-cargo`} disabled={!roster} onClick={() => setCargo(value => !value)}><HudIcon icon={cargo ? ChevronUpIcon : ChevronDownIcon} size={16} />Cargo{roster && ` · ${tons(roster.freeHold)} free`}</HudButton>
       {cargo && roster && <div id={`${id}-cargo`}><HudFacts layout="rows" items={[
         ...(roster.cargo ? Object.entries(roster.cargo).map(([kind, value]) => ({ label: kind === 'fuel' ? 'Fuel (in hold)' : kind, value: <HudValue>{tons(value)}</HudValue> })) : [{ label: 'Cargo', value: 'Unavailable' }]),
@@ -114,7 +116,7 @@ export function FleetStatusContent(props: FleetStatusProps) {
         ...Array.from(counts, ([kind, count]) => ({ label: kind, value: <HudValue>× {count}</HudValue> })),
         { label: 'Combined hold', value: <HudValue>{tons(roster.cargoCapacity)}</HudValue> },
       ]} /></HudSection>}
-    </div>
+    </div>}
     {notice && <HudText role="status">{notice}</HudText>}
     {error && <HudText role="alert" className={styles.warning}>{error}</HudText>}
     {fleet.strandingWarning && <HudText className={styles.warning}>This course leaves the fleet unable to reach a station or lane gate.</HudText>}

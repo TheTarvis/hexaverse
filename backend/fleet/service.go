@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"hexaverse/rules"
 	"math"
 
 	"hexaverse/action"
@@ -711,7 +712,7 @@ func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, r
 	// values are rejected FIRST, before either bound comparison, so a NaN or
 	// ±Inf never reaches space.SolveBurn's flight-time quantization
 	// (tasks.md 4.11).
-	ceiling := DerivedAccelCeiling(*f, s.classStats)
+	ceiling := DerivedAccelCeiling(*f, s.currentClassStats())
 	accel := ceiling
 	if req.Accel != nil {
 		accel = *req.Accel
@@ -722,7 +723,7 @@ func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, r
 	if accel > ceiling {
 		return nil, ErrAccelAboveCeiling
 	}
-	if accel < disclosure.MinCommandedAccel {
+	if accel < rules.TunedMinCommandedAccel() {
 		return nil, ErrAccelBelowFloor
 	}
 
@@ -768,7 +769,7 @@ func (s *Service) solveOrder(ctx context.Context, id string, req OrderRequest, r
 	// that predates cargo tracking entirely is never rejected for lacking a
 	// currency it was never given the chance to hold.
 	hullCount := len(effectiveRoster(*f))
-	newCost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
+	newCost := FuelCostTons(&sol.Burn, hullCount, s.currentFuelParams())
 	refund := priorBurnRefund(f, now)
 	currentFuel := f.Cargo["fuel"]
 	fuelActive := fuelTrackingEngaged(f)
@@ -885,7 +886,7 @@ func (s *Service) OrderTo(ctx context.Context, id string, req OrderRequest) (*Fl
 				if isExpiredHold(p, txNow) {
 					return nil, ErrHoldExpiredMidCommit
 				}
-				settledUpkeep = upkeepTons(stationKeepRateFor(bt, p.BodyId), p.HoldStartMs, txNow, s.fuelParams)
+				settledUpkeep = upkeepTons(stationKeepRateFor(bt, p.BodyId), p.HoldStartMs, txNow, s.currentFuelParams())
 				fuel -= settledUpkeep
 				if fuel < 0 {
 					fuel = 0
@@ -1383,7 +1384,7 @@ func (s *Service) Stop(ctx context.Context, id string) (*Fleet, error) {
 	// is otherwise gated exactly like OrderTo's commit (task 2.1): checked,
 	// and rejected if unaffordable, BEFORE the prior action is cancelled.
 	hullCount := len(effectiveRoster(*f))
-	newCost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
+	newCost := FuelCostTons(&sol.Burn, hullCount, s.currentFuelParams())
 	if fuelActive && currentFuel+refund-s.openHoldUpkeep(f, s.holdRateFor(bt, f), now) < newCost {
 		return nil, ErrInsufficientFuel
 	}
@@ -1532,7 +1533,7 @@ func (s *Service) Jump(ctx context.Context, id, laneId string) (*Fleet, error) {
 	// lane-length-units / unit-world-time") — then quantized by ceiling like
 	// every other stored duration (design.md Decision 10, corrected 2026-08-31).
 	length := space.Vec3{X: to.X - from.X, Y: to.Y - from.Y, Z: to.Z - from.Z}.Length()
-	rate := DerivedLaneRate(*f, s.classStats)
+	rate := DerivedLaneRate(*f, s.currentClassStats())
 	// A single division (length / (rate*1000)) rather than length/rate
 	// followed by a second /1000 — the latter round-trips through an extra
 	// float64 rounding step that can push an exact-in-world-ms crossing
@@ -1739,7 +1740,7 @@ func (s *Service) scanHostPosition(ctx context.Context, scanner *Fleet, bt *syst
 // two implementations of the same predicates (link8b-impl-contract.md
 // §1.11, task 3.1).
 func scanGeometry(from, hostPos, starPos space.Vec3, starSize float64) error {
-	if !disclosure.WithinRange(from, hostPos, disclosure.FocusedScanRange) {
+	if !disclosure.WithinRange(from, hostPos, rules.TunedFocusedScanRange()) {
 		return disclosure.ErrScanOutOfRange
 	}
 	if disclosure.Occluded(from, hostPos, starPos, starSize) {
@@ -1849,7 +1850,7 @@ func (s *Service) seedFleet(ctx context.Context, systemID, corporationID string,
 			return nil, space.ErrUnknownBody
 		}
 		radius := space.InsertionStandoff(body)
-		park = &space.Park{Kind: space.ParkOrbit, BodyId: stationID, Radius: radius, PeriodMs: space.InsertionPeriod(radius), EpochMs: now}
+		park = &space.Park{Kind: space.ParkOrbit, BodyId: stationID, Radius: radius, PeriodMs: space.InsertionPeriodFor(bt, radius), EpochMs: now}
 		if _, err := park.Position(bt, now); err != nil {
 			return nil, err
 		}
@@ -1887,7 +1888,7 @@ func (s *Service) resolveDue(ctx context.Context, f *Fleet) (*Fleet, error) {
 // Never Duplicated Client-Side") — one value, read from the server, backs
 // both the refuel offer's client-side preview and the settlement's charged
 // cost, so the two can never diverge.
-func (s *Service) FuelPricePerTon() float64 { return s.fuelParams.PricePerTon }
+func (s *Service) FuelPricePerTon() float64 { return s.currentFuelParams().PricePerTon }
 
 // FuelStatus computes the acceleration-floor-priced estimated maximum range
 // and the persistent stranded indication for an owning corporation's own
@@ -1904,7 +1905,7 @@ func (s *Service) FuelPricePerTon() float64 { return s.fuelParams.PricePerTon }
 func (s *Service) FuelStatus(ctx context.Context, f *Fleet) (estimatedRange float64, stranded bool, err error) {
 	hullCount := len(effectiveRoster(*f))
 	fuelTons := f.Cargo["fuel"]
-	estimatedRange = EstimatedRangeTons(fuelTons, hullCount, s.fuelParams)
+	estimatedRange = EstimatedRangeTons(fuelTons, hullCount, s.currentFuelParams())
 
 	bt, err := s.bodiesFor(ctx, f.SystemId)
 	if err != nil {

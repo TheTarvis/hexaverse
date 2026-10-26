@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"hexaverse/tuning"
 	"math"
 
 	"hexaverse/common"
@@ -59,6 +60,6 @@ const ScanRoundTripMsPerUnit float64 = 40.0
 func roundTripMs(d float64) common.WorldMillis {
 	// determinism:allow(pinned) Ceil is in the exact-arithmetic set (design.md
 	// Decision 8), mirroring space.QuantizeArrival's own quantize-upward Ceil.
-	extra := math.Ceil(ScanRoundTripMsPerUnit * d)
-	return ScanBaseDurationMs + common.WorldMillis(int64(extra))
+	extra := math.Ceil(tuning.Number("sensors.roundTripMsPerUnit", ScanRoundTripMsPerUnit) * d)
+	return common.WorldMillis(tuning.Number("sensors.baseDurationMs", float64(ScanBaseDurationMs))) + common.WorldMillis(int64(extra))
 }

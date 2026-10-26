@@ -8,9 +8,10 @@ import {
   type UseQueryOptions,
   type UseQueryResult,
 } from '@tanstack/react-query'
+import { BOARD_POLL_MS } from '@/lib/realtime'
 import { fleetService } from '@/lib/services'
 import { queryKeys } from '@/lib/query-keys'
-import type { Fleet, FleetList, MineCommit, MineRequest, OrderRequest } from '@/lib/types/fleet'
+import type { Fleet, FleetList, MineCommit, MineRequest, MiningOptions, OrderRequest } from '@/lib/types/fleet'
 
 // MyFleetsResult — `useMyFleets`'s own shape (openspec change
 // `fix-world-time-render-loop`, task 3.4, impl contract §4). `data` KEEPS
@@ -137,6 +138,11 @@ export function useRelease(): UseMutationResult<Fleet, Error, string> {
   })
 }
 
+export function useMiningOptions(fleetId: string | null) {
+  return useQuery<MiningOptions, Error>({ queryKey: queryKeys.fleets.miningOptions(fleetId ?? ''),
+    queryFn: () => fleetService.miningOptions(fleetId!), enabled: !!fleetId, retry: false, refetchInterval: BOARD_POLL_MS })
+}
+
 // useMine — the extraction verb: commit a run against the docked-at
 // feature. Rides the movement channel (a 409 names the occupying action),
 // so success refreshes the fleet reads (the claimed slot), the interior
@@ -149,6 +155,7 @@ export function useMine(
   return useMutation<MineCommit, Error, { fleetId: string; request: MineRequest }>({
     mutationFn: ({ fleetId, request }) => fleetService.mine(fleetId, request),
     onSuccess: (_, { fleetId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.fleets.miningOptions(fleetId) })
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.mine() })
       void qc.invalidateQueries({ queryKey: queryKeys.fleets.detail(fleetId) })
       void qc.invalidateQueries({ queryKey: queryKeys.systemSpace.detail(systemId) })

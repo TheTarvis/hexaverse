@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAM = "https://github.com/mattpocock/skills.git"
-LOCAL_SKILLS = {"spinup"}
+LOCAL_SKILLS = {"onboarding", "spinup"}
 
 
 def inventory(directory):

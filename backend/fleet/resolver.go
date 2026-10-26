@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hexaverse/rules"
 
 	"hexaverse/action"
 	"hexaverse/charts"
@@ -232,7 +233,7 @@ func ScanResolver(ships ShipSource, bodies BodySource) action.ResolveFunc {
 		// interior read's contact union (fleet.FleetsInSystem) and this
 		// resolver build over the fleet set they each already hold — one
 		// notion of "who is docked where", not a second, divergent one.
-		w := disclosure.World{
+		w := disclosure.World{Params: rules.SensorParams(),
 			Bodies: bt, Attachments: Attachments(allShips), StarId: bt.StarId(), StarSize: bt.StarSize(), SystemId: f.SystemId,
 		}
 		records, err := disclosure.FocusedScan(w, scannerPos, window.HostId, shipMap, pulseReach)

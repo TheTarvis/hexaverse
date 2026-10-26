@@ -6,6 +6,10 @@ import { apiClient } from '../api-client'
 import type { ActionList, GameAction } from '../types/action'
 
 class ActionService {
+  subscribe(scope: string, onAction: (data: unknown) => void, onConnect: () => void): () => void {
+    return apiClient.subscribe(`/v1/channels/${encodeURIComponent(scope)}/stream`, 'action.completed', onAction, onConnect)
+  }
+
   async get(actionId: string): Promise<GameAction> {
     const response = await apiClient.get<GameAction>(`/v1/actions/${encodeURIComponent(actionId)}`)
     return response.data

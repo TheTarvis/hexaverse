@@ -9,15 +9,15 @@ import styles from './hud-object-thumbnail.stories.module.css'
 
 // Storybook controls describe the known-object branch; unresolved stories
 // render the separate, kind-free branch explicitly.
-const meta: Meta<{ kind: HudObjectKind; alt?: string }> = {
+const meta: Meta<{ kind: HudObjectKind; alt?: string; size?: 'compact' | 'large' }> = {
   id: 'hud-object-thumbnails', title: 'Foundations/Object thumbnails',
   component: HudObjectThumbnail,
   tags: ['autodocs', 'catalog'],
-  args: { kind: 'fleet' },
+  args: { kind: 'fleet', size: 'compact' },
   parameters: { catalog: { purpose: 'foundation', status: 'reference', record: 'docs/hud.md' },
-    docs: { description: { component: 'C2 — 32px static thumbnails, using 128px transparent sources rendered offline from existing game art. Representative category images rather than per-object portraits. Decorative beside names; supply alt for standalone images. No model loading, canvas or GPU renderer is created by this component. These examples do not settle fleet-list composition.' } },
+    docs: { description: { component: 'Shared 32px compact and 88px grid thumbnails, using 128px transparent sources rendered offline from existing game art. Representative category images rather than per-object portraits. Decorative beside names; supply alt for standalone images. No model loading, canvas or GPU renderer is created by this component. These examples do not settle fleet-list composition.' } },
   },
-  argTypes: { kind: { control: 'select', options: ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon', 'gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] } },
+  argTypes: { size: { control: 'radio', options: ['compact', 'large'] }, kind: { control: 'select', options: ['fleet', 'station', 'rocky', 'resource-site', 'star', 'gas_giant', 'ice', 'moon', 'gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiation'] } },
   decorators: [(Story) => <div className={`dark ${styles.stage}`}><Story /></div>],
 }
 

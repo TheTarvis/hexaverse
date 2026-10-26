@@ -212,3 +212,9 @@ export const OriginalChromeAlignment: Story = {
     await expect(args.onClose).toHaveBeenCalled()
   },
 }
+
+export const SearchTitle: Story = {
+  args: { title: { search: 'travel-destination', fleet: 'Peregrine', scope: 'Solace' }, showBack: true, showClose: true },
+  argTypes: { title: { control: 'object' } },
+  parameters: { docs: { description: { story: 'Selection cards use the same shared plaque and Back/Close row. Structured search title data carries scope and optional fleet/target context without a second header band.' } } },
+}

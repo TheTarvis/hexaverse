@@ -9,6 +9,11 @@ it.each<[HudCardTitle, string]>([
   [{ fleet: '  ', action: 'travel', object: ' ' }, 'Travel'],
   [{ fleet: 'Peregrine', action: 'travel' }, 'Peregrine · Travel'],
   ['Objects', 'Objects'],
+  [{ search: 'objects', scope: 'Solace' }, 'Objects · Solace'],
+  [{ search: 'travel-destination', fleet: 'Peregrine', scope: 'Solace' }, 'Peregrine · Choose destination · Solace'],
+  [{ search: 'mining-target', fleet: 'Peregrine', scope: 'Solace' }, 'Peregrine · Choose mining target · Solace'],
+  [{ search: 'command-fleet', object: 'Solace Station', scope: 'Solace' }, 'Choose command fleet for Solace Station · Solace'],
+  [{ search: 'objects', scope: ' ', fleet: ' ', object: ' ' }, 'Objects'],
 ])('formats contextual and ordinary titles: %j', (input, expected) => {
   expect(formatHudCardTitle(input)).toBe(expected)
 })

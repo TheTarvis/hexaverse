@@ -33,6 +33,10 @@ func (f *fakeMineSvc) Commit(context.Context, string, string, MineRequest) (*act
 	return f.action, f.err
 }
 
+func (f *fakeMineSvc) Options(ctx context.Context, corporationID, fleetID string) (*Options, error) {
+	return &Options{Eligible: true, FreeHold: 20, MiningRate: 2}, f.err
+}
+
 func newMineRouter(svc ServiceInterface, authenticated bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -216,5 +220,25 @@ func TestHandlerCommit_Scenario_BusySlotNamesOccupyingKind(t *testing.T) {
 			t.Errorf("activeType=%s produced a reason (%q) already seen for another occupying kind — busy-slot reasons must distinguish burn/lane-transit/mine", tc.activeType, reason)
 		}
 		reasons[reason] = true
+	}
+}
+
+func TestMiningOptionsRoute(t *testing.T) {
+	for _, test := range []struct {
+		err    error
+		status int
+	}{{nil, http.StatusOK}, {ErrForeignFleet, http.StatusNotFound}, {ErrUnauthenticated, http.StatusUnauthorized}} {
+		router := newMineRouter(&fakeMineSvc{err: test.err}, true)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/fleets/f1/mining-options", nil))
+		if response.Code != test.status {
+			t.Fatalf("status %d, want %d: %s", response.Code, test.status, response.Body.String())
+		}
+		if test.err == nil {
+			var options Options
+			if err := json.Unmarshal(response.Body.Bytes(), &options); err != nil || !options.Eligible || options.FreeHold != 20 {
+				t.Fatalf("options: %s, %v", response.Body.String(), err)
+			}
+		}
 	}
 }

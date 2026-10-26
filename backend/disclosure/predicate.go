@@ -73,9 +73,12 @@ func Scanning(s Ship, t common.WorldMillis) bool {
 // lighting a drive is always detectable by anyone who could already see you
 // cold, however gently the burn was commanded.
 func PlumeRadius(driveOutput, commandedAccel float64) float64 {
-	radius := float64(float64(PlumePerDriveOutput*driveOutput) * commandedAccel)
-	if radius < PlumeFloor {
-		return PlumeFloor
+	return plumeRadius(driveOutput, commandedAccel, Params{PlumeFloor: PlumeFloor, PlumePerDriveOutput: PlumePerDriveOutput})
+}
+func plumeRadius(driveOutput, commandedAccel float64, p Params) float64 {
+	radius := float64(float64(p.PlumePerDriveOutput*driveOutput) * commandedAccel)
+	if radius < p.PlumeFloor {
+		return p.PlumeFloor
 	}
 	return radius
 }
@@ -99,12 +102,15 @@ func PlumeReaches(observer, emitter space.Vec3, passiveRange, plumeRadius float6
 // nothing on this path persists. A target sitting exactly at the edge
 // flickers for a tick and discloses nothing it was not already disclosing.
 func detectionRadius(obs Observer, target Ship, t common.WorldMillis) float64 {
+	return detectionRadiusWithParams(obs, target, t, World{}.params())
+}
+func detectionRadiusWithParams(obs Observer, target Ship, t common.WorldMillis, p Params) float64 {
 	loudest := 0.0
 	if Emitting(target.State, t) {
-		loudest = PlumeRadius(target.DriveOutput, target.State.Burn.Accel)
+		loudest = plumeRadius(target.DriveOutput, target.State.Burn.Accel, p)
 	}
 	if Scanning(target, t) {
-		if sweep := scanEmissionRadius(target.Scan.Range); sweep > loudest {
+		if sweep := max(p.ScanEmissionFloor, p.ScanEmissionPerRange*target.Scan.Range); sweep > loudest {
 			loudest = sweep
 		}
 	}

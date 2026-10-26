@@ -85,7 +85,7 @@ const KNOWN_TOFIXED_EXCEPTIONS: Array<{ file: string; lines: number[]; ruling: s
     // after adding passive world annotations; verified against live source.
     // HUD cleanup: unchanged bearing/speed expressions re-anchored after removing offscreen chips.
     file: 'frontend/components/space/SpaceStage.tsx',
-    lines: [766, 767, 825, 826, 982],
+    lines: [794, 795, 853, 854, 1010],
     ruling: 'RULING 10 / RULING 25 / D2',
     note: 'bearing/speed hover-facts toFixed — no covering requirement anywhere; filed as defect-hover-facts-unspecced.md, not fixed here',
   },

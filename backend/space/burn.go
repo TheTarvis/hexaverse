@@ -264,7 +264,7 @@ func BuildCurve(bodies Bodies, from Vec3, target Target, arriveMs common.WorldMi
 			Kind:     ParkOrbit,
 			BodyId:   target.BodyId,
 			Radius:   standoff,
-			PeriodMs: InsertionPeriod(standoff),
+			PeriodMs: InsertionPeriodFor(bodies, standoff),
 			Phase:    phase,
 			EpochMs:  arriveMs,
 		}

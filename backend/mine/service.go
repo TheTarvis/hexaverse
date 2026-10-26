@@ -189,6 +189,7 @@ type Actions interface {
 
 // ServiceInterface is mine's HTTP-facing surface.
 type ServiceInterface interface {
+	Options(ctx context.Context, corporationID, fleetID string) (*Options, error)
 	// Commit validates every mine precondition (design.md task 2.2, Decisions
 	// #4/#8/#9/#10/#12/#14) and commits the run through the action spine.
 	// requesterCorpId is the resolved common.ActorCorp (empty ⇒
@@ -254,7 +255,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 	if math.IsNaN(req.Tons) || math.IsInf(req.Tons, 0) || req.Tons <= 0 {
 		return nil, ErrInvalidTonnage
 	}
-	if req.Tons < s.params.MinRunTons {
+	if req.Tons < s.currentParams().MinRunTons {
 		return nil, ErrSubMinimumRun
 	}
 
@@ -277,7 +278,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 	// ownership is established, turning this endpoint into an existence
 	// oracle (mine-extraction: "An unresolvable member rejection never
 	// precedes ownership or the not-docked rejection").
-	if err := validateFeatureIdLexical(req.FeatureId, s.params.MaxFeatureIdBytes); err != nil {
+	if err := validateFeatureIdLexical(req.FeatureId, s.currentParams().MaxFeatureIdBytes); err != nil {
 		return nil, err
 	}
 
@@ -325,7 +326,7 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 	if err != nil {
 		return nil, fmt.Errorf("mine: folding ledger at commit: %w", err)
 	}
-	startTons := res.Richness * s.params.TonsPerRichness
+	startTons := res.Richness * s.currentParams().TonsPerRichness
 	remainingAtNow := startTons + fold
 	if remainingAtNow < 0 {
 		remainingAtNow = 0
@@ -342,12 +343,12 @@ func (s *Service) Commit(ctx context.Context, requesterCorpId, fleetId string, r
 		return nil, ErrLodeDepleted
 	}
 
-	fleetRate := fleet.DerivedMiningRate(*f, s.classStats)
+	fleetRate := fleet.DerivedMiningRate(*f, s.currentClassStats())
 	if fleetRate <= 0 {
 		return nil, ErrNoMiningCapability
 	}
 
-	freeHold := fleet.FreeHold(*f, s.classStats)
+	freeHold := fleet.FreeHold(*f, s.currentClassStats())
 	if req.Tons > freeHold {
 		return nil, ErrOverFreeHold
 	}

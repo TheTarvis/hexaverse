@@ -7,7 +7,6 @@
 .identityArt { grid-column: 1; grid-row: 2; align-self: start; }
 .identityText { grid-column: 2; grid-row: 2; display: grid; gap: 4px; min-width: 0; }
 .identityChevron { grid-column: 3; grid-row: 2; margin-top: 6px; color: var(--hud-control-focus); }
-.picker, .picker label { display: grid; gap: 8px; }
 .facts > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .facts dd { text-align: right; }
 .warning { color: #f8ce85; }

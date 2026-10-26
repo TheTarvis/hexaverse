@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"hexaverse/tuning"
 	"math/rand"
 
 	"github.com/rs/zerolog/log"
@@ -77,7 +78,7 @@ func SeedDevGalaxy(ctx context.Context) error {
 		return fmt.Errorf("checking for live galaxy: %w", err)
 	}
 
-	meta, err := svc.Seed(ctx, devGalaxy.Seed, devGalaxy.Params)
+	meta, err := svc.Seed(ctx, int64(tuning.Number("generation.seed", float64(devGalaxy.Seed))), localSeedParams())
 	if err != nil {
 		return fmt.Errorf("seeding dev galaxy: %w", err)
 	}
@@ -86,4 +87,11 @@ func SeedDevGalaxy(ctx context.Context) error {
 		Int("blocks", len(StartAreaBlocks(devGalaxy.Params))).
 		Msg("Seed: created dev galaxy")
 	return nil
+}
+
+func localSeedParams() GenerationParams {
+	if tuning.Enabled() {
+		return StartAreaParams()
+	}
+	return devGalaxy.Params
 }

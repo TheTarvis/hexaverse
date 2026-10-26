@@ -28,13 +28,7 @@
     { "go": "FirstTonPrice", "ts": "firstTonPrice", "coverage": "family:firstTonPrice" },
     { "go": "Capacity", "ts": "capacity", "coverage": "family:fold", "note": "indirect (the per-entry remaining-capacity helper FoldSale/foldSale consume on every portion; every fold case exercises it)" }
   ],
-  "goOnly": [
-    "BudgetCheck", "DefaultParams", "DemandFor", "EpochAt", "FloorFor", "GetBoard",
-    "NewHandler", "NewService", "ObserveSale", "ProvisionRequests", "RegisterRoutes",
-    "Sell", "blendedUnitPrice", "checkGuards", "dockedTo", "ensureProvisioned",
-    "isContention", "mix64", "mixStation", "regionOf", "reject", "settle",
-    "unitFloat", "validateGuards", "venueQuotes"
-  ],
+  "goOnly": ["BudgetCheck", "DefaultParams", "DemandFor", "EpochAt", "FloorFor", "GetBoard", "NewHandler", "NewService", "ObserveSale", "ProvisionRequests", "RegisterRoutes", "Sell", "blendedUnitPrice", "checkGuards", "currentParams", "dockedTo", "ensureProvisioned", "isContention", "mix64", "mixStation", "regionOf", "reject", "settle", "unitFloat", "validateGuards", "venueQuotes"],
   "tsOnly": ["bestPriceFor"],
   "inventory": []
 }

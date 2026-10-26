@@ -130,7 +130,7 @@ func (s *Service) GetOrCreateInterior(ctx context.Context, systemID string) (*Ge
 	// Generate deterministically from the SAME per-system seed M1's skeleton
 	// used, so the interior extends the skeleton rather than contradicting it.
 	seed := galaxy.SystemSeed(meta.Seed, systemID)
-	gen := Generate(seed, string(node.Region), node.Skeleton, s.params)
+	gen := Generate(seed, string(node.Region), node.Skeleton, s.currentParams())
 	gen.Interior.SystemId = systemID
 	gen.Interior.CreatedAt = s.clock.Now()
 	prepareNames(galaxyID, node, &gen)

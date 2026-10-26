@@ -7,6 +7,7 @@ import (
 
 	"hexaverse/common"
 	"hexaverse/config"
+	"hexaverse/devtools"
 	"hexaverse/galaxy"
 	"hexaverse/middlewares"
 
@@ -41,6 +42,10 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to initialize Firebase")
 	}
 	log.Info().Msg("Firebase initialized successfully")
+
+	if err := devtools.Initialize(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to load local tuning")
+	}
 
 	// Local + e2e only: ensure a live galaxy exists so drill-in has a world to
 	// render (GET /v1/systems/:id 404s without one). Idempotent and synchronous —

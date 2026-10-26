@@ -15,6 +15,7 @@ package system
 // whether a sighting for it exists.
 
 import (
+"hexaverse/rules"
 	"context"
 	"sort"
 
@@ -97,7 +98,7 @@ func (s *Service) Contacts(ctx context.Context, systemID, requesterCorpId string
 				// precedent elsewhere in this codebase).
 				continue
 			}
-			observers = append(observers, disclosure.Observer{Position: pos, PassiveRange: disclosure.PassiveRange})
+			observers = append(observers, disclosure.Observer{Position: pos, PassiveRange: rules.TunedPassiveRange()})
 			continue
 		}
 		targets = append(targets, p.Ship)

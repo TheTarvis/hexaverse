@@ -22,7 +22,7 @@ it('lists disclosed systems without autofocus and filters by name, region and st
   fireEvent.change(search, { target: { value: 'G' } })
   expect(screen.getByRole('button', { name: /Axion/ })).toBeVisible()
   fireEvent.change(search, { target: { value: 'not disclosed' } })
-  expect(screen.getByRole('status')).toHaveTextContent('No known systems match')
+  expect(screen.getByText('No matching objects.')).toBeVisible()
   expect(select).not.toHaveBeenCalled()
 })
 

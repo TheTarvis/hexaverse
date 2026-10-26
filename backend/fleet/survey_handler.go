@@ -2,9 +2,9 @@ package fleet
 
 import (
 	"context"
+	"hexaverse/rules"
 	"net/http"
 
-	"hexaverse/disclosure"
 	"hexaverse/discovery"
 	"hexaverse/space"
 
@@ -69,14 +69,14 @@ func (s *Service) SurveyOptions(ctx context.Context, id string) (map[string]inte
 				reason = "Protected place"
 			} else if f.ActiveScanId != "" {
 				reason = "Sensor channel is busy"
-			} else if e != nil || p.Sub(q).Length() > disclosure.FocusedScanRange {
+			} else if e != nil || p.Sub(q).Length() > rules.TunedFocusedScanRange() {
 				reason = "Move within survey range"
 			}
 			targets = append(targets, map[string]interface{}{"bodyId": body.BodyId, "eligible": reason == "", "reason": reason})
 		}
 
 	}
-	return map[string]interface{}{"targets": targets, "range": disclosure.FocusedScanRange, "durationMs": duration, "survey": f.Survey, "outcome": f.LastSurveyOutcome, "sensorBusy": f.ActiveScanId != "", "inTransit": f.Jump != nil}, nil
+	return map[string]interface{}{"targets": targets, "range": rules.TunedFocusedScanRange(), "durationMs": duration, "survey": f.Survey, "outcome": f.LastSurveyOutcome, "sensorBusy": f.ActiveScanId != "", "inTransit": f.Jump != nil}, nil
 }
 
 func (h *Handler) SurveyOptions(c *gin.Context) {

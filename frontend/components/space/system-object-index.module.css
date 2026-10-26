@@ -2,25 +2,14 @@
 .indexShell { --muted: #91a3b7; --signal: #76e3ef; color: #dce6f0; display: flex; flex-direction: column; min-height: 0; max-height: 100%; width: 280px; }
 .indexPanels { display: flex; align-items: stretch; margin-top: 0; min-height: 0; flex: 1 1 auto; }
 .systemIndex, .objectDetails { box-sizing: border-box; padding: 16px; min-height: 0; border: 1px solid #76e3ef44; background: #071019f5; scrollbar-width: thin; scrollbar-color: #76e3ef88 #071019; }
-.systemIndex { flex: 0 0 280px; overflow-y: auto; scrollbar-gutter: stable; }
-.systemIndex input { color: #dce6f0; background: #0c1b28; }
-.systemIndex section { margin-top: 16px; }
+.systemIndex { display: flex; flex-direction: column; flex: 0 0 280px; overflow-y: auto; scrollbar-gutter: stable; }
+.muted { color: var(--muted); }
 .eyebrow { font: var(--hud-label-font); letter-spacing: var(--hud-label-tracking); color: var(--signal); }
-.muted, .indexRow small { color: var(--muted); }
-.indexRow { display: flex; margin-top: 4px; }
-.indexRow > button[data-hud-button] { width: 100%; min-height: 58px; align-items: center; justify-content: space-between; text-align: left; gap: 12px; padding: 10px 12px; border-radius: 0; }
-.rowCopy { flex: 1; min-width: 0; }
-.rowChevron { flex-shrink: 0; color: var(--signal); }
-.rowCopy > span, .indexRow small { display: block; overflow-wrap: anywhere; }
-.indexRow small { font: var(--hud-caption-font); }
 .objectDetails { flex: 0 0 290px; display: flex; flex-direction: column; border-left: 0; overflow: hidden; }
 .detailsHeader { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; flex-shrink: 0; padding-bottom: 10px; }
 .detailsBody { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .inspectorTitle { display: flex; align-items: center; gap: 12px; margin: 8px 0 24px; }
 .inspectorTitle p { font: var(--hud-secondary-font); }
-.objectFacts { display: grid; grid-template-columns: 90px 1fr; gap: 12px; font: var(--hud-caption-font); margin-block: 20px; }
-.objectFacts dt { color: var(--muted); }
-.objectFacts dd { margin: 0; overflow-wrap: anywhere; }
 .indexActions { display: grid; gap: 6px; flex-shrink: 0; padding-top: 10px; border-top: 1px solid #76e3ef22; }
 .primary { min-height: 42px; }
 @media (max-width: 760px) {
@@ -43,17 +32,13 @@
 .compact .objectDetails { border-left: 1px solid #76e3ef44; }
 
 /* In a workspace, the shared outer card owns the frame and scroll viewport. */
-.compact { max-height: none; }
-.compact .indexPanels { display: block; flex: initial; }
+.compact { max-height: none; height: 100%; }
+.compact .indexPanels { display: flex; flex: 1; }
 .compact .systemIndex, .compact .objectDetails { border: 0; background: transparent; padding: 0; overflow: visible; }
 .compact .detailsBody { overflow: visible; }
 .compact .detailsHeader { position: static; background: transparent; }
 .compact .objectDetails { margin-top: 16px; }
 .compact .inspectorTitle { margin-block: 8px 16px; }
 
-/* Search stays at the top of the owning list/card scroll viewport. No disclosure
-   or category filter can hide otherwise available objects. */
-.searchHeader { position: sticky; top: 0; z-index: 2; display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; background: #0b1621; }
-.compact .searchHeader { top: 12px; }
-/* Cover the card's existing padded inset so scrolled rows cannot peek above search. */
-.compact .searchHeader::before { content: ''; position: absolute; inset: -36px -16px 0; z-index: -1; background: inherit; pointer-events: none; }
+.searchHeader { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; flex-shrink: 0; }
+.searchBody { display: flex; flex-direction: column; flex: 1; min-height: 0; }

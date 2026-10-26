@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
   useMyFleets: vi.fn(),
   push: vi.fn(),
   preview: vi.fn(),
+  miningOptions: vi.fn(),
+  getFleet: vi.fn(),
+  getAction: vi.fn(),
+  subscribe: vi.fn(),
   order: vi.fn(),
   stop: vi.fn(),
   mine: vi.fn(),
@@ -32,6 +36,8 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/services', () => ({
   fleetService: {
+    miningOptions: (...a: unknown[]) => mocks.miningOptions(...a),
+    get: (...a: unknown[]) => mocks.getFleet(...a),
     preview: (...a: unknown[]) => mocks.preview(...a),
     order: (...a: unknown[]) => mocks.order(...a),
     stop: (...a: unknown[]) => mocks.stop(...a),
@@ -40,6 +46,8 @@ vi.mock('@/lib/services', () => ({
     scan: (...a: unknown[]) => mocks.scan(...a),
   },
   actionService: {
+    get: (...a: unknown[]) => mocks.getAction(...a),
+    subscribe: (...a: unknown[]) => mocks.subscribe(...a),
     listRunning: (...a: unknown[]) => mocks.listRunning(...a),
     cancel: (...a: unknown[]) => mocks.cancel(...a),
     listSettled: (...a: unknown[]) => mocks.listSettled(...a),
@@ -148,6 +156,8 @@ vi.mock('./SpaceStage', async () => {
   }
   return { SpaceStage: SpaceStageMock, default: SpaceStageMock }
 })
+
+vi.mock('./SpacecraftPreview', () => ({ SpacecraftPreview: () => <div data-testid="mining-preview" /> }))
 
 import { SystemSpaceView } from './SystemSpaceView'
 import { PREVIEW_REFRESH_MS } from '@/lib/realtime'
@@ -354,7 +364,11 @@ beforeEach(() => {
   mocks.preview.mockResolvedValue(QUOTE)
   mocks.order.mockResolvedValue(burningFleet('fleet_1'))
   mocks.stop.mockResolvedValue(fleet('fleet_1'))
-  mocks.mine.mockResolvedValue({ id: 'act_mine_fleet_1', eta: T0 + 600_000 })
+  mocks.mine.mockResolvedValue({ actionId: 'act_mine_fleet_1', eta: T0 + 600_000, worldTime: T0 })
+  mocks.miningOptions.mockResolvedValue({ eligible: true, featureId: HOST, commitFeatureId: HOST, freeHold: 40, miningRate: 1, minRunTons: 1, resources: [{ kind: 'metals', remainingTons: 100 }], worldTime: T0 })
+  mocks.getFleet.mockResolvedValue(attachedTo('fleet_1', HOST))
+  mocks.getAction.mockResolvedValue({ id: 'act_mine_fleet_1', actor: 'fleet_1', type: 'mine', scope: SYSTEM_ID, status: 'running', committedAt: T0, eta: T0 + 600_000, worldTime: T0, params: { featureId: HOST, kind: 'metals', tons: 12 } })
+  mocks.subscribe.mockReturnValue(() => {})
   mocks.listSettled.mockResolvedValue([])
   mocks.scanTargets.mockResolvedValue([])
   mocks.acknowledge.mockResolvedValue({})
@@ -412,7 +426,8 @@ describe('compact production travel', () => {
     mocks.preview.mockImplementation((id: string) => id === 'fleet_b' ? replacement.promise : Promise.resolve(QUOTE))
     mount([ready(), ready('fleet_b')]); await flush(); await click('mock-select-point'); await click('travel-review-entry')
     fireEvent.click(screen.getByRole('button', { name: 'Change fleet' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Travel command fleet' }), { target: { value: 'fleet_b' } }); await flush()
+    expect(screen.queryByTestId('travel-start')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Fleet fleet_b/ })); await flush()
     expect(selection()).toBe('point')
     expect(screen.getByTestId('travel-start')).toBeDisabled()
     expect(screen.getByTestId('compact-travel-card')).not.toHaveTextContent('Fuel cost')
@@ -550,4 +565,63 @@ it('refreshes missing fleet readings without querying actions for a missing acto
   expect(mocks.listRunning).toHaveBeenCalledTimes(beforeRunning)
   expect(mocks.listSettled).toHaveBeenCalledTimes(beforeSettled)
   expect(mocks.order).not.toHaveBeenCalled()
+})
+
+
+it('uses the merged mining card from fleet status, preserves a hidden draft, and confirms the exact result', async () => {
+  mount([attachedTo('fleet_1', HOST)]); await flush()
+  fireEvent.click(screen.getByRole('button', { name: 'Mine' })); await flush()
+  expect(screen.queryByRole('group', { name: 'Secondary presets' })).toBeNull()
+  fireEvent.click(within(screen.getByRole('region', { name: 'Fleet status panel' })).getByRole('button', { name: /feat-body-0 rocky/ })); await flush()
+  const quantity = screen.getByRole('spinbutton', { name: 'Quantity in tonnes' })
+  fireEvent.change(quantity, { target: { value: '12' } })
+  const navigation = within(screen.getByRole('navigation', { name: 'HUD panels' }))
+  fireEvent.click(navigation.getByRole('button', { name: 'Fleet status' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Fleet status (hidden)' }))
+  expect(screen.getByRole('spinbutton', { name: 'Quantity in tonnes' })).toHaveValue(12)
+  const start = screen.getByRole('button', { name: 'Start mining' })
+  fireEvent.click(start); fireEvent.click(start); await flush()
+  expect(mocks.mine).toHaveBeenCalledExactlyOnceWith('fleet_1', { featureId: HOST, kind: 'metals', tons: 12 })
+  expect(screen.getByText('Mining in progress')).toBeVisible()
+  expect(mocks.order).not.toHaveBeenCalled()
+  mocks.getAction.mockResolvedValue({ id: 'act_mine_fleet_1', actor: 'fleet_1', type: 'mine', scope: SYSTEM_ID, status: 'done', reasonCode: 'holdFull', committedAt: T0, eta: T0 + 600_000, worldTime: T0 + 600_000, params: { kind: 'metals', tons: 12 }, outcome: 'hold full at 9 tons of metals' })
+  await act(async () => { mocks.subscribe.mock.calls[0][1]({ actionId: 'act_mine_fleet_1' }) }); await flush()
+  expect(screen.getByText('The fleet’s hold is full.')).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Cancel mining' })).toBeNull()
+})
+
+it('uses resource-first mining search with only local owned attached eligible fleets', async () => {
+  mocks.miningOptions.mockImplementation((id: string) => Promise.resolve({ eligible: id === 'fleet_1', featureId: HOST, commitFeatureId: HOST, freeHold: 40, miningRate: 1, minRunTons: 1, resources: [{ kind: 'metals', remainingTons: 100 }], worldTime: T0 }))
+  mount([attachedTo('fleet_1', HOST), attachedTo('fleet_b', HOST), fleet('remote', { attachedTo: HOST, systemId: 'elsewhere' }), fleet('foreign', { attachedTo: HOST, own: false })]); await flush()
+  fireEvent.click(screen.getByTestId(`index-${HOST}`)); await flush()
+  fireEvent.click(screen.getByRole('button', { name: 'Mine here' })); await flush()
+  expect(screen.queryByRole('button', { name: /Fleet fleet_b Owned fleet/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /Fleet remote Owned fleet/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /Fleet foreign Owned fleet/ })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /Fleet fleet_1 Owned fleet/ })); await flush()
+  expect(screen.getByRole('button', { name: 'Start mining' })).toBeEnabled()
+  expect(screen.getByRole('spinbutton', { name: 'Quantity in tonnes' })).toHaveValue(40)
+  expect(mocks.mine).not.toHaveBeenCalled()
+})
+
+it('returns directly from shared destination search to a refreshed travel review', async () => {
+  mount([fleet('fleet_1', { roster: { ...fleet('fleet_1').roster, cargo: { fuel: 1000 } } })]); await flush(); await click('mock-select-point'); await click('travel-review-entry')
+  fireEvent.click(screen.getByRole('button', { name: 'Change destination' })); await flush()
+  const searches = screen.getAllByRole('searchbox', { name: 'Find an object' })
+  fireEvent.change(searches[0], { target: { value: 'metals' } })
+  fireEvent.click(screen.getByRole('button', { name: /feat-body-0 rocky/ })); await flush()
+  expect(selection()).toBe(HOST)
+  expect(screen.getByTestId('compact-travel-card')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Start travel' })).toBeEnabled()
+  expect(mocks.order).not.toHaveBeenCalled()
+})
+
+it('hydrates an owned Galaxy travel intent into destination search without issuing an order', async () => {
+  window.history.replaceState(null, '', `/?task=travel&fleet=fleet_1`)
+  try {
+    mount([attachedTo('fleet_1', HOST)]); await flush()
+    expect(screen.getByRole('searchbox', { name: 'Find an object' })).toBeVisible()
+    expect(screen.queryByTestId('travel-start')).toBeNull()
+    expect(mocks.order).not.toHaveBeenCalled()
+  } finally { window.history.replaceState(null, '', '/') }
 })

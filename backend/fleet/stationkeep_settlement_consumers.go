@@ -38,7 +38,7 @@ import (
 func (s *Service) forceDemotionMerge(p space.Park, now common.WorldMillis) map[string]interface{} {
 	return map[string]interface{}{
 		"state":     EncodeKinematicState(parkedState(releasedParkOf(p))),
-		"cargo":     map[string]interface{}{"fuel": s.fuelParams.StationKeepReserveTons},
+		"cargo":     map[string]interface{}{"fuel": s.currentFuelParams().StationKeepReserveTons},
 		"updatedAt": int64(now),
 	}
 }
@@ -90,7 +90,7 @@ func (s *Service) settleExpiredHoldFirst(ctx context.Context, f *Fleet) (*Fleet,
 		if cur.Cargo == nil {
 			cur.Cargo = map[string]float64{}
 		}
-		cur.Cargo["fuel"] = s.fuelParams.StationKeepReserveTons
+		cur.Cargo["fuel"] = s.currentFuelParams().StationKeepReserveTons
 		cur.UpdatedAt = now
 		return s.forceDemotionMerge(p, now), nil
 	})
@@ -124,13 +124,13 @@ func (s *Service) settledFuelInTx(p space.Park, storedFuel, rate float64, now co
 		return storedFuel, space.Park{}, false
 	}
 	if now >= p.DryInstantMs {
-		return s.fuelParams.StationKeepReserveTons, releasedParkOf(p), true
+		return s.currentFuelParams().StationKeepReserveTons, releasedParkOf(p), true
 	}
-	fuel = storedFuel - upkeepTons(rate, p.HoldStartMs, now, s.fuelParams)
+	fuel = storedFuel - upkeepTons(rate, p.HoldStartMs, now, s.currentFuelParams())
 	if fuel < 0 {
 		fuel = 0
 	}
-	return fuel, space.ReleaseStationkeep(p.BodyId, p.Offset, now), true
+	return fuel, space.ReleaseStationkeep(p.BodyId, p.Offset, now, p.PeriodMs), true
 }
 
 // holdEndingMergeInTx folds settledFuelInTx into the actor-doc merge a
@@ -308,7 +308,7 @@ func (s *Service) applyMidHoldSettlement(ctx context.Context, plan *FuelCreditPl
 	}
 	rate := stationKeepRateFor(bt, p.BodyId)
 
-	settled := plan.Fleet.Cargo["fuel"] - upkeepTons(rate, p.HoldStartMs, now, s.fuelParams)
+	settled := plan.Fleet.Cargo["fuel"] - upkeepTons(rate, p.HoldStartMs, now, s.currentFuelParams())
 	if settled < 0 {
 		settled = 0
 	}
@@ -316,7 +316,7 @@ func (s *Service) applyMidHoldSettlement(ctx context.Context, plan *FuelCreditPl
 
 	restamped := p
 	restamped.HoldStartMs = now
-	restamped.DryInstantMs = dryInstantFor(now, credited, rate, s.fuelParams)
+	restamped.DryInstantMs = dryInstantFor(now, credited, rate, s.currentFuelParams())
 	if restamped.DryInstantMs <= restamped.HoldStartMs {
 		// Unreachable for a CREDIT, which can only push the recomputed dry
 		// instant later: exactly one mutation reachable today lands during an

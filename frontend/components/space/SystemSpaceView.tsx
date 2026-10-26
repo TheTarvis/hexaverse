@@ -9,6 +9,13 @@ import { CelestialActions } from './CelestialActions'
 
 import { GameViewShell, GameViewHeading, GameViewScene, GameViewWorkspace } from '@/components/hud/GameViewShell'
 import { HudButton } from '@/components/hud/HudControls'
+import { useMiningJourney } from '@/hooks/use-mining-journey'
+import { MiningJourney } from './MiningJourney'
+import { MiningCardActions, miningCardTitle } from './MiningCard'
+import { ObjectSearchCard } from './ObjectSearchCard'
+import { emptyObjectSearch } from './ObjectSearch'
+import { fleetLabel } from '@/lib/fleet-label'
+import { travelCommandFleets, miningFleet, resourceHost, travelTargets } from '@/lib/hud-action-targets'
 import { useSelectedFleet } from '@/hooks/use-selected-fleet'
 import { type HudPanelId } from '@/components/hud/HudWorkspace'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactElement } from 'react'
@@ -267,6 +274,10 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   const [travelReviewOpen, setTravelReviewOpen] = useState(false)
   const [travelControlsOpen, setTravelControlsOpen] = useState(false)
   const [travelNotice, setTravelNotice] = useState<string | null>(null)
+  const [choosingTravelDestination, setChoosingTravelDestination] = useState(false)
+  const [miningReturnPanel, setMiningReturnPanel] = useState<'objects' | 'fleet-status'>('fleet-status')
+  const [travelSearch, setTravelSearch] = useState(emptyObjectSearch)
+  const [choosingTravelFleet, setChoosingTravelFleet] = useState(false)
   const [travelError, setTravelError] = useState<string | null>(null)
   const [travelPending, setTravelPending] = useState(false)
   const [travelReceipt, setTravelReceipt] = useState<{ fleet: Fleet; readCount: number | undefined } | null>(null)
@@ -501,6 +512,38 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
   // after `useWorldClock`, in this same component (its own "immediately on
   // re-anchor" path relies on layout-effect declaration order).
   const worldTime = useCoarseWorldTime(clock)
+
+  const mining = useMiningJourney({ systemId, fleets: allFleets, features: interior.data?.features ?? [], clock, worldTime, scale: servedScale,
+    failed: interior.isError || fleets.isError, loading: interior.isLoading || fleets.isLoading,
+    onFleet: setActingFleetId, onExit: toFleetOverview => requestHudPanel(toFleetOverview ? 'fleet-status' : miningReturnPanel),
+    onAccepted: accepted => {
+      if (guide && guiding && accepted.fleetId === guide.fleetId && accepted.featureId === guide.targetId && guide.phase === 'mine' && accepted.tons >= 1) {
+        saveCommandGuide({ ...guide, phase: 'extraction', mineActionId: accepted.actionId, resource: accepted.kind, cargoBefore: accepted.cargoBefore })
+      }
+    },
+  })
+  const openMining = (fleetId: string | null, targetId: string | null, returnPanel: 'objects' | 'fleet-status' = 'fleet-status') => {
+    setMiningReturnPanel(returnPanel)
+    mining.begin({ fleetId, targetId }, targetId && !fleetId ? 'object' : 'fleet')
+    setTravelControlsOpen(false)
+    requestHudPanel('fleet-status')
+  }
+
+  const openMiningRef = useRef(openMining)
+  openMiningRef.current = openMining
+  const appliedTaskEntry = useRef<string | null>(null)
+  useEffect(() => {
+    const intent = new URLSearchParams(window.location.search)
+    const fleetId = intent.get('fleet')
+    const task = intent.get('task')
+    if ((task !== 'mine' && task !== 'travel') || !fleetId || interior.isLoading || interior.isError || !interior.data) return
+    const key = `${systemId}:${task}:${fleetId}`
+    if (appliedTaskEntry.current === key || !allFleets.some(fleet => fleet.id === fleetId && fleet.own && fleet.systemId === systemId && !fleet.jump && !!fleet.position)) return
+    appliedTaskEntry.current = key
+    setActingFleetId(fleetId)
+    if (task === 'mine') openMiningRef.current(fleetId, null)
+    else { setSelection(null); setTravelReviewOpen(true); setChoosingTravelFleet(false); setChoosingTravelDestination(true); requestHudPanel('objects') }
+  }, [systemId, allFleets, interior.data, interior.isLoading, interior.isError, setActingFleetId, requestHudPanel])
 
   // The live `prefers-reduced-motion` preference (task 3.8, OQ1 folded in).
   const reducedMotion = useReducedMotion()
@@ -813,7 +856,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         setTravelNotice(burn && burn.ArriveMs !== agreedArrival ? 'The accepted arrival differs from the estimate. Status reflects the accepted order.' : null)
         handleCommitAccepted({ fleetId, departMs: burn?.DepartMs ?? null, arriveMs: burn?.ArriveMs ?? null, selectionKey: targetKey })
         setTravelReceipt({ fleet, readCount: qc.getQueryState(queryKeys.fleets.mine())?.dataUpdateCount })
-        setTravelReviewOpen(false)
+        setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false)
         setTravelControlsOpen(true)
         requestHudPanel('fleet-status')
       },
@@ -861,22 +904,31 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
       onSettled: () => { jumpGuard.release(); setTravelPending(false) },
     })
   }
-  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelReviewOpen(true); requestHudPanel('objects') }
-  const travelCard: ReactElement<CompactTravelCardProps> | null = travelReviewOpen ? <CompactTravelCard footerHost="workspace" fleet={acting}
-    fleets={allFleets} systemId={systemId} destination={destinationLabel}
+  const reviewTravel = () => { setTravelError(null); setTravelNotice(null); setTravelReviewOpen(true); setChoosingTravelFleet(!acting || actingRemote); setChoosingTravelDestination(!!acting && !actingRemote && !selection); requestHudPanel('objects') }
+  const travelCard: ReactElement<CompactTravelCardProps> | null = travelReviewOpen ? <CompactTravelCard choosingFleet={choosingTravelFleet} onFleetSearchChange={setChoosingTravelFleet} footerHost="workspace" fleet={acting}
+    fleets={fleets.isError ? [] : travelCommandFleets(allFleets, systemId)} fleetSearchStatus={fleets.isError ? 'error' : fleets.isLoading ? 'loading' : 'ready'} onRetryFleetSearch={() => { void fleets.refetch() }} systemId={systemId} destination={destinationLabel}
     destinationKind={selection?.bodyId ? interior.data?.features.find(body => body.id === selection.bodyId)?.type ?? (interior.data?.laneGates.some(gate => gate.id === selection.bodyId) ? 'gate' : 'unknown') : selection?.point ? 'point' : 'unknown'}
     quote={currentQuote} worldTime={worldTime} mine={!runningMineRead.isError ? runningMine : null} scale={servedScale} blocker={travelBlocker} error={fleets.isError ? 'Fleet telemetry unavailable.' : travelError}
-    pending={travelPending} onFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }} onStart={startTravel}
-    onBack={() => { if (!travelGuard.held) { setTravelReviewOpen(false); openObjectIndex(true) } }}
-    onChooseDestination={() => { if (!travelGuard.held) { setTravelReviewOpen(false); openObjectIndex(true) } }}
-    onClose={() => { if (!travelGuard.held) setTravelReviewOpen(false) }} onRetry={burnPreview.retry} /> : null
+    pending={travelPending} onFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) { selectFleet(fleet); if (!selection) setChoosingTravelDestination(true) } }} onStart={startTravel}
+    onBack={() => { if (!travelGuard.held) { setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false); openObjectIndex(true) } }}
+    onChooseDestination={() => { if (!travelGuard.held) { setChoosingTravelDestination(true); setChoosingTravelFleet(false) } }}
+    onClose={() => { if (!travelGuard.held) { setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false) } }} onRetry={burnPreview.retry} /> : null
+  const destinationSearch = choosingTravelDestination ? <ObjectSearchCard frameHost="workspace" showPresets={false}
+    title={{ search: 'travel-destination', scope: systemNames[systemId] ?? systemId, fleet: acting?.name }}
+    items={interior.isError || !interior.data ? [] : travelTargets(interior.data)} value={travelSearch} onChange={setTravelSearch}
+    status={interior.isError ? 'error' : interior.isLoading ? 'loading' : 'ready'} onRetry={() => { void interior.refetch() }}
+    onSelect={id => { setSelection({ bodyId: id }); setInspectedFleetId(null); setChoosingTravelDestination(false); setTravelReviewOpen(true) }}
+    onBack={() => setChoosingTravelDestination(false)} backDestination="trip" onClose={() => setChoosingTravelDestination(false)} /> : null
   const fleetStatus: FleetStatusProps = {
+    miningAction: statusFleet && !fleets.isError && !interior.isError && !travelControlsOpen &&
+      (mining.hasRun(statusFleet.id) || runningMine?.actor === statusFleet.id || (interior.data?.features ?? []).some(body => miningFleet(statusFleet, body, systemId)))
+      ? { id: 'mining', label: mining.hasRun(statusFleet.id) || runningMine?.actor === statusFleet.id ? 'View mining' : 'Mine', onClick: () => openMining(statusFleet.id, runningMine?.actor === statusFleet.id ? String(runningMine.params?.featureId ?? statusFleet.attachedTo?.split('#')[0] ?? '') : null) } : undefined,
     fleet: statusFleet, worldTime, scale: servedScale, nameOf: id => systemNames[id] ?? id, resolveBody,
     mine: statusFleet?.id === acting?.id && !runningMineRead.isError ? runningMine : null, scan: statusFleet?.id === acting?.id && !actingRunningScan.isError ? actingRunningScan.data : null,
     scanReport: statusFleet?.id === acting?.id && !actingSettledScan.isError ? actingSettledScan.data : null,
     activityFailed: runningMineRead.isError || actingRunningScan.isError || actingSettledScan.isError, failed: fleets.isError, loading: fleets.isLoading,
     notice: travelNotice, error: travelError, pending: travelPending, stopPending: travelStop.isPending,
-    travelControlsOpen, onTravelControls: () => setTravelControlsOpen(true), onBack: () => setTravelControlsOpen(false), onReviewTravel: reviewTravel,
+    travelControlsOpen, onTravelControls: () => setTravelControlsOpen(true), onBack: () => setTravelControlsOpen(false), onReviewTravel: () => { reviewTravel(); if (acting && !actingRemote) setChoosingTravelDestination(true) },
     onFocus: () => {
       if (!statusFleet) return
       if (statusFleet.jump) router.push(`/systems/${statusFleet.jump.destSystemId}`)
@@ -1048,7 +1100,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               worldTime={worldTime}
               scale={servedScale}
               selection={selection}
-              onSelect={(picked) => { if (travelGuard.held) return; setTravelReviewOpen(false); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('objects') }}
+              onSelect={(picked) => { if (travelGuard.held) return; setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false); setInspectedFleetId(null); setSelection((current) => toggleSelection(current, picked)); if (picked?.point) requestHudPanel('objects') }}
               onAvailabilityChange={setCanvasAvailable}
               onPendingChange={setRendererPending}
               onFirstFrame={handleFirstFrame}
@@ -1113,21 +1165,21 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         className={commandStyles.workspace}
         request={hudRequest}
         panels={[
-          { id: 'objects', label: 'Objects', title: travelCard ? travelCardTitle(travelCard.props) : 'Objects', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), footer: travelCard ? <CompactTravelActions {...travelCard.props} /> : undefined, children: (
+          { id: 'objects', label: 'Objects', tuningGroups: ['Orbits', 'Generation', 'Travel', 'Sensors', 'Mining', 'Markets'], title: destinationSearch ? { search: 'travel-destination', scope: systemNames[systemId] ?? systemId, fleet: acting?.name } : travelCard ? choosingTravelFleet ? { search: 'command-fleet', scope: systemNames[systemId] ?? systemId, object: destinationLabel } : travelCardTitle(travelCard.props) : { search: 'objects', scope: systemNames[systemId] ?? systemId }, suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), footer: travelCard && !choosingTravelFleet && !choosingTravelDestination ? <CompactTravelActions {...travelCard.props} /> : undefined, children: (
       <div className={commandStyles.objectBrowser} data-testid="live-object-browser" data-attention={discovering && !discoveryStarted && !objectIndexOpen && !interiorFailed} style={{ position: 'relative', inset: 'auto', width: '100%', height: '100%' }}>
         <SystemObjectIndex
           listActions={!travelReviewOpen && <div className={commandStyles.objectActions}>
           {selection?.point && <HudButton variant="primary" data-testid="travel-review-entry" onClick={reviewTravel}>Travel here</HudButton>}
-          {acting && <HudButton variant="quiet" data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelReviewOpen(false); setTravelControlsOpen(true); setTravelError(null); requestHudPanel('fleet-status') }}>Fleet status</HudButton>}
+          {acting && <HudButton variant="quiet" data-testid="travel-status-entry" onClick={() => { setTravelReceipt(receipt => receipt?.fleet.id === acting.id ? receipt : null); setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false); setTravelControlsOpen(true); setTravelError(null); requestHudPanel('fleet-status') }}>Fleet status</HudButton>}
         </div>}
           compact
           servicesWithoutDetails={interiorFailed && !!stationActionsHost}
           key={systemId}
           systemName={systemNames[systemId] ?? systemId}
           objects={[
-            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, label: body.name, catalogueRef: body.catalogueRef, enclosingStar: systemNames[systemId], starClass: body.type === 'star' ? interior.data?.starClass : undefined, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
+            ...[...(interior.data?.features ?? [])].sort((a, b) => Number(b.type === 'station') - Number(a.type === 'station')).map(body => ({ name: body.id, label: body.name, catalogueRef: body.catalogueRef, enclosingStar: systemNames[systemId], starClass: body.type === 'star' ? interior.data?.starClass : undefined, knownFrom: 'System telemetry', kind: body.type.replaceAll('_', ' '), group: body.type === 'star' ? 'Stars' : body.type === 'station' ? 'Stations' : body.type === 'belt' ? 'Resource sites' : body.type === 'moon' ? 'Moons' : 'Worlds', x: 0, y: 0, className: body.type === 'gas_giant' ? 'gas' : body.type === 'ice' ? 'ice' : 'rock', resourceSite: !!body.resources?.length, resourceKinds: body.resources?.map(resource => resource.kind), resources: body.resources === undefined ? undefined : body.resources.length ? body.resources.map(resource => resource.kind).join(', ') : 'No disclosed deposits', fleets: fleets.isError ? ['Fleet telemetry unavailable'] : here.filter(fleet => !fleet.jump && fleet.attachedTo === body.id).map(fleet => `Fleet ${fleet.id.slice(-6)}`) })),
             ...(interior.data?.laneGates ?? []).map(gate => ({ name: gate.id, label: gate.name ?? `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, catalogueRef: gate.catalogueRef, enclosingStar: systemNames[systemId], knownFrom: 'System telemetry', kind: `Gate to ${systemNames[gate.destSystemId] ?? gate.destSystemId}`, group: 'Lane gates', x: 0, y: 0, resources: 'Not a resource site' })),
-            ...indexedFleets.map(fleet => ({ name: fleet.id, label: fleet.name?.trim() || undefined, kind: 'fleet', group: 'Fleets', x: 0, y: 0, fleet: {
+            ...indexedFleets.map(fleet => ({ name: fleet.id, label: fleet.name?.trim() || undefined, kind: 'fleet', group: 'Fleets', x: 0, y: 0, category: 'owned' as const, fleet: {
               id: fleet.id, mode: fleet.state?.Mode,
               activity: rosterRowStatus(fleet, worldTime, nameOf, fleet.id === acting?.id ? runningMine : undefined, resolveBody).activity,
               systemLabel: systemNames[fleet.systemId] ?? fleet.systemId,
@@ -1135,7 +1187,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               ...(fleet.roster ? { shipCount: fleet.roster.ships.length } : {}),
             } })),
           ]}
-          inspectorBody={travelCard ?? undefined}
+          inspectorBody={destinationSearch ?? travelCard ?? undefined}
           detailContent={stationActionsHost || (objectIndexOpen && selection?.bodyId) ? <>{stationActionsHost && <div style={stationActionsHost !== selection?.bodyId && !interiorFailed ? { display: "none" } : undefined}>{marketNotices}{fleetActions}</div>}{!interiorFailed && objectIndexOpen && interior.data?.features.filter(body => body.id === selection?.bodyId).map(body => <CelestialActions key={`${systemId}:${body.id}`} systemId={systemId} body={body} fleetId={acting && !actingRemote ? acting.id : null} onSettled={() => { void interior.refetch(); void fleets.refetch() }} />)}</> : undefined}
           detailContentFor={selection?.bodyId ?? stationActionsHost ?? undefined}
           selected={selection?.bodyId ?? null}
@@ -1151,9 +1203,11 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
           tutorialTarget={guiding ? guide?.phase === 'station' ? guide.stationId : guide?.targetId : null}
           open={objectIndexOpen}
           onOpen={openObjectIndex}
-          onSelect={id => { setTravelReviewOpen(false); setInspectedFleetId(null); setSelection({ bodyId: id }) }}
+          onSelect={id => { setTravelReviewOpen(false); setChoosingTravelFleet(false); setChoosingTravelDestination(false); setInspectedFleetId(null); setSelection({ bodyId: id }) }}
           onFocus={() => { if (selection?.bodyId) setGuideFocus(previous => ({ bodyId: selection.bodyId!, sequence: (previous?.sequence ?? 0) + 1 })) }}
-          canPlot={!!acting && !actingRemote && !!selection?.bodyId && interior.data?.features.find(body => body.id === selection.bodyId)?.type !== 'star'}
+          onMine={!interior.isError && selection?.bodyId && (interior.data?.features ?? []).some(body => body.id === selection.bodyId && resourceHost(body) && here.some(fleet => miningFleet(fleet, body, systemId))) ? () => openMining(null, selection!.bodyId!, 'objects') : undefined}
+          onMineFleet={!fleets.isError && !interior.isError && inspectedFleetId && here.some(fleet => fleet.id === inspectedFleetId && (interior.data?.features ?? []).some(body => miningFleet(fleet, body, systemId))) ? id => openMining(id, null, 'objects') : undefined}
+          canPlot={travelCommandFleets(allFleets, systemId).length > 0 && !!selection?.bodyId && interior.data?.features.find(body => body.id === selection.bodyId)?.type !== 'star'}
           onPlot={reviewTravel}
           loading={interior.isLoading}
           failed={interiorFailed}
@@ -1162,7 +1216,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
         />
       </div>
           ) },
-          { id: 'fleet-status', label: 'Fleet status', suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), children: <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: <FleetStatusActions {...fleetStatus} /> },
+          { id: 'fleet-status', label: 'Fleet status', tuningGroups: ['Ships', 'Travel', 'Fuel', 'Sensors', 'Mining'], suspended: !!(guidePageVisible && guiding && guide?.phase === 'wake'), title: mining.active ? mining.step === 'review' && mining.card ? miningCardTitle(mining.card) : { search: mining.step === 'fleet' ? 'command-fleet' : 'mining-target', scope: systemNames[systemId] ?? systemId, fleet: mining.step === 'target' && mining.fleet ? fleetLabel(mining.fleet) : null, object: mining.step === 'fleet' ? mining.target?.name ?? mining.target?.id : null } : 'Fleet status', children: mining.active ? <MiningJourney journey={mining} systemName={systemNames[systemId] ?? systemId} failed={interior.isError || fleets.isError} loading={interior.isLoading || fleets.isLoading} onRetry={() => { void interior.refetch(); void fleets.refetch() }} /> : <FleetStatusContent key={statusFleet?.id ?? 'unavailable'} {...fleetStatus} />, footer: mining.active ? mining.step === 'review' && mining.card ? <MiningCardActions {...mining.card} /> : undefined : <FleetStatusActions {...fleetStatus} /> },
         ]}
       />
 

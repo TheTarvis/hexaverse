@@ -1,6 +1,7 @@
 package common
 
 import (
+	"hexaverse/tuning"
 	"sync"
 	"time"
 
@@ -15,10 +16,9 @@ import (
 //
 //	worldTime(t) = (wallNow − worldEpoch) × scale
 //
-// scale warps how fast the simulation advances relative to wall time. Prod runs
-// at 1 (real time); dev/test run fast so a burn that "takes an hour" resolves in
-// seconds. scale must NEVER change on a world that already holds data — the
-// stored stamps would reinterpret. Dev worlds are disposable, so that's fine.
+// Production and injected test clocks use a fixed epoch/scale. Local developer
+// tuning uses a durable world/wall anchor so changing scale and restarting
+// preserve world-time continuity. Never change scale on a fixed-epoch clock.
 type WorldTime interface {
 	// Now returns the current world time in milliseconds since the world epoch.
 	Now() WorldMillis
@@ -72,7 +72,17 @@ var (
 // time.Now(). Tests inject their own WorldTime via NewWorldTime / a fake.
 func WorldClock() WorldTime {
 	worldTimeOnce.Do(func() {
-		defaultWorldTime = NewWorldTime(worldEpoch, config.ServiceConfig.WorldTimeScale)
+		if tuning.Enabled() {
+			defaultWorldTime = localWorldClock{}
+		} else {
+			defaultWorldTime = NewWorldTime(worldEpoch, config.ServiceConfig.WorldTimeScale)
+		}
 	})
 	return defaultWorldTime
 }
+
+type localWorldClock struct{}
+
+func (localWorldClock) Now() WorldMillis                 { return WorldMillis(tuning.ClockAt(time.Now())) }
+func (localWorldClock) FromWall(t time.Time) WorldMillis { return WorldMillis(tuning.ClockAt(t)) }
+func (localWorldClock) Scale() float64                   { return tuning.ClockScale() }

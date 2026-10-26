@@ -1,0 +1,17 @@
+.search { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; height: 100%; }
+.filters, .presets { display: flex; gap: 4px; }
+.filters { overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; padding-block: 2px; }
+.presets { flex-wrap: wrap; flex-shrink: 0; }
+.filters .filter { display: flex; flex-direction: column; gap: 4px; padding: 8px; min-width: 60px; flex: 1 0 64px; justify-content: flex-start; font: var(--hud-control-font); }
+.presets .preset { padding: 8px 10px; font: var(--hud-control-font); }
+.results { flex: 1; min-height: 80px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.results:focus-visible { outline: 2px solid var(--hud-control-focus); outline-offset: -2px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.grid .tile { align-items: flex-start; gap: 8px; min-width: 0; }
+.grid[data-layout='compact'] { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.grid[data-layout='compact'] .tile { align-items: center; gap: 12px; padding-block: 4px; }
+.grid[data-layout='compact'] .tileText { gap: 2px; }
+.grid[data-layout='image'] .tile { flex-direction: column; align-items: center; text-align: center; gap: 12px; }
+.tileText { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.message { display: grid; justify-items: start; gap: 8px; }
+@media (max-width: 340px) { .grid { grid-template-columns: minmax(0, 1fr); } }

@@ -48,7 +48,7 @@ func NewService(params fleet.FuelParams, fleets FleetSource, credits CreditSourc
 // diverge (fuel-purchase "A Single Global Fuel Price..."; fleet-movement
 // "Fleet Read Serves the Configured Fuel Price, Never Duplicated
 // Client-Side").
-func (s *Service) PricePerTon() float64 { return s.params.PricePerTon }
+func (s *Service) PricePerTon() float64 { return s.currentParams().PricePerTon }
 
 // Refuel settles POST /v1/fleets/:fleetId/refuel.
 func (s *Service) Refuel(ctx context.Context, accountID, corpID, fleetID string, req Request) (*Result, error) {
@@ -95,7 +95,7 @@ func (s *Service) Refuel(ctx context.Context, accountID, corpID, fleetID string,
 		return nil, ErrExceedsFreeHold
 	}
 
-	cost, err := computeCost(req.Tons, s.params.PricePerTon)
+	cost, err := computeCost(req.Tons, s.currentParams().PricePerTon)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (s *Service) Refuel(ctx context.Context, accountID, corpID, fleetID string,
 				Kind:      corporations.EntryFuelPurchase,
 				Item:      "fuel",
 				Quantity:  req.Tons,
-				UnitPrice: int64(s.params.PricePerTon),
+				UnitPrice: int64(s.currentParams().PricePerTon),
 				Amount:    -cost,
 			}, now)
 		if err != nil {

@@ -3,6 +3,7 @@ package mine
 import (
 	"context"
 	"fmt"
+	"hexaverse/tuning"
 
 	"hexaverse/action"
 	"hexaverse/common"
@@ -59,6 +60,10 @@ func RegisterResolver(a *action.Service, params MineParams, classStats map[fleet
 // live hold as still open).
 func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats, clock common.WorldTime) action.ResolveFunc {
 	return func(ctx context.Context, r action.Resolution) (action.ResolveResult, error) {
+		liveStats := classStats
+		if tuning.Enabled() {
+			liveStats = fleet.DefaultClassStats()
+		}
 		var f fleet.Fleet
 		if err := r.DecodeActor(&f); err != nil {
 			return action.ResolveResult{}, err
@@ -91,7 +96,7 @@ func Resolver(params MineParams, classStats map[fleet.ShipClass]fleet.ClassStats
 		// equal to freeHoldAtCommit.
 		actorState, _ := fleet.SettleExpiredHold(&f, nil, fleet.DefaultFuelParams(), clock.Now())
 
-		freeHoldAtResolve := fleet.FreeHold(f, classStats)
+		freeHoldAtResolve := fleet.FreeHold(f, liveStats)
 
 		take := tons
 		reason := ReasonClean

@@ -3,6 +3,7 @@ package market
 import (
 	"hexaverse/charts"
 	"hexaverse/common"
+	"hexaverse/tuning"
 )
 
 // Params holds every knob this milestone's market introduces: the starting
@@ -17,6 +18,9 @@ import (
 // either. It is closer to mine.MineParams' richness curve than to
 // Tuning().LaneMsPerDistance, and it follows the same shape: one struct, one
 // Default*Params() constructor, read at service construction.
+// Local developer tuning is the explicit exception: currentParams reads the
+// configured table on each operation. Simulation activity still never changes
+// floor prices automatically.
 type Params struct {
 	// StartingCredits is the one-time opening grant at spawn. Injected into the
 	// corporations service rather than imported by it — market imports
@@ -88,8 +92,8 @@ type Params struct {
 // DefaultParams are this milestone's starting numbers. Every value here is a
 // playtest-tunable placeholder, the same status mine.MineParams' numbers carry.
 func DefaultParams() Params {
-	return Params{
-		StartingCredits: 1000,
+	p := Params{
+		StartingCredits: int64(tuning.Number("markets.startingCredits", 1000)),
 
 		// Floors are dialed by region character: a star_rich region is
 		// well-supplied and pays less; a dead one pays a premium for anything
@@ -103,28 +107,35 @@ func DefaultParams() Params {
 		},
 		TradableKinds: []string{"metals", "volatiles", "water", "organics", "research", "exotic"},
 
-		ConcurrentRequestCount: 2,
+		ConcurrentRequestCount: int(tuning.Number("markets.requestCount", 2)),
 		RequestKinds:           []string{"metals", "volatiles", "water", "organics"},
-		PremiumBandLow:         1.2,
-		PremiumBandHigh:        1.6,
-		QuantityBandLow:        20,
-		QuantityBandHigh:       120,
+		PremiumBandLow:         tuning.Number("markets.premiumLow", 1.2),
+		PremiumBandHigh:        tuning.Number("markets.premiumHigh", 1.6),
+		QuantityBandLow:        tuning.Number("markets.quantityLow", 20),
+		QuantityBandHigh:       tuning.Number("markets.quantityHigh", 120),
 		// World-milliseconds, written raw with digit separators the way every
 		// other pacing value in this codebase is (see common.GameTuning).
-		RequestLifetime:     21_600_000, // 6 world-hours
-		RegenerationCadence: 7_200_000,  // 2 world-hours
-		EpochWidth:          3_600_000,  // 1 world-hour
+		RequestLifetime:     common.WorldMillis(tuning.Number("markets.requestLifetimeMs", 21_600_000)), // 6 world-hours
+		RegenerationCadence: common.WorldMillis(tuning.Number("markets.regenerationMs", 7_200_000)),     // 2 world-hours
+		EpochWidth:          3_600_000,                                                                  // 1 world-hour
 
 		// Unlimited this version — a pure faucet with no buy side has nothing to
 		// balance against yet. The reject path stays specified and tested via a
 		// fixtured finite value, exactly the way mine's holdFull clamp does.
-		BudgetPerWindow:     0,
-		AbsorptionPerWindow: 0,
+		BudgetPerWindow:     int64(tuning.Number("markets.budget", 0)),
+		AbsorptionPerWindow: tuning.Number("markets.absorption", 0),
 
 		MinVisibilityTier:   charts.TierRumored,
 		BoardRefreshCadence: 30_000, // 30s — a price that stale is fine for a
 		// decision that itself costs minutes of travel to act on.
 	}
+	for region, kinds := range p.Floors {
+		for kind, price := range kinds {
+			p.Floors[region][kind] = int64(tuning.Number("markets.floor."+region+"."+kind, float64(price)))
+		}
+	}
+	return p
+
 }
 
 // FloorFor returns the NPC floor price for a kind in a region. tradable is false

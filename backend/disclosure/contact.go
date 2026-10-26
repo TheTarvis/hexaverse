@@ -96,7 +96,7 @@ func Disclose(w World, obs Observer, target Ship, t common.WorldMillis) (Contact
 		return Contact{}, false, err
 	}
 
-	if !WithinRange(obs.Position, pos, detectionRadius(obs, target, t)) {
+	if !WithinRange(obs.Position, pos, detectionRadiusWithParams(obs, target, t, w.params())) {
 		return Contact{}, false, nil
 	}
 

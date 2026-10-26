@@ -2,9 +2,8 @@
 
 import { HudCardBack } from '@/components/hud/HudCardShell'
 
+import { ObjectSearch, emptyObjectSearch } from '@/components/space/ObjectSearch'
 import { useState } from 'react'
-import { HudButton, HudSearchInput } from '@/components/hud/HudControls'
-import { HudObjectThumbnail } from '@/components/hud/HudObjectThumbnail'
 import { HudHeading, HudText } from '@/components/hud/HudTypography'
 import { HudWorkspace } from '@/components/hud/HudWorkspace'
 import { FleetStatusActions, FleetStatusContent, type FleetStatusProps } from '../FleetStatusCard'
@@ -14,7 +13,7 @@ import styles from './fleet-status-study.module.css'
 
 /** Fixture adapter only. The production module owns every fleet fact and disclosure. */
 export function FleetStatusHostingStudy({ scenario = 'travelling' }: { scenario?: StatusScenario }) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(emptyObjectSearch)
   const [inspecting, setInspecting] = useState(false)
   const [travelControlsOpen, setTravelControlsOpen] = useState(false)
   const [notice, setNotice] = useState('')
@@ -35,8 +34,9 @@ export function FleetStatusHostingStudy({ scenario = 'travelling' }: { scenario?
     <HudWorkspace corporationId="storybook-fleet-status-own-host" panels={[
       { id: 'objects', label: 'Objects', children: <>
         {inspecting && <HudCardBack destination="objects" onClick={() => setInspecting(false)} />}
-        <HudSearchInput aria-label="Find objects" placeholder="Find an object…" value={query} onChange={event => setQuery(event.target.value)} />
-        {inspecting ? <><HudHeading size="compact">Nereid Outer System Research Anchorage</HudHeading><HudText variant="secondary">Station · fictional inspection</HudText><HudText>Inspecting this station keeps Peregrine selected for commands.</HudText></> : 'Nereid Outer System Research Anchorage'.toLowerCase().includes(query.toLowerCase()) ? <HudButton presentation="row" onClick={() => setInspecting(true)}><HudObjectThumbnail kind="station" />Nereid Outer System Research Anchorage</HudButton> : <HudText>No matching objects.</HudText>}
+        {inspecting ? <><HudHeading size="compact">Nereid Outer System Research Anchorage</HudHeading><HudText variant="secondary">Station · fictional inspection</HudText><HudText>Inspecting this station keeps Peregrine selected for commands.</HudText></>
+          : <ObjectSearch items={[{ id: 'nereid', name: 'Nereid Outer System Research Anchorage', kind: 'station', subtitle: 'Station · fictional inspection' }]} value={query} onChange={setQuery} onSelect={() => setInspecting(true)} />}
+
       </> },
       { id: 'fleet-status', label: 'Fleet status', children: <FleetStatusContent {...props} />, footer: <FleetStatusActions {...props} /> },
     ]} />

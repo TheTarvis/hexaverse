@@ -33,7 +33,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { GalaxyView } from './GalaxyView'
 import { useGalaxy } from '@/hooks/use-galaxy'
-import { useCutDrive, useJump, useMyFleets, useStop } from '@/hooks/use-fleets'
+import { useCutDrive, useJump, useMyFleets, useStop, useMiningOptions } from '@/hooks/use-fleets'
 import { useCancelAction } from '@/hooks/use-actions'
 import { useMarketBoard } from '@/hooks/use-market'
 import { toast } from '@/lib/toast'
@@ -170,6 +170,7 @@ vi.mock('@/hooks/use-galaxy', () => ({ useGalaxy: vi.fn() }))
 // the mounted `<FleetRoster>` calls it directly (not through this view).
 vi.mock('@/hooks/use-fleets', () => ({
   useMyFleets: vi.fn(),
+  useMiningOptions: vi.fn(),
   useCutDrive: vi.fn(),
   useStop: vi.fn(),
   useJump: vi.fn(),
@@ -301,6 +302,7 @@ describe('GalaxyView', () => {
     graphBehavior.throwOnRender = false
   graphBehavior.phase = 'ready'
     // Default: no fleets, inert command mutations.
+    vi.mocked(useMiningOptions).mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMiningOptions>)
     mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
     mockUseCutDrive.mockReturnValue({ mutate: cutDriveMutate, isPending: false } as unknown as ReturnType<typeof useCutDrive>)
     mockUseStop.mockReturnValue({ mutate: stopMutate, isPending: false } as unknown as ReturnType<typeof useStop>)
@@ -312,7 +314,7 @@ describe('GalaxyView', () => {
   it('retains Galaxy search and inspection through hide/reopen without navigating', () => {
     mockGalaxyState()
     renderView()
-    const search = screen.getByRole('searchbox', { name: 'Find a galaxy system' })
+    const search = screen.getByRole('searchbox', { name: 'Find an object' })
     fireEvent.change(search, { target: { value: 'Axion' } })
     fireEvent.click(screen.getByTestId('galaxy-object-sys-0'))
     expect(screen.getByTestId('inspector-name')).toHaveTextContent('Axion')
@@ -554,30 +556,18 @@ describe('GalaxyView', () => {
 
     fireEvent.click(screen.getByTestId('fleet-cmd-burn-fleet_1'))
 
-    // SDET, 2026-09-03 — tasks.md 10.9 ("retire the 'board' wording"). This
-    // used to pin the sentence verbatim: 'Open the system board to choose a
-    // target'. The board view is deleted by this change, so a toast that
-    // still calls the destination a "board" sends the player looking for a
-    // surface that no longer exists.
-    //
-    // The assertion is deliberately shape-not-sentence: the exact wording is
-    // a product-copy decision, not this SDET's to legislate. What IS pinned
-    // is what the requirement actually claims — the copy names the space
-    // view a player is being sent to, and no longer names the retired board.
-    // Both halves are load-bearing: dropping the word "board" while saying
-    // nothing useful would satisfy a bare negative check.
-    const copy = vi.mocked(toast.error).mock.calls.at(-1)?.[0] ?? ''
-    expect(copy, 'the burn refusal must tell the player where to go').toBeTruthy()
-    expect(
-      copy,
-      `player-facing copy still calls the destination a "board": ${JSON.stringify(copy)} ` +
-        '(tasks.md 10.9 — the board view is deleted by this change)',
-    ).not.toMatch(/board/i)
-    expect(
-      copy,
-      `the refusal must name the surface that can take a target: ${JSON.stringify(copy)}`,
-    ).toMatch(/system view|space view|system’s view|system's view/i)
-    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0')
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0?task=travel&fleet=fleet_1')
+  })
+
+  it('opens the shared system mining journey from eligible Galaxy fleet status', () => {
+    mockGalaxyState()
+    mockUseMyFleets.mockReturnValue({ data: [parkedFleet('fleet_1', 'sys-0')] } as unknown as ReturnType<typeof useMyFleets>)
+    vi.mocked(useMiningOptions).mockReturnValue({ data: { eligible: true }, isError: false } as unknown as ReturnType<typeof useMiningOptions>)
+    renderView()
+    fireEvent.click(screen.getByTestId('fleet-row-fleet_1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Mine' }))
+    expect(pushSpy).toHaveBeenCalledWith('/systems/sys-0?task=mine&fleet=fleet_1')
   })
 
   it('cuts the drive and toasts on success, composed the same way as the board view', () => {
@@ -1015,7 +1005,8 @@ describe('GalaxyView', () => {
     it('does not instruct the player to select a system on the graph when none is selected and there is no own fleet in the roster (Scenario: Choosing a system on the graph is unreachable without the canvas)', async () => {
       restoreCanvas = stubUnsupported()
       mockGalaxyState()
-      mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
+      vi.mocked(useMiningOptions).mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useMiningOptions>)
+    mockUseMyFleets.mockReturnValue({ data: [] } as unknown as ReturnType<typeof useMyFleets>)
       renderView()
       await screen.findByTestId('renderer-unsupported')
 

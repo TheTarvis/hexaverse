@@ -79,6 +79,8 @@ const BURN_COPY: CopyMap = [
 ]
 
 const MINE_COPY: CopyMap = [
+  ['movement slot', 'This fleet is busy with another run. Cancel it first.'],
+  ['no mining capability', 'This fleet has no mining capability.'],
   ['trading station', 'A trading station cannot be mined — dock and trade instead.'],
   ['not docked', 'Dock at the body before mining it.'],
   ['free hold', 'Your hold cannot take that much. Sell or jettison first.'],

@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -169,5 +170,22 @@ func TestGet_Scenario_OwnFleetDirectFetchReturns200(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("direct fetch of an own fleet: status = %d, want 200", w.Code)
+	}
+}
+
+func TestGetOwnMovementActionIdentity(t *testing.T) {
+	own := &Fleet{Id: "f1", CorporationId: "corp-user1", SystemId: "s1", ActiveActionId: "mine-1"}
+	router := newFleetRouter(&fakeFleetSvc{fleet: own})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
+	var dto map[string]interface{}
+	if err := json.Unmarshal(response.Body.Bytes(), &dto); err != nil || response.Code != http.StatusOK || dto["activeActionId"] != "mine-1" {
+		t.Fatalf("own action identity: %d %s, %v", response.Code, response.Body.String(), err)
+	}
+	own.CorporationId = "another-corp"
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/fleets/f1", nil))
+	if response.Code != http.StatusNotFound || strings.Contains(response.Body.String(), "mine-1") {
+		t.Fatalf("foreign action identity leaked: %s", response.Body.String())
 	}
 }

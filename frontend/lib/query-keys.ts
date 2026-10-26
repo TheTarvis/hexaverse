@@ -3,6 +3,7 @@
 // Per-domain blocks are added by `/new-domain`.
 
 export const queryKeys = {
+  tuning: ['local-tuning'] as const,
   discovery: {
     all: ["discovery"] as const,
     survey: (fleetId: string) => [...queryKeys.discovery.all, "survey", fleetId] as const,
@@ -43,6 +44,7 @@ export const queryKeys = {
   },
 
   fleets: {
+    miningOptions: (id: string) => ['fleets', 'mining-options', id] as const,
     // The requester's own fleets (migrate-fleet-to-continuous-burns: the
     // board draws no fleet layer, so there is no per-system fleet list read
     // any more — only `mine`/`detail`). `inSystem` is kept as a key SHAPE

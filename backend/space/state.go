@@ -67,7 +67,7 @@ func StateAt(bodies Bodies, s ShipState, t common.WorldMillis) (ShipState, error
 			Kind:     ParkOrbit,
 			BodyId:   b.Target.BodyId,
 			Radius:   standoff,
-			PeriodMs: InsertionPeriod(standoff),
+			PeriodMs: InsertionPeriodFor(bodies, standoff),
 			Phase:    b.InsertionPhase,
 			EpochMs:  b.ArriveMs,
 		}
@@ -122,5 +122,5 @@ func releasedIfDry(p *Park, t common.WorldMillis) (Park, bool) {
 	if p.DryInstantMs <= p.HoldStartMs || t < p.DryInstantMs {
 		return Park{}, false
 	}
-	return ReleaseStationkeep(p.BodyId, p.Offset, p.DryInstantMs), true
+	return ReleaseStationkeep(p.BodyId, p.Offset, p.DryInstantMs, p.PeriodMs), true
 }

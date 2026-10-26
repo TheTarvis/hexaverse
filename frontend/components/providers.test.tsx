@@ -29,6 +29,10 @@ vi.mock('./audio/AppMusicProvider', () => ({
   AppMusicProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+vi.mock('./tuning/LocalTuningContext', () => ({
+  LocalTuningProvider: ({ children }: { children: React.ReactNode }) => <div data-testid="local-tuning-provider">{children}</div>,
+}))
+
 describe('Providers', () => {
   it('renders children', () => {
     render(
@@ -56,7 +60,8 @@ describe('Providers', () => {
     expect(accountProvider).toBeInTheDocument()
     expect(corporationProvider).toBeInTheDocument()
     expect(queryProvider).toContainElement(accountProvider)
-    expect(accountProvider).toContainElement(corporationProvider)
+    expect(accountProvider).toContainElement(screen.getByTestId('local-tuning-provider'))
+    expect(screen.getByTestId('local-tuning-provider')).toContainElement(corporationProvider)
     expect(corporationProvider).toContainElement(screen.getByTestId('child'))
   })
 })

@@ -626,14 +626,15 @@ func (h *Handler) respond(c *gin.Context, f *Fleet, err error) {
 // position and worldTime, so the client can render immediately. `own` tells
 // the client whether it may drive this fleet.
 type fleetDTO struct {
-	Survey        *SurveyWindow   `json:"survey,omitempty"`
-	ActiveScanId  string          `json:"activeScanId,omitempty"`
-	Id            string          `json:"id"`
-	Name          string          `json:"name,omitempty"`
-	CorporationId string          `json:"corporationId"`
-	SystemId      string          `json:"systemId"`
-	State         space.ShipState `json:"state"`
-	AttachedTo    string          `json:"attachedTo,omitempty"`
+	ActiveActionId string          `json:"activeActionId,omitempty"`
+	Survey         *SurveyWindow   `json:"survey,omitempty"`
+	ActiveScanId   string          `json:"activeScanId,omitempty"`
+	Id             string          `json:"id"`
+	Name           string          `json:"name,omitempty"`
+	CorporationId  string          `json:"corporationId"`
+	SystemId       string          `json:"systemId"`
+	State          space.ShipState `json:"state"`
+	AttachedTo     string          `json:"attachedTo,omitempty"`
 	// LaneId names the lane of the gate this fleet is attached to, if any
 	// (fleet-movement "Fleet Read Serves the Attached Gate's Lane Id").
 	// Derived purely from f.SystemId and AttachedTo's "gate-"+destSystemId
@@ -809,14 +810,16 @@ func (h *Handler) toDTO(c *gin.Context, f *Fleet) (fleetDTO, error) {
 		}
 	}
 
+	activeActionID := ""
 	scanID := ""
 	name := ""
 	if own {
+		activeActionID = f.ActiveActionId
 		scanID = f.ActiveScanId
 		name = f.Name
 	}
 	return fleetDTO{
-		ActiveScanId: scanID, Survey: f.Survey,
+		ActiveActionId: activeActionID, ActiveScanId: scanID, Survey: f.Survey,
 		Id:            f.Id,
 		Name:          name,
 		CorporationId: f.CorporationId,

@@ -438,13 +438,13 @@ func (s *Service) ensureStation(ctx context.Context, systemID string) error {
 // Credits == 0: a corporation can legitimately spend to exactly zero, and
 // re-granting it would be a silent faucet.
 func (s *Service) ensureOpeningGrant(ctx context.Context, corp *Corporation, now common.WorldMillis) error {
-	if s.credits == nil || s.startingCredits <= 0 {
+	if s.credits == nil || s.currentStartingCredits() <= 0 {
 		return nil
 	}
 	_, err := s.credits.ApplyCredit(ctx, corp.Id, spawnGrantKey(corp.Id), LedgerEntry{
 		AccountId: corp.AccountId,
 		Kind:      EntryStartingGrant,
-		Amount:    s.startingCredits,
+		Amount:    s.currentStartingCredits(),
 	}, now)
 	if err != nil {
 		// A replay is the normal healed path, not an error — ApplyCredit already
@@ -464,10 +464,10 @@ func (s *Service) ensureOpeningGrant(ctx context.Context, corp *Corporation, now
 // the same anti-pattern ensureOpeningGrant's own doc comment guards
 // against).
 func (s *Service) ensureStartingFuel(ctx context.Context, corp *Corporation, hull *fleet.Fleet) error {
-	if s.credits == nil || s.fleets == nil || hull == nil || s.fuelParams.StartingFuelTons <= 0 {
+	if s.credits == nil || s.fleets == nil || hull == nil || s.currentFuelParams().StartingFuelTons <= 0 {
 		return nil
 	}
-	return s.credits.GrantStartingFuel(ctx, corp.Id, hull.Id, s.fuelParams.StartingFuelTons, s.fleets)
+	return s.credits.GrantStartingFuel(ctx, corp.Id, hull.Id, s.currentFuelParams().StartingFuelTons, s.fleets)
 }
 
 // markAssetsComplete stamps the short-circuit marker once every derived asset is

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"hexaverse/tuning"
 	"sync"
 
 	"hexaverse/config"
@@ -58,6 +59,10 @@ import (
 // out a burn in real time.
 //
 // # Liveness caveat (read before building the admin page)
+//
+// Local developer tuning now uses tuning.Number overrides and the domains'
+// current*Params accessors on each invocation. The construction caveat below
+// still applies to SetTuning alone and to ordinary nonlocal service instances.
 //
 // Values are read at CONSTRUCTION today: services call Default*Params() when they
 // are built, and action resolvers capture params by value at RegisterResolver.
@@ -162,7 +167,10 @@ func init() {
 func Tuning() GameTuning {
 	tuningMu.RLock()
 	defer tuningMu.RUnlock()
-	return activeTuning
+	t := activeTuning
+	t.LaneMsPerDistance = tuning.Number("travel.laneMsPerDistance", t.LaneMsPerDistance)
+	t.MaxOrbitalIndex = int(tuning.Number("generation.maxOrbitalIndex", float64(t.MaxOrbitalIndex)))
+	return t
 }
 
 // SetTuning replaces the live gameplay tuning. This is the seam a future admin

@@ -6,11 +6,12 @@ including references, scripts and client metadata, is copied without changes.
 Experimental and miscellaneous skills outside that published manifest are not
 installed. `.agents/skills` and `.claude/skills` both point to this directory.
 
-`skills/spinup/` is a local skill shared by Claude Code and Codex. Invoke
-`spinup` to restart the dev stack, in GoLand Run tabs.
-Test runners own the test emulators. The skill is excluded from the upstream
-lock and preserved by the updater; an upstream skill with the same name
-blocks the update rather than replacing it.
+`skills/onboarding/` and `skills/spinup/` are local skills shared by Claude Code
+and Codex. Invoke `onboarding` for bootstrap through CI/CD and dev/prod
+verification; invoke `spinup` to restart the dev stack in GoLand Run tabs.
+Test runners own the test emulators. Local skills are excluded from the upstream
+lock and preserved by the updater; an upstream skill with the same name blocks
+the update rather than replacing it.
 
 The initial import is upstream version 1.3.1, commit
 `49dd158d1076134a641b33efb035946536778336`. The lock file is authoritative after

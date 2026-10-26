@@ -15,9 +15,9 @@ package fleet
 import (
 	"context"
 	"errors"
+	"hexaverse/rules"
 
 	"hexaverse/common"
-	"hexaverse/disclosure"
 	"hexaverse/space"
 	"hexaverse/stations"
 	"hexaverse/system"
@@ -84,7 +84,7 @@ func EstimatedRangeTons(fuelTons float64, hullCount int, params FuelParams) floa
 		return 0
 	}
 	deltaV := fuelTons * params.DeltaVPerTon / float64(hullCount)
-	return (deltaV * deltaV) / (4 * disclosure.MinCommandedAccel)
+	return (deltaV * deltaV) / (4 * rules.TunedMinCommandedAccel())
 }
 
 // gateBodyIdPrefix mirrors system.gateId's own naming convention
@@ -151,9 +151,9 @@ func (s *Service) candidateHosts(ctx context.Context, bt *system.BodyTable, syst
 func (s *Service) reachableAtFloor(ctx context.Context, bt *system.BodyTable, systemID string, from space.Vec3, now common.WorldMillis, hullCount int, availableFuel float64, starClearance float64) (bool, error) {
 	for _, candidateId := range s.candidateHosts(ctx, bt, systemID) {
 		sol, err := space.SolveBurn(bt, from, space.Target{BodyId: candidateId}, now,
-			disclosure.MinCommandedAccel, nil, starClearance, space.SolveRounds)
+			rules.TunedMinCommandedAccel(), nil, starClearance, space.SolveRounds)
 		if err == nil {
-			cost := FuelCostTons(&sol.Burn, hullCount, s.fuelParams)
+			cost := FuelCostTons(&sol.Burn, hullCount, s.currentFuelParams())
 			if cost <= availableFuel {
 				return true, nil
 			}

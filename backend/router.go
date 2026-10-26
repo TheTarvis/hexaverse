@@ -12,6 +12,7 @@ import (
 	"hexaverse/common"
 	"hexaverse/config"
 	"hexaverse/corporations"
+	"hexaverse/devtools"
 	"hexaverse/discovery"
 	"hexaverse/fleet"
 	"hexaverse/galaxy"
@@ -34,7 +35,7 @@ func SetupRouter() *gin.Engine { return setupRouterWithClock(common.WorldClock()
 
 func setupRouterWithClock(clock common.WorldTime) *gin.Engine {
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(gin.Recovery(), devtools.Gate())
 
 	// Cloud Run provides HTTP request logging in production; only log locally.
 	if config.IsLocal() {
@@ -177,6 +178,14 @@ func setupRouterWithClock(clock common.WorldTime) *gin.Engine {
 			return corpSvc.CorpForAccount(c.Request.Context(), accountId)
 		}),
 	)
+
+	if config.LocalTuningAllowed() {
+		tools := devtools.NewService(devtools.NewDao(common.NewFirestoreService().(*common.FirestoreBaseService).Client), fleetSvc)
+		if err := tools.ReconcileCargo(context.Background()); err != nil {
+			log.Error().Err(err).Msg("Local tuning cargo reconciliation failed")
+		}
+		devtools.RegisterRoutes(authorized, tools)
+	}
 
 	accountHandler := account.NewHandler()
 	accountHandler.RegisterRoutes(authorized, strictLimit)

@@ -140,6 +140,8 @@ export interface FleetRoster {
 }
 
 export interface Fleet {
+  /** Current owner-only movement-channel occupant; sensors use activeScanId. */
+  activeActionId?: string
   /** Optional owner-facing display name; legacy fleets may be unnamed. */
   name?: string
   /** Accepted sensor action, owner-only; used to follow the exact tutorial scan. */
@@ -245,4 +247,18 @@ export interface FleetList {
   fleets: Fleet[]
   worldTime: number
   scale: number
+}
+
+/** Owner-only prerequisites, priced against the live resource ledger. */
+export interface MiningOptions {
+ featureId: string
+ commitFeatureId: string
+ eligible: boolean
+ reason?: string
+ activeActionId?: string
+ freeHold: number
+ miningRate: number
+ minRunTons: number
+ resources: { kind: ResourceKind; remainingTons: number }[]
+ worldTime: number
 }

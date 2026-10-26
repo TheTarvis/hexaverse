@@ -23,7 +23,7 @@ export function GameViewScene({ className, ...props }: ComponentPropsWithoutRef<
 }
 
 export function GameViewWorkspace({ className, ...props }: HudWorkspaceProps) {
-  return <HudWorkspace settingsContent={<><GameMusicControls /><GameAccountSettings /></>} {...props} className={clsx(styles.workspace, className)} />
+  return <HudWorkspace settingsTabs={{ audio: <GameMusicControls />, account: <GameAccountSettings /> }} {...props} className={clsx(styles.workspace, className)} />
 }
 
 /** Persistent page footer, used for the guest sign-in entry. */

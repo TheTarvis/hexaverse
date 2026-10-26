@@ -74,31 +74,38 @@ class SkillsUpdateTests(unittest.TestCase):
             updater.update(self.root, "HEAD", str(self.source))
         self.assertEqual(file.read_text(), "local edit")
 
-    def test_local_spinup_survives_updates_outside_upstream_lock(self):
-        skill = self.root / "harness/skills/spinup/SKILL.md"
-        skill.parent.mkdir()
-        skill.write_bytes(b"local spinup\n")
+    def test_local_skills_survive_updates_outside_upstream_lock(self):
+        skills = {}
+        for name in ("onboarding", "spinup"):
+            skill = self.root / "harness/skills" / name / "SKILL.md"
+            skill.parent.mkdir()
+            skill.write_bytes(f"local {name}\n".encode())
+            skills[name] = skill
         updater.verify(self.root)
         lock = updater.update(self.root, "HEAD", str(self.source))
-        self.assertEqual(skill.read_bytes(), b"local spinup\n")
-        self.assertNotIn("spinup/SKILL.md", lock["files"])
-        skill.write_bytes(b"edited local spinup\n")
+        for name, skill in skills.items():
+            self.assertEqual(skill.read_bytes(), f"local {name}\n".encode())
+            self.assertNotIn(f"{name}/SKILL.md", lock["files"])
+            skill.write_bytes(f"edited local {name}\n".encode())
         self.publish("second", "two")
         updater.update(self.root, "HEAD", str(self.source))
-        self.assertEqual(skill.read_bytes(), b"edited local spinup\n")
+        for name, skill in skills.items():
+            self.assertEqual(skill.read_bytes(), f"edited local {name}\n".encode())
         updater.verify(self.root)
 
-    def test_upstream_spinup_conflict_preserves_install_and_lock(self):
-        skill = self.root / "harness/skills/spinup/SKILL.md"
-        skill.parent.mkdir()
-        skill.write_text("local spinup")
-        before = self.lock.read_bytes()
-        self.publish("spinup", "upstream spinup")
-        with self.assertRaisesRegex(ValueError, "conflicts with local skill: spinup"):
-            updater.update(self.root, "HEAD", str(self.source))
-        self.assertEqual(skill.read_text(), "local spinup")
-        self.assertEqual(self.lock.read_bytes(), before)
-        updater.verify(self.root)
+    def test_upstream_local_skill_conflict_preserves_install_and_lock(self):
+        for name in ("onboarding", "spinup"):
+            with self.subTest(skill=name):
+                skill = self.root / "harness/skills" / name / "SKILL.md"
+                skill.parent.mkdir()
+                skill.write_text(f"local {name}")
+                before = self.lock.read_bytes()
+                self.publish(name, f"upstream {name}")
+                with self.assertRaisesRegex(ValueError, f"conflicts with local skill: {name}"):
+                    updater.update(self.root, "HEAD", str(self.source))
+                self.assertEqual(skill.read_text(), f"local {name}")
+                self.assertEqual(self.lock.read_bytes(), before)
+                updater.verify(self.root)
 
     def test_failed_fetch_keeps_existing_install_and_lock(self):
         before = self.lock.read_bytes()

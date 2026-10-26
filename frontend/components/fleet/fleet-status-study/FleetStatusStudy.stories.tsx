@@ -19,13 +19,13 @@ export const OwnCard: Story = {
   name: 'Journey',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const arrange = canvas.getByRole('button', { name: 'Arrange HUD' })
+    const arrange = canvas.getByRole('button', { name: 'Settings' })
     const hit = arrange.getBoundingClientRect()
     await expect(arrange.contains(document.elementFromPoint(hit.x + hit.width / 2, hit.y + hit.height / 2))).toBe(true)
     // Isolate the regression from this demonstration's persisted arrangement.
-    await userEvent.click(canvas.getByRole('button', { name: 'Arrange HUD' }))
+    await userEvent.click(canvas.getByRole('button', { name: 'Settings' }))
     await userEvent.click(canvas.getByRole('button', { name: 'Reset HUD layout' }))
-    await userEvent.click(canvas.getByRole('button', { name: window.matchMedia(PHONE_HUD_QUERY).matches ? 'Return to map' : 'Arrange HUD' }))
+    await userEvent.click(canvas.getByRole('button', { name: window.matchMedia(PHONE_HUD_QUERY).matches ? 'Return to map' : 'Settings' }))
     if (window.matchMedia(PHONE_HUD_QUERY).matches) await userEvent.click(canvas.getByRole('button', { name: 'Fleet status' }))
     const band = canvasElement.querySelector<HTMLElement>('[data-slot="hud-action-band"]')!
     const frame = band.closest<HTMLElement>('[data-hud-framing="frame"]')!

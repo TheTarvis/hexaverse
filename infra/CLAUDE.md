@@ -33,12 +33,19 @@ CI variables live in `.gitlab-ci.yml` and reference the same substituted values.
 
 ## `setup-gcp.sh` vs Terraform
 
-Two GCP-touching scripts in this repo, with a clean split:
+Cloud provisioning has two entry points with overlapping Firebase ownership:
 
 - **`bootstrap/setup-gcp.sh`** runs once per env at fork time. It provisions the *project shell*: `gcloud projects create`, billing link, API enable, Firestore database create, `firebase projects:addfirebase`, web app create, SDK config pull. The output (project ID + Firebase web-app config) feeds back into `config.env`. After this runs, the GCP project exists and Firebase is wired up.
-- **Terraform** runs every time infra changes. It manages everything *inside* the project: Cloud Run service, Firestore composite indexes, Pub/Sub topics + subscriptions, Secret Manager secrets, GCS buckets, Cloud Scheduler jobs, IAM. Terraform assumes the project already exists.
+- **Terraform** runs every time infra changes. It manages resources *inside* the project, including Firebase registration/web app and the default Firestore database in `firebase.tf`, Cloud Run, indexes, Pub/Sub, secrets, buckets, Scheduler and IAM. Terraform assumes the project shell already exists. If `setup-gcp.sh` created Firebase/Firestore resources first, import them into the environment's state before applying; otherwise let Terraform create them. The two paths must converge on the same resources.
 
-Order of operations on a fresh fork: `setup-gcp.sh dev` → `setup-gcp.sh prod` → `bootstrap/init.sh` (placeholder substitution) → `terraform apply -var-file=environments/dev.tfvars` → repeat for prod when you're ready to deploy. See `bootstrap/README.md` for setup and the onboarding probe; review Terraform plans before applying.
+For the script-led path on a fresh fork: run `setup-gcp.sh` per environment, capture its SDK config, run `bootstrap/init.sh` for placeholder substitution, initialize separate Terraform states, import script-created resources, and review each environment's plan before applying. CI identities and initial images must also exist before their Terraform consumers; follow the onboarding workflow for dependency order. See `bootstrap/README.md` for setup and the local probe.
+
+For CI/CD bootstrap or replacement environments, use the shared
+`harness/skills/onboarding/SKILL.md` workflow and the implementation gaps listed
+in `bootstrap/README.md`. The old `infra/terraform/BOOTSTRAP.md` and `README.md`
+contain inherited Flywheel instructions; the scripts and current Terraform/CI
+configuration determine what actually runs. `bootstrap/init.sh` does not
+retarget project IDs after their template tokens have already been substituted.
 
 ## Common operations
 

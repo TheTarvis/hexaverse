@@ -1,5 +1,6 @@
 /** Retired examples resolve to their maintained owner without duplicate sidebar entries. */
 export const storyRedirects: Record<string, string> = {
+  'hud-travel-selection--concepts': 'hud-object-search--travel-journey',
   'hud-fleet-object-review--activity-first': 'hud-fleet-object-review--model-first',
   'hud-fleet-object-review--compact': 'hud-fleet-object-review--model-first',
   'graphics-galaxy-map--original': 'graphics-galaxy-map--overview',

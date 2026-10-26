@@ -69,6 +69,7 @@ type Attachments interface {
 // carries no writer and no transaction, which is half of why a live
 // disclosure decision cannot write: there is nothing to write with.
 type World struct {
+	Params *Params
 	// Bodies resolves body identity for space.StatePosition and for the
 	// star's own position.
 	Bodies space.Bodies

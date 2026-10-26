@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hexaverse/rules"
 
 	"hexaverse/action"
 	"hexaverse/common"
-	"hexaverse/disclosure"
 	"hexaverse/discovery"
 	"hexaverse/space"
 	"hexaverse/system"
@@ -82,7 +82,7 @@ func (s *Service) Survey(ctx context.Context, id, bodyID string) (*Fleet, error)
 	if err != nil {
 		return nil, ErrSurveyTarget
 	}
-	if from.Sub(to).Length() > disclosure.FocusedScanRange {
+	if from.Sub(to).Length() > rules.TunedFocusedScanRange() {
 		return nil, ErrSurveyTarget
 	}
 	duration := s.surveyDuration
@@ -100,7 +100,7 @@ func (s *Service) Survey(ctx context.Context, id, bodyID string) (*Fleet, error)
 			return nil, e
 		}
 		p, e := space.StatePosition(bodies, state, now)
-		if e != nil || p.Sub(to).Length() > disclosure.FocusedScanRange {
+		if e != nil || p.Sub(to).Length() > rules.TunedFocusedScanRange() {
 			return nil, ErrSurveyTarget
 		}
 		return map[string]interface{}{"survey": window, "updatedAt": int64(now), "lastSurveyOutcome": ""}, nil
@@ -124,7 +124,7 @@ func surveyValid(bt *system.BodyTable, f *Fleet, a action.Action) bool {
 	}
 	for _, segment := range w.History {
 		state, err := DecodeKinematicState(bt, segment.State, surveyType, a.Id)
-		if err != nil || !space.StaysWithinRange(bt, state, body, segment.From, min(segment.To, a.Eta), disclosure.FocusedScanRange) {
+		if err != nil || !space.StaysWithinRange(bt, state, body, segment.From, min(segment.To, a.Eta), rules.TunedFocusedScanRange()) {
 			return false
 		}
 	}
@@ -132,7 +132,7 @@ func surveyValid(bt *system.BodyTable, f *Fleet, a action.Action) bool {
 		return true
 	}
 	state, err := DecodeKinematicState(bt, f.StateDoc, surveyType, a.Id)
-	return err == nil && space.StaysWithinRange(bt, state, body, w.LastMotionAt, a.Eta, disclosure.FocusedScanRange)
+	return err == nil && space.StaysWithinRange(bt, state, body, w.LastMotionAt, a.Eta, rules.TunedFocusedScanRange())
 }
 
 func RegisterSurveyResolver(a *action.Service, bodies BodySource, claims DiscoverySource) {

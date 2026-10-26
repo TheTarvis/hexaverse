@@ -47,7 +47,7 @@ it.each(['gate', 'anomaly', 'ruin', 'nebula', 'gravity_well', 'debris', 'radiati
 )
 
 it.each([
-  ['belt', 'resource-site'], ['Asteroid belt', 'resource-site'],
+  ['asteroid', 'resource-site'], ['belt', 'resource-site'], ['Asteroid belt', 'resource-site'],
   ['gas giant', 'gas_giant'], ['gravity well', 'gravity_well'], ['Lane gate', 'gate'],
   ['ice', 'ice'], ['resource-site', 'resource-site'],
 ])('resolves disclosed caller category %s to %s', (input, expected) => {

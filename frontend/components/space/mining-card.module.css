@@ -1,0 +1,9 @@
+.model { min-width: 0; }
+.field { display: grid; gap: 8px; min-width: 0; }
+.formFields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 12px; min-width: 0; }
+.quantityRow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.quantityRow > :first-child { flex: 1; min-width: 0; }
+.quantityRow > button { flex: 0 0 auto; }
+.estimate { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.expandedChevron { transform: rotate(180deg); }
+@media (max-width: 340px) { .formFields { grid-template-columns: minmax(0, 1fr); } }

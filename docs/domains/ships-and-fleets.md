@@ -43,7 +43,8 @@ class exists. New specialized roles and signatures require implementation.
 [Roster derivation](../../backend/fleet/roster.go) aggregates hold/mining/drive
 output and uses limiting acceleration/lane rate. A missing legacy roster is read
 as one seed hull. Cargo is a fleet pool, not per-ship allocation. Owner-facing
-reads expose composition/cargo; [foreign-read tests](../../backend/fleet/roster_handler_test.go)
+reads expose composition/cargo and the current movement `activeActionId`, used
+for command eligibility independently of the sensor `activeScanId`; [foreign-read tests](../../backend/fleet/roster_handler_test.go)
 check withholding. No split/merge/ship-transfer API was found in the current audit.
 
 ## Own-fleet roster

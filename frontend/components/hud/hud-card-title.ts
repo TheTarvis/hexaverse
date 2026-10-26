@@ -5,7 +5,22 @@ export type HudTaskTitle = {
   object?: string | null
 }
 
-export type HudCardTitle = string | HudTaskTitle
+/** Selection context uses the same plaque as action review; it never implies a committed order. */
+export type HudSearchTitle = {
+  search: 'objects' | 'travel-destination' | 'mining-target' | 'command-fleet'
+  scope: string
+  fleet?: string | null
+  object?: string | null
+}
+
+export type HudCardTitle = string | HudTaskTitle | HudSearchTitle
+
+const searches = {
+  objects: 'Objects',
+  'travel-destination': 'Choose destination',
+  'mining-target': 'Choose mining target',
+  'command-fleet': 'Choose command fleet',
+} satisfies Record<HudSearchTitle['search'], string>
 
 const actions = {
   mining: { label: 'Mining', relation: 'at' },
@@ -15,6 +30,13 @@ const actions = {
 /** One wording policy for standalone cards and their owning workspace frames. */
 export function formatHudCardTitle(title: HudCardTitle): string {
   if (typeof title === 'string') return title
+  if ('search' in title) {
+    const scope = title.scope.trim()
+    const fleet = title.fleet?.trim()
+    const object = title.object?.trim()
+    const label = searches[title.search]
+    return `${fleet ? `${fleet} · ` : ''}${label}${object ? ` for ${object}` : ''}${scope ? ` · ${scope}` : ''}`
+  }
   const fleet = title.fleet?.trim()
   const object = title.object?.trim()
   const action = actions[title.action]

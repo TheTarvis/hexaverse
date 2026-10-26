@@ -114,6 +114,36 @@ export class ApiClient {
     return error
   }
 
+  /** Authenticated SSE with refreshed credentials on reconnect; payloads are invalidation signals. */
+  subscribe(endpoint: string, event: string, onMessage: (data: unknown) => void, onConnect: () => void): () => void {
+    let stopped = false
+    let source: EventSource | null = null
+    let retry: ReturnType<typeof setTimeout> | null = null
+    const connect = async () => {
+      if (stopped || typeof EventSource === 'undefined') return
+      try {
+        const token = await this.getAuthToken()
+        if (stopped) return
+        if (!token) throw new Error('Authentication unavailable')
+        const url = new URL(`${this.baseURL.replace(/\/$/, '')}${endpoint}`, window.location.origin)
+        url.searchParams.set('token', token)
+        source = new EventSource(url.toString())
+        source.addEventListener('connected', onConnect)
+        source.addEventListener(event, message => {
+          try { onMessage(JSON.parse((message as MessageEvent).data)) } catch { /* Ignore malformed invalidation messages. */ }
+        })
+        source.onerror = () => {
+          source?.close()
+          if (!stopped) retry = setTimeout(() => { void connect() }, 5000)
+        }
+      } catch {
+        if (!stopped) retry = setTimeout(() => { void connect() }, 5000)
+      }
+    }
+    void connect()
+    return () => { stopped = true; source?.close(); if (retry) clearTimeout(retry) }
+  }
+
   async request<T = unknown>(
     endpoint: string,
     options: RequestInit = {}

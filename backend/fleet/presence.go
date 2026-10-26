@@ -35,7 +35,7 @@ func (s *Service) FleetsInSystem(ctx context.Context, systemID string) ([]system
 			Ship: disclosure.Ship{
 				Id:            f.Id,
 				State:         f.State,
-				DriveOutput:   DerivedDriveOutput(f, s.classStats),
+				DriveOutput:   DerivedDriveOutput(f, s.currentClassStats()),
 				InLaneTransit: f.Jump != nil,
 				Scan:          liveScanWindow(f),
 			},

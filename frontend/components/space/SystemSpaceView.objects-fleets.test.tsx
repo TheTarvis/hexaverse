@@ -201,7 +201,7 @@ describe('Objects own-fleet parent integration', () => {
     for (const id of ['remote', 'transit', 'no-position', 'foreign']) expect(screen.queryByTestId(`index-fleet-${id}`)).toBeNull()
     expect(screen.getByTestId('system-index-results').querySelectorAll('[aria-controls="object-details"]')).toHaveLength(4)
     expect(screen.queryByTestId('test-preview')).toBeNull()
-    fireEvent.change(screen.getByLabelText('Find a system object'), { target: { value: 'fleet' } })
+    fireEvent.change(screen.getByLabelText('Find an object'), { target: { value: 'fleet' } })
     expect(row('parked')).toBeVisible(); expect(screen.queryByTestId('index-feat-star')).toBeNull()
     useMyFleets.mockReturnValue({ ...ownFleets([fleet('parked')]), isFetching: true }); view.refresh()
     expect(row('parked')).toBeVisible()
@@ -237,6 +237,7 @@ describe('Objects own-fleet parent integration', () => {
     fireEvent.click(screen.getByTestId('mock-select-feat-star'))
     expect(screen.queryByTestId('test-preview')).toBeNull()
   })
+
   it('canvas fleet activation inspects without changing the command fleet or travel target', () => {
     seedPair()
     mount()
@@ -271,7 +272,7 @@ describe('Objects own-fleet parent integration', () => {
     useMyFleets.mockReturnValue(ownFleets([fleet('fleet_1'), fleet('fleet_2', { state: { Mode: 2 } })])); view.refresh()
     expect(screen.getByTestId('test-preview')).toHaveAttribute('data-accent', String(0xc4b5fd))
     expect(life.created).toEqual(['fleet_2']); expect(life.disposed).toEqual([])
-    fireEvent.change(screen.getByLabelText('Find a system object'), { target: { value: 'no-match' } })
+    fireEvent.change(screen.getByLabelText('Find an object'), { target: { value: 'no-match' } })
     expect(screen.getByTestId('test-preview')).toBeInTheDocument()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'HUD panels' })).getByRole('button', { name: 'Objects' })); expect(screen.queryByTestId('test-preview')).toBeNull()
     showIndex(); expect(screen.getByTestId('test-preview')).toBeInTheDocument()
