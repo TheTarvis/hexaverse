@@ -1,18 +1,40 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSystemCameraAdapter } from './system-camera-adapter'
-import { defaultCamera, fleetCamera, panBound, zoomRange } from './space-camera'
+import { defaultCamera, fleetCamera, zoomRange } from './space-camera'
 import { viewBasisOf } from './space-projection'
 const disposals: (() => void)[] = []
 afterEach(() => disposals.splice(0).forEach(dispose => dispose()))
 function setup(initial = defaultCamera(100)) {
   const host = document.createElement('div'); document.body.append(host)
   Object.defineProperties(host, { clientWidth: { value: 1200 }, clientHeight: { value: 900 } })
-  const onChange = vi.fn(), home = vi.fn(), confirm = vi.fn()
-  const adapter = createSystemCameraAdapter(host, 100, initial, { onChange, onHome: home, onConfirm: confirm })
+  const onChange = vi.fn()
+  const adapter = createSystemCameraAdapter(host, 100, initial, { onChange })
   disposals.push(() => { adapter.dispose(); host.remove() })
   return { host, adapter, onChange }
 }
 describe('System coordinate adapter for the shared camera', () => {
+  it('applies sunward focus orientation through the glide and preserves user zoom afterward', () => {
+    let now = 0
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const initial = defaultCamera(100), { adapter, host, onChange } = setup(initial)
+    const request = { ...initial, yaw: -Math.PI / 2, pitch: 0, distance: 10, minDistance: 1,
+      followBodyId: 'planet', target: { x: 50, y: 0, z: 0 },
+      focusRequest: { durationMs: 600, alignView: true, from: initial } }
+    try {
+      adapter.step(request)
+      now = 600
+      const focused = adapter.step(request)
+      expect(focused.yaw).toBeCloseTo(-Math.PI / 2)
+      expect(focused.pitch).toBeCloseTo(0)
+      expect(focused.distance).toBeCloseTo(10)
+      host.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 }))
+      const zoomed = onChange.mock.calls.at(-1)![0]
+      const followed = adapter.step({ ...zoomed, target: { x: 55, y: 0, z: 0 } }, true, zoomed)
+      expect(followed.yaw).toBeCloseTo(-Math.PI / 2)
+      expect(followed.target.x).toBeCloseTo(55)
+      expect(followed.distance).toBeCloseTo(zoomed.distance)
+    } finally { clock.mockRestore() }
+  })
   it('preserves an untouched camera exactly and does not publish React updates while stepping', () => {
     const initial = defaultCamera(100), { adapter, onChange } = setup(initial)
     let frame = initial
@@ -20,24 +42,19 @@ describe('System coordinate adapter for the shared camera', () => {
     expect(frame).toEqual(initial); expect(viewBasisOf(frame, { width: 1200, height: 900 })).toEqual(viewBasisOf(initial, { width: 1200, height: 900 }))
     expect(onChange).not.toHaveBeenCalled()
   })
-  it('follows the resolved fleet frame, retains following on orbit/zoom and releases it on pan', () => {
+  it('follows the resolved fleet frame and retains following on zoom', () => {
     const initial = fleetCamera(100, 'fleet', { x: 5, y: 2, z: 3 }), { adapter, host, onChange } = setup(initial)
     const followed = { ...initial, target: { x: 20, y: 2, z: 10 }, distance: 40 }
     expect(adapter.step(followed).target).toEqual(followed.target)
-    host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
-    expect(onChange.mock.calls.at(-1)?.[0].followFleetId).toBe('fleet')
     host.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -100 }))
     expect(onChange.mock.calls.at(-1)?.[0].followFleetId).toBe('fleet')
     host.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 100 }))
-    expect(onChange.mock.calls.at(-1)?.[0].followFleetId).toBeUndefined()
+    expect(onChange.mock.calls.at(-1)?.[0].followFleetId).toBe('fleet')
   })
   it('applies scene limits without a second gesture implementation', () => {
     const { adapter, host, onChange } = setup(), range = zoomRange(100)
-    for (let i = 0; i < 200; i++) host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: '+' }))
+    for (let i = 0; i < 200; i++) host.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 }))
     expect(onChange.mock.calls.at(-1)?.[0].distance).toBeCloseTo(range.min)
-    for (let i = 0; i < 500; i++) host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight', shiftKey: true }))
-    const state = onChange.mock.calls.at(-1)?.[0]
-    expect(Math.hypot(state.target.x, state.target.y, state.target.z)).toBeCloseTo(panBound(100))
     expect(adapter.rig.controls.screenSpacePanning).toBe(false)
     expect(adapter.rig.controls.minDistance).toBe(range.min)
   })
@@ -56,12 +73,10 @@ it('body focus glides from the current pose, follows live positions and keeps us
     now = 600
     const end = adapter.step({ ...request, target: { x: 50, y: 0, z: 0 } }, true, request)
     expect(end.target.x).toBeCloseTo(50); expect(end.distance).toBeCloseTo(5)
-    host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: '+' }))
+    host.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100 }))
     const zoomed = onChange.mock.calls.at(-1)![0]
     expect(zoomed.followBodyId).toBe('moon')
     const followed = adapter.step({ ...zoomed, target: { x: 60, y: 0, z: 0 } }, true, zoomed)
     expect(followed.target.x).toBeCloseTo(60); expect(followed.distance).toBeCloseTo(zoomed.distance)
-    host.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight', shiftKey: true }))
-    expect(onChange.mock.calls.at(-1)![0].followBodyId).toBeUndefined()
   } finally { time.mockRestore() }
 })

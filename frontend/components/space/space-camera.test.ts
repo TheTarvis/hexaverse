@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { advanceDrag, atOrbitLimit, atPanLimit, atZoomLimit, beginDrag, clampCamera, defaultCamera, fleetCamera, isDefaultCamera, isGesture, panBound, panBySteps, pickRadius, zoomRange } from './space-camera'
 import { viewBasisOf } from './space-projection'
 describe('System framing and limits (input belongs to shared MapCameraRig)', () => {
+  it('preserves tilt and orbit angle when explicitly focusing another fleet', () => {
+    const view = { yaw: -1.2, pitch: 0.35 }
+    const camera = fleetCamera(100, 'fleet', { x: 20, y: 3, z: -10 }, { x: 0, y: 0, z: 0 }, view)
+    expect(camera.yaw).toBeCloseTo(view.yaw)
+    expect(camera.pitch).toBeCloseTo(view.pitch)
+  })
   it('scales framing, legal pick radius and zoom range with served extent', () => {
     for (const extent of [100, 650, 1400]) {
       expect(defaultCamera(extent).distance).toBe(extent * 0.45)
@@ -16,12 +22,16 @@ describe('System framing and limits (input belongs to shared MapCameraRig)', () 
     expect(Math.hypot(state.target.x, state.target.y, state.target.z)).toBeCloseTo(panBound(100))
     expect(panBySteps(defaultCamera(100), 1, 0, 100).target.x).toBeGreaterThan(0)
   })
-  it('frames behind a followed fleet toward the star and handles an origin fleet', () => {
+  it('frames a fleet from the sunlit side and handles an origin fleet', () => {
     for (const position of [{ x: 20, y: 3, z: -10 }, { x: -20, y: -3, z: 10 }, { x: 0, y: 0, z: 0 }]) {
       const camera = fleetCamera(100, 'fleet', position), basis = viewBasisOf(camera, { width: 390, height: 844 })
       expect(camera.followFleetId).toBe('fleet'); expect(camera.target).toEqual(position)
       expect(Number.isFinite(basis.eye.x + basis.eye.y + basis.eye.z)).toBe(true)
       expect(basis.eye.y).toBeGreaterThan(position.y)
+      if (Math.hypot(position.x, position.y, position.z) > 0) {
+        const toSun = { x: -position.x, y: -position.y, z: -position.z }
+        expect((basis.eye.x - position.x) * toSun.x + (basis.eye.y - position.y) * toSun.y + (basis.eye.z - position.z) * toSun.z).toBeGreaterThan(0)
+      }
     }
   })
 })

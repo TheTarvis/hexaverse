@@ -86,7 +86,7 @@ vi.mock('@/hooks/use-burn-preview', () => ({
 vi.mock('@/lib/toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }))
 
 // The stage stand-ins (contract 3.8): a camera control, a body pick, an
-// acting-fleet change, the selection and acting fleet as attributes, and a
+// fleet inspection, the selection and acting fleet as attributes, and a
 // pick counter.
 const stage = vi.hoisted(() => ({ available: true, firstFrame: true }))
 vi.mock('./SpaceStage', async () => {
@@ -236,6 +236,16 @@ describe('Objects own-fleet parent integration', () => {
     noCommands()
     fireEvent.click(screen.getByTestId('mock-select-feat-star'))
     expect(screen.queryByTestId('test-preview')).toBeNull()
+  })
+  it('canvas fleet activation inspects without changing the command fleet or travel target', () => {
+    seedPair()
+    mount()
+    fireEvent.click(screen.getByTestId('mock-select-feat-star'))
+    const commandFleet = canvas().getAttribute('data-acting-fleet')
+    fireEvent.click(screen.getByTestId('mock-activate-fleet_2'))
+    expect(row('fleet_2')).toHaveAttribute('aria-pressed', 'true')
+    expect(canvas()).toHaveAttribute('data-acting-fleet', commandFleet)
+    expect(canvas()).toHaveAttribute('data-selection', 'feat-star')
   })
   it('Scenario: Distinct identity and explicit fleet focus — local inspection while acting remote', () => {
     sessionStorage.setItem('hexaverse:selected-fleet:v1:corp-1', 'remote')

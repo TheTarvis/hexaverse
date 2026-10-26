@@ -1058,7 +1058,7 @@ export function SystemSpaceView({ systemId }: SystemSpaceViewProps) {
               initialFocusFleetId={!actingRemote && !fleets.isError ? acting?.id : null}
               focusFleetRequest={canvasAvailable && !interiorFailed && !interior.isLoading && fleetFocus && indexedFleets.some(fleet => fleet.id === fleetFocus.fleetId) && scene.marks.some(mark => mark.kind === 'fleet' && mark.id === fleetFocus.fleetId) ? fleetFocus : null}
               actingFleetId={acting?.id ?? null}
-              onActivateFleet={id => { const fleet = allFleets.find(item => item.id === id); if (fleet) selectFleet(fleet) }}
+              onActivateFleet={id => { if (travelGuard.held) return; setInspectedFleetId(id); requestHudPanel('objects') }}
               frameSource={frameSource}
             />
           </>

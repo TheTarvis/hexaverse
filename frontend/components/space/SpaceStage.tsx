@@ -50,18 +50,16 @@ import type { OrbitAppearance, LabelAppearance } from './space-appearance'
 import {
   advanceDrag,
   atOrbitLimit,
-  atPanLimit,
   atZoomLimit,
   beginDrag,
   defaultCamera,
   fleetCamera,
   isGesture,
-  panBySteps,
   pickRadius,
   type DragTracker,
   type SpaceCamera,
 } from './space-camera'
-import { resolvePick, type PickMark, type SpaceSelection } from './space-selection'
+import { selectionKey, resolvePick, type PickMark, type SpaceSelection } from './space-selection'
 import type { SceneMark, SceneModel } from './space-scene'
 import type { SpaceGridMode, HexSkySettings } from '@/components/graphics/space-sky'
 import {
@@ -149,7 +147,6 @@ const AFFORDANCE_ATTR = 'data-space-affordance'
 
 const LIMIT_MESSAGE = {
   zoom: 'The camera is as close or as far as it goes.',
-  pan: 'The camera is at the edge of the system.',
   orbit: 'The camera is as high or as low as it tilts.',
 } as const
 
@@ -219,7 +216,7 @@ export function SpaceStage({
   const entryMark = initialFocusFleetId ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === initialFocusFleetId) : null
   if (entryMark && entryFocus.current !== entryKey) {
     entryFocus.current = entryKey
-    setCamera(fleetCamera(extent, entryMark.id, entryMark.followAnchor?.position ?? entryMark.position))
+    setCamera(fleetCamera(extent, entryMark.id, entryMark.followAnchor?.position ?? entryMark.position, scene.marks.find(mark => mark.kind === 'star')?.position))
   }
 
   const fleetRequest = useRef<string | null>(null)
@@ -227,7 +224,7 @@ export function SpaceStage({
   const fleetMark = focusFleetRequest ? scene.marks.find(mark => mark.kind === 'fleet' && mark.id === focusFleetRequest.fleetId) : null
   if (fleetMark && fleetRequestKey !== fleetRequest.current) {
     fleetRequest.current = fleetRequestKey
-    setCamera(fleetCamera(extent, fleetMark.id, fleetMark.followAnchor?.position ?? fleetMark.position))
+    setCamera(prev => fleetCamera(extent, fleetMark.id, fleetMark.followAnchor?.position ?? fleetMark.position, scene.marks.find(mark => mark.kind === 'star')?.position, prev))
   }
 
   const focusedRequest = useRef<string | null>(null)
@@ -330,7 +327,30 @@ export function SpaceStage({
     [extent, setCamera, scene, host, bodyFocusSettings, frameSource],
   )
 
-  const recenter = useCallback(() => setCamera(defaultCamera(extent)), [extent, setCamera])
+  // Inspection preserves viewing direction and zoom. Keep this
+  // independent from command-fleet selection and explicit double-click framing.
+  const pivotSelection = useRef(selection ? '' : 'none')
+  const pivotOn = useCallback((mark: SceneMark, durationMs = 0) => {
+    setCamera(prev => {
+      const next = bodyFocusCamera(prev, frameRef.current?.scene ?? scene, mark, extent, host?.clientWidth ?? 1, host?.clientHeight ?? 1,
+        { ...bodyFocusSettings, durationMs, orientation: 'steady' })
+      return { ...next, distance: prev.distance, minDistance: Math.min(next.minDistance ?? 0.02, prev.distance) }
+    })
+  }, [setCamera, scene, extent, host, bodyFocusSettings])
+  const selectionIdentity = selectionKey(selection)
+  useLayoutEffect(() => {
+    if (pivotSelection.current === selectionIdentity) return
+    const liveScene = frameRef.current?.scene ?? scene
+    const mark = selection?.bodyId ? liveScene.marks.find(mark => mark.id === selection.bodyId) : undefined
+    if (selection?.bodyId && !mark) return
+    pivotSelection.current = selectionIdentity
+    if (mark) pivotOn(mark)
+    else if (selection?.point) {
+      const p = selection.point
+      const position = 'x' in p ? p : { x: p.X, y: p.Y, z: p.Z }
+      pivotOn({ id: 'point-selection', kind: 'point-selection', position, radius: 0, pickable: false, selected: true })
+    } else setCamera(prev => ({ ...prev, followBodyId: undefined, followFleetId: undefined, focusPoint: undefined, focusRequest: undefined }))
+  }, [selectionIdentity, selection, scene, pivotOn, setCamera])
 
   // --- picking -------------------------------------------------------------
 
@@ -371,7 +391,7 @@ export function SpaceStage({
     affordance: HTMLElement | null
   }
   const gestureRef = useRef<Gesture | null>(null)
-  const lastTap = useRef<{ id: string; at: number } | null>(null)
+  const lastTap = useRef<{ id: string; at: number; wasSelected?: boolean } | null>(null)
   const suppressClick = useRef(false)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const bodyIdUnder = (target: EventTarget | null): string | null =>
@@ -402,21 +422,26 @@ export function SpaceStage({
     (clientX: number, clientY: number, marks: PickMark[], at: number) => {
       const gesture = gestureRef.current
       gestureRef.current = null
-      if (!gesture || gesture.secondary || isGesture(gesture.tracker)) return
+      if (!gesture || gesture.secondary || isGesture(gesture.tracker) || cameraAdapter.current?.rig.gestureActive) return
       if (gesture.affordance) {
         if (gesture.affordance.isConnected && !gesture.affordance.closest('[inert], [hidden]')) gesture.affordance.click()
         return
       }
       if (gesture.bodyId) {
         const previous = lastTap.current, now = at
-        lastTap.current = { id: gesture.bodyId, at: now }
+        lastTap.current = { id: gesture.bodyId, at: now, wasSelected: selection?.bodyId === gesture.bodyId }
         if (previous?.id === gesture.bodyId && now - previous.at < 350) {
           const mark = frameRef.current?.projected.get(gesture.bodyId)?.mark
           if (mark) reframeOn(mark)
+          if (previous.wasSelected && gesture.bodyId !== 'point-selection' && selection?.bodyId !== gesture.bodyId) onSelect?.({ bodyId: gesture.bodyId })
           lastTap.current = null
           return
         }
-        if (gesture.bodyId === 'point-selection') return
+        if (gesture.bodyId === 'point-selection') {
+          const mark = frameRef.current?.projected.get(gesture.bodyId)?.mark
+          if (mark) pivotOn(mark)
+          return
+        }
         onSelect?.({ bodyId: gesture.bodyId })
         return
       }
@@ -425,7 +450,7 @@ export function SpaceStage({
       lastTap.current = picked?.point ? { id: 'point-selection', at } : null
       onSelect?.(picked)
     },
-    [onSelect, pickAt, reframeOn],
+    [onSelect, pickAt, reframeOn, pivotOn, selection?.bodyId],
   )
 
   const cancelGesture = useCallback(() => { gestureRef.current = null; pointers.current.clear() }, [])
@@ -449,23 +474,31 @@ export function SpaceStage({
     try { event.currentTarget.releasePointerCapture(event.pointerId) } catch { /* Already lost. */ }
   }, [finishGesture])
 
+  const navigationTargets = () => (frameRef.current?.scene ?? scene).marks
+    .filter(mark => mark.pickable || mark.kind === 'fleet')
+    .filter(mark => !['ghost', 'sighting', 'point-selection'].includes(mark.kind))
+    .map(mark => ({ id: mark.id, position: mark.position, activate: () => {
+      if (mark.kind === 'fleet') onActivateFleet?.(mark.id)
+      else { pivotSelection.current = selectionKey({ bodyId: mark.id }); onSelect?.({ bodyId: mark.id }) }
+      pivotOn(mark, 600)
+    } }))
   const cameraCallbacks = useRef({
+    targets: navigationTargets,
+    selectedId: () => cameraRef.current.followBodyId ?? cameraRef.current.followFleetId,
     onChange: (next: SpaceCamera) => { cameraRef.current = next; storeCamera(next); loop.refresh() },
-    onHome: recenter,
-    onConfirm: () => onSelect?.({ point: { ...(frameRef.current?.camera.target ?? cameraRef.current.target) } }),
   })
   cameraCallbacks.current = {
+    targets: navigationTargets,
+    selectedId: () => cameraRef.current.followBodyId ?? cameraRef.current.followFleetId,
     onChange: next => { cameraRef.current = next; storeCamera(next); loop.refresh() },
-    onHome: recenter,
-    onConfirm: () => onSelect?.({ point: { ...(frameRef.current?.camera.target ?? cameraRef.current.target) } }),
   }
   useLayoutEffect(() => {
     if (!host) return
     const adapter = createSystemCameraAdapter(host, extent, cameraRef.current, {
+      targets: () => cameraCallbacks.current.targets(),
+      selectedId: () => cameraCallbacks.current.selectedId(),
       onChange: next => cameraCallbacks.current.onChange(next),
       onRest: next => setViewBasis(viewBasisOf(next, { width: host.clientWidth || 1, height: host.clientHeight || 1 })),
-      onHome: () => cameraCallbacks.current.onHome(),
-      onConfirm: () => cameraCallbacks.current.onConfirm(),
     })
     adapter.rig.controls.enabled = false
     cameraAdapter.current = adapter
@@ -484,14 +517,9 @@ export function SpaceStage({
       data-camera={cameraJson}
       tabIndex={available ? 0 : -1}
       role="group"
-      aria-label="System map. Arrow keys rotate; hold Shift and press arrow keys to pan. Plus and minus zoom. Home recenters. Enter selects the camera center."
+      aria-label="System map. Drag to orbit. Scroll vertically or pinch to zoom; swipe horizontally to switch objects."
       data-orbit-at-limit={atOrbitLimit(camera) ?? undefined}
       data-zoom-at-limit={atZoomLimit(camera, extent) ?? undefined}
-      data-pan-at-limit={(['left', 'right', 'up', 'down'] as const).filter((_, index) => {
-        const [right, up] = [[-1, 0], [1, 0], [0, 1], [0, -1]][index]
-        const next = panBySteps(camera, right, up, extent)
-        return next.target.x === camera.target.x && next.target.y === camera.target.y && next.target.z === camera.target.z
-      }).join(' ') || undefined}
       data-selection={selectionAttr(selection)}
       data-draw-world-time={String(drawWorldTime)}
       data-reframe-animated={(camera.followBodyId || camera.focusPoint) && (camera.focusRequest?.durationMs ?? 0) > 0 ? 'true' : 'false'}
@@ -536,7 +564,11 @@ export function SpaceStage({
           hoveredFleetId={hoveredFleetId}
           actingFleetId={actingFleetId}
           onHoverFleet={setHoveredFleetId}
-          onActivateFleet={onActivateFleet}
+          onActivateFleet={id => {
+            onActivateFleet?.(id)
+            const mark = (frameRef.current?.scene ?? scene).marks.find(mark => mark.kind === 'fleet' && mark.id === id)
+            if (mark) pivotOn(mark)
+          }}
           onFocusMark={(id) => {
             setFocusedMarkId(id)
             const live = frameRef.current?.projected.get(id)
@@ -652,11 +684,7 @@ function SpaceLayers({
   const orbitLimit = atOrbitLimit(camera)
   const limitMessage = zoomLimit
     ? LIMIT_MESSAGE.zoom
-    : atPanLimit(camera, extent)
-      ? LIMIT_MESSAGE.pan
-      : orbitLimit
-        ? LIMIT_MESSAGE.orbit
-        : ''
+    : orbitLimit ? LIMIT_MESSAGE.orbit : ''
 
   // A body/gate hit target's ENTIRE placement — the −50%/−50% centring
   // included — is written by the transform loop's `style.transform`, every
@@ -699,7 +727,7 @@ function SpaceLayers({
 
   return (
     <>
-      {phone && <span className="sr-only" data-testid="touch-camera-hint">One finger orbits. Two fingers pan and pinch zooms. Double-tap an object to focus it.</span>}
+      {phone && <span className="sr-only" data-testid="touch-camera-hint">One finger orbits. Pinch or swipe two fingers vertically to zoom. Swipe two fingers horizontally to switch objects. Double-tap an object to frame it.</span>}
 
       <span className="sr-only" role="status" aria-live="polite" data-testid="camera-limit-status">
         {limitMessage}

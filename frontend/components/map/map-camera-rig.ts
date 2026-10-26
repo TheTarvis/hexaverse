@@ -2,20 +2,20 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 export interface MapBounds { x: [number, number]; y: [number, number]; z: [number, number] }
-export type CameraIntent = 'orbit' | 'pan' | 'zoom'
+export type CameraIntent = 'orbit' | 'zoom'
+export interface MapCameraTarget { id: string; position: Vec3; activate: () => void }
 export interface MapCameraOptions {
+  targets?: () => MapCameraTarget[]
+  selectedId?: () => string | null | undefined
   up?: THREE.Vector3
   minDistance?: number
   maxDistance?: number
   minPolarAngle?: number
   maxPolarAngle?: number
   maxTargetRadius?: number
-  keyPanDistance?: number
   onIntent?: (intent: CameraIntent) => void
   onChange?: () => void
   onRest?: () => void
-  onHome?: () => void
-  onConfirm?: () => void
 }
 
 
@@ -43,11 +43,18 @@ export class MapCameraRig {
   private stepping = false
   private awaitingRest = false
   private changed: () => void
-  private onKey: (event: KeyboardEvent) => void
   private onPointerIntent: (event: PointerEvent) => void
   private onPointerMove: (event: PointerEvent) => void
   private onPointerUp: (event: PointerEvent) => void
-  private presses = new Map<number, { x: number; y: number; currentX: number; currentY: number; intent: CameraIntent }>()
+  private suppressClick = false
+  private multiTouch = false
+  private touchMode: 'switch' | 'zoom' | 'pinch' | null = null
+  private touchFrame = 0
+  private touchSwitched = false
+  private touchPrevious: { x: number; y: number; distance: number } | null = null
+  private wheelGesture = { at: -Infinity, axis: '', amount: 0, switched: false }
+  private onClick: (event: MouseEvent) => void
+  private presses = new Map<number, { x: number; y: number; currentX: number; currentY: number }>()
   private following: (() => { position: Vec3; rotation?: THREE.Quaternion } | null) | null = null
   private followRotation: THREE.Quaternion | null = null
   private options: MapCameraOptions
@@ -61,6 +68,7 @@ export class MapCameraRig {
     toTarget: THREE.Vector3
     start: number
     ms: number
+    rotateView: boolean
   } | null = null
 
   constructor(
@@ -97,15 +105,9 @@ export class MapCameraRig {
     // Damping smooths trackpad inertia into a glide.
     controls.enableDamping = true
     controls.dampingFactor = 0.12
-    // Gesture map (trackpad-first): left-drag orbits, right-drag pans, wheel
-    // dollies (plain wheel is intercepted below for pan; ctrl+wheel = pinch
-    // falls through to dolly).
-    controls.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.DOLLY,
-      RIGHT: THREE.MOUSE.PAN,
-    }
-    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+    controls.enablePan = false
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: null, RIGHT: null }
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: null }
     controls.minDistance = options.minDistance ?? 0
     controls.maxDistance = options.maxDistance ?? Infinity
     controls.maxTargetRadius = options.maxTargetRadius ?? Infinity
@@ -113,42 +115,63 @@ export class MapCameraRig {
     controls.addEventListener('change', this.changed)
     this.onPointerIntent = event => {
       if (!controls.enabled || domElement.closest('[inert]')) return
-      const intent = event.pointerType === 'touch'
-        ? (event.isPrimary === false ? 'pan' : 'orbit')
-        : event.button === 1 ? 'zoom' : event.button === 2 || event.ctrlKey || event.metaKey || event.shiftKey ? 'pan' : 'orbit'
-      this.presses.set(event.pointerId, { x: event.clientX, y: event.clientY, currentX: event.clientX, currentY: event.clientY, intent })
+      if (event.pointerType !== 'touch' && event.button !== 0) return
+      if (!this.presses.size) {
+        this.suppressClick = false; this.multiTouch = false
+        this.touchMode = null; this.touchSwitched = false
+      }
+      // Pointer interaction returns keyboard ownership to the canvas on release.
+      if (event.target === domElement || event.target instanceof HTMLCanvasElement) domElement.focus({ preventScroll: true })
+      this.presses.set(event.pointerId, { x: event.clientX, y: event.clientY, currentX: event.clientX, currentY: event.clientY })
+      if (this.presses.size >= 2) {
+        this.multiTouch = true; this.suppressClick = true
+        const [a, b] = [...this.presses.values()]
+        a.x = a.currentX; a.y = a.currentY; b.x = b.currentX; b.y = b.currentY
+        this.touchPrevious = this.touchMetrics()
+        this.clearMotion()
+      }
     }
     this.onPointerMove = event => {
       const press = this.presses.get(event.pointerId)
       if (!controls.enabled || !press) return
       press.currentX = event.clientX; press.currentY = event.clientY
-      if (event.pointerType === 'touch' && this.presses.size === 2) {
-        const [a, b] = [...this.presses.values()]
-        const pan = Math.hypot((a.currentX + b.currentX - a.x - b.x) / 2, (a.currentY + b.currentY - a.y - b.y) / 2)
-        const zoom = Math.abs(Math.hypot(a.currentX - b.currentX, a.currentY - b.currentY) - Math.hypot(a.x - b.x, a.y - b.y))
-        // Pointer moves arrive one finger at a time. Do not misclassify half
-        // of a symmetric pinch as a pan that would release following.
-        if (pan >= 6 && pan > zoom * 0.75) this.interrupt('pan')
-        else if (zoom >= 6) this.interrupt('zoom')
-      } else if (Math.hypot(event.clientX - press.x, event.clientY - press.y) >= 6) this.interrupt(press.intent)
+      if (this.multiTouch) {
+        // OrbitControls must never interpret two fingers as pan, or a remaining
+        // finger as a fresh orbit after a pinch/swipe.
+        event.stopImmediatePropagation()
+        if (event.cancelable) event.preventDefault()
+        if (this.presses.size === 2) this.handleTouch()
+      } else if (Math.hypot(event.clientX - press.x, event.clientY - press.y) >= 6) {
+        this.suppressClick = true
+        this.interrupt('orbit')
+      } else {
+        // A small press tremor remains a click rather than a camera rotation.
+        event.stopImmediatePropagation()
+      }
     }
-    this.onPointerUp = event => { this.presses.delete(event.pointerId) }
-    // A click only inspects. Interrupt camera motion when a drag actually begins.
+    this.onPointerUp = event => {
+      if (event.type !== 'pointercancel' && controls.enabled && this.presses.has(event.pointerId)) domElement.focus({ preventScroll: true })
+      this.presses.delete(event.pointerId)
+      if (this.presses.size < 2 && this.touchFrame) { cancelAnimationFrame(this.touchFrame); this.touchFrame = 0 }
+      if (this.multiTouch || this.suppressClick) {
+        // Keep release-click suppression until the next press.
+        this.suppressClick = true
+      }
+    }
+    this.onClick = event => {
+      if (event.detail > 0 && this.suppressClick) { event.preventDefault(); event.stopImmediatePropagation() }
+    }
+    domElement.addEventListener('click', this.onClick, true)
     domElement.addEventListener('pointerdown', this.onPointerIntent, true)
     domElement.addEventListener('pointermove', this.onPointerMove, true)
     domElement.addEventListener('pointerup', this.onPointerUp, true)
     domElement.addEventListener('pointercancel', this.onPointerUp, true)
-    this.onKey = event => this.handleKey(event)
-    domElement.addEventListener('keydown', this.onKey)
 
     // TODO(travis-feel): zoom (dolly) range clamp — leaving OrbitControls
     // defaults (min 0 / max Infinity). Tune min/maxDistance for the
     // board-tier handoff once that feel is decided.
 
-    // Two-finger swipe -> ground-plane pan. macOS delivers a swipe as a plain
-    // `wheel` and a pinch as `wheel` + ctrlKey. We intercept in the CAPTURE
-    // phase on the wrapper (before OrbitControls' own canvas listener) so we
-    // can preempt zoom on plain wheel; ctrl+wheel falls through to dolly.
+    // Own wheel classification before OrbitControls, including trackpad momentum.
     this.onWheelCapture = (e: WheelEvent) => this.handleWheel(e)
     wrapper.addEventListener('wheel', this.onWheelCapture, { capture: true, passive: false })
 
@@ -194,72 +217,88 @@ export class MapCameraRig {
     if (this.input.dataset.mapCamera !== value) this.input.dataset.mapCamera = value
   }
 
-  private handleWheel(e: WheelEvent) {
-    if (!this.controls.enabled) return
-    this.interrupt(e.ctrlKey ? 'zoom' : 'pan')
-    if (e.ctrlKey) return // pinch — leave it for OrbitControls to dolly
-    const cam = this.camera
-    const target = this.controls.target
-    e.preventDefault()
-    e.stopPropagation()
-    // world-units-per-pixel scaled by the camera's HEIGHT above the disk, not
-    // its slant distance — at a grazing pitch the slant stays large while the
-    // camera sits low, so distance-scaling flings the foreground past you.
-    // abs() so swipe-pan keeps working when orbited under the disk.
-    const up = cam.up.clone().normalize()
-    const height = Math.max(1, Math.abs(cam.position.clone().sub(target).dot(up)))
-    const perPx = (2 * height * Math.tan(((cam.fov ?? 50) / 2) * (Math.PI / 180))) / (this.wrapper.clientHeight || 1)
-    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0)
-    right.addScaledVector(up, -right.dot(up)).normalize()
-    const forward = new THREE.Vector3().crossVectors(up, right)
-    // grab-the-map feel: content follows the fingers.
-    const move = right
-      .multiplyScalar(-e.deltaX * perPx)
-      .add(forward.multiplyScalar(e.deltaY * perPx))
-    cam.position.add(move)
-    target.add(move)
+  get isFollowing() { return this.following !== null }
+
+  /** Whether scene pointer-up picking must ignore this gesture. */
+  get gestureActive() { return this.suppressClick || this.multiTouch }
+
+  private zoom(delta: number) {
+    this.interrupt('zoom')
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    offset.setLength(THREE.MathUtils.clamp(offset.length() * Math.exp(THREE.MathUtils.clamp(delta * 0.002, -1, 1)), this.controls.minDistance, this.controls.maxDistance))
+    this.camera.position.copy(this.controls.target).add(offset)
     this.controls.update()
   }
 
-  private handleKey(event: KeyboardEvent) {
-    if (!this.controls.enabled || event.target !== this.controls.domElement || event.altKey || event.ctrlKey || event.metaKey) return
-    const direction: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }
-    const step = direction[event.key]
-    if (step) {
-      this.interrupt(event.shiftKey ? 'pan' : 'orbit')
-      const offset = this.camera.position.clone().sub(this.controls.target)
-      if (event.shiftKey) {
-        const up = this.camera.up.clone().normalize()
-        const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0)
-        right.addScaledVector(up, -right.dot(up)).normalize()
-        const forward = new THREE.Vector3().crossVectors(up, right)
-        const distance = this.options.keyPanDistance ?? offset.length() * 0.05
-        const move = right.multiplyScalar(step[0] * distance).addScaledVector(forward, step[1] * distance)
-        this.camera.position.add(move); this.controls.target.add(move)
-      } else {
-        const rotation = new THREE.Quaternion().setFromUnitVectors(this.camera.up, new THREE.Vector3(0, 1, 0))
-        const spherical = new THREE.Spherical().setFromVector3(offset.applyQuaternion(rotation))
-        spherical.theta -= step[0] * 0.05
-        spherical.phi = THREE.MathUtils.clamp(spherical.phi - step[1] * 0.05, this.controls.minPolarAngle, this.controls.maxPolarAngle)
-        spherical.makeSafe()
-        offset.setFromSpherical(spherical).applyQuaternion(rotation.invert())
-        this.camera.position.copy(this.controls.target).add(offset)
+  private switchTarget(direction: number) {
+    this.camera.updateMatrixWorld(true)
+    const origin = this.controls.target.clone().project(this.camera)
+    const width = this.wrapper.clientWidth || 1, height = this.wrapper.clientHeight || 1
+    let nearest: MapCameraTarget | undefined, distance = Infinity
+    for (const target of this.options.targets?.() ?? []) {
+      if (target.id === this.options.selectedId?.()) continue
+      const projected = new THREE.Vector3().copy(target.position).project(this.camera)
+      if (Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1 || Math.abs(projected.z) > 1) continue
+      const dx = (projected.x - origin.x) * width / 2
+      if (dx * direction <= 0) continue
+      const d = Math.hypot(dx, (projected.y - origin.y) * height / 2)
+      if (d < distance) { nearest = target; distance = d }
+    }
+    nearest?.activate()
+  }
+
+  private touchMetrics() {
+    const [a, b] = [...this.presses.values()]
+    return { x: (a.currentX + b.currentX) / 2, y: (a.currentY + b.currentY) / 2,
+      distance: Math.hypot(a.currentX - b.currentX, a.currentY - b.currentY) }
+  }
+
+  private handleTouch(flush = false) {
+    const [a, b] = [...this.presses.values()]
+    const current = this.touchMetrics(), previous = this.touchPrevious!
+    const dx = current.x - previous.x, dy = current.y - previous.y
+    const spread = current.distance - previous.distance
+    if (!this.touchMode) {
+      // Wait for both fingers before classifying: half of a parallel swipe
+      // otherwise looks exactly like a pinch.
+      if (!flush && ((a.currentX === a.x && a.currentY === a.y) || (b.currentX === b.x && b.currentY === b.y))) {
+        if (!this.touchFrame) this.touchFrame = requestAnimationFrame(() => {
+          this.touchFrame = 0
+          if (this.controls.enabled && this.presses.size === 2) this.handleTouch(true)
+        })
+        return
       }
-    } else if (['+', '=', '-', '_'].includes(event.key)) {
-      this.interrupt('zoom')
-      const offset = this.camera.position.clone().sub(this.controls.target)
-      offset.multiplyScalar(['+', '='].includes(event.key) ? 0.9 : 1 / 0.9)
-      this.camera.position.copy(this.controls.target).add(offset)
-    } else if (event.key === 'Home') { event.preventDefault(); this.stopFollowing(); this.clearMotion(); this.glide = null; this.options.onHome?.(); return }
-    else if (event.key === 'Enter') { event.preventDefault(); this.options.onConfirm?.(); return }
-    else return
-    event.preventDefault()
-    this.controls.update()
+      if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(spread)) < 8) return
+      this.touchMode = Math.abs(spread) > Math.hypot(dx, dy) * 1.5 ? 'pinch' : Math.abs(dy) >= Math.abs(dx) ? 'zoom' : 'switch'
+    }
+    if (this.touchMode === 'switch') {
+      if (!this.touchSwitched && Math.abs(dx) >= 30) { this.touchSwitched = true; this.switchTarget(Math.sign(dx)) }
+    } else {
+      this.zoom(this.touchMode === 'pinch' ? -spread * 2 : dy * 2)
+      this.touchPrevious = current
+    }
+  }
+
+  private handleWheel(e: WheelEvent) {
+    if (!this.controls.enabled || this.input.closest('[inert]')) return
+    // HUD scroll events are unrelated to the map even if they share a wrapper.
+    if (e.target instanceof Element && e.target !== this.input && !this.input.contains(e.target)) return
+    e.preventDefault(); e.stopImmediatePropagation()
+    const now = performance.now(), gesture = this.wheelGesture
+    if (now - gesture.at > 220) { gesture.axis = ''; gesture.amount = 0; gesture.switched = false }
+    gesture.at = now
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? (this.wrapper.clientHeight || 800) : 1
+    if (e.ctrlKey) gesture.axis = 'y'
+    if (!gesture.axis) gesture.axis = !e.ctrlKey && Math.abs(e.deltaX) > Math.abs(e.deltaY) ? 'x' : 'y'
+    if (gesture.axis === 'y') this.zoom(e.deltaY * unit)
+    else {
+      gesture.amount += e.deltaX * unit
+      if (!gesture.switched && Math.abs(gesture.amount) >= 30) { gesture.switched = true; this.switchTarget(Math.sign(gesture.amount)) }
+    }
   }
 
   private interrupt(intent: CameraIntent) {
     this.glide = null
-    if (intent === 'pan') this.stopFollowing()
     this.options.onIntent?.(intent)
   }
 
@@ -270,14 +309,14 @@ export class MapCameraRig {
   }
 
   /** Follow live positions during and after the glide. Null releases at the last pose. */
-  follow(resolve: () => { position: Vec3; rotation?: THREE.Quaternion } | null, distance: number, ms = 600) {
+  follow(resolve: () => { position: Vec3; rotation?: THREE.Quaternion } | null, distance: number, ms = 600, viewDirection?: Vec3) {
     this.stopFollowing()
     this.clearMotion()
     this.following = resolve
     const target = resolve()
     if (!target) { this.stopFollowing(); return }
     this.followRotation = target.rotation?.clone() ?? null
-    this.focus(target.position, ms, distance)
+    this.focus(target.position, ms, distance, viewDirection)
   }
 
   private stepFollow() {
@@ -307,20 +346,35 @@ export class MapCameraRig {
     const t = Math.min(1, (performance.now() - g.start) / g.ms)
     // ease-in-out
     const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-    this.camera.position.copy(g.fromPos.clone().lerp(g.toPos, e))
     this.controls.target.copy(g.fromTarget.clone().lerp(g.toTarget, e))
+    if (g.rotateView) {
+      // Swing around the pivot when changing sides, rather than cutting through it.
+      // Interpolate azimuth separately so a change of sides cannot tilt the
+      // view up over the pole when the requested elevation is unchanged.
+      const basis = new THREE.Quaternion().setFromUnitVectors(this.camera.up.clone().normalize(), new THREE.Vector3(0, 1, 0))
+      const from = new THREE.Spherical().setFromVector3(g.fromPos.clone().sub(g.fromTarget).applyQuaternion(basis))
+      const to = new THREE.Spherical().setFromVector3(g.toPos.clone().sub(g.toTarget).applyQuaternion(basis))
+      const turn = Math.atan2(Math.sin(to.theta - from.theta), Math.cos(to.theta - from.theta))
+      const pose = new THREE.Spherical(THREE.MathUtils.lerp(from.radius, to.radius, e), THREE.MathUtils.lerp(from.phi, to.phi, e), from.theta + turn * e)
+      pose.makeSafe()
+      this.camera.position.copy(this.controls.target).add(new THREE.Vector3().setFromSpherical(pose).applyQuaternion(basis.invert()))
+    } else this.camera.position.copy(g.fromPos.clone().lerp(g.toPos, e))
     if (t >= 1) this.glide = null
   }
 
   /**
-   * Glide to a target, preserving viewing direction. Omit distance to retain
+   * Glide to a target, optionally choosing a new viewing direction. Omit distance to retain
    * zoom; focus/follow callers can instead request a consistent framing.
    */
-  focus(pos: Vec3, ms = 600, distance?: number) {
+  focus(pos: Vec3, ms = 600, distance?: number, viewDirection?: Vec3) {
     const target = new THREE.Vector3(pos.x, pos.y, pos.z)
     const offset = this.camera.position.clone().sub(this.controls.target)
+    if (viewDirection && Math.hypot(viewDirection.x, viewDirection.y, viewDirection.z) > 0) {
+      const length = offset.length()
+      offset.copy(viewDirection).setLength(length)
+    }
     if (distance !== undefined) offset.setLength(THREE.MathUtils.clamp(distance, this.controls.minDistance, this.controls.maxDistance))
-    this.startGlide(target.clone().add(offset), target, ms)
+    this.startGlide(target.clone().add(offset), target, ms, viewDirection !== undefined)
   }
 
   /**
@@ -334,7 +388,7 @@ export class MapCameraRig {
     this.startGlide(camPos, target, ms)
   }
 
-  private startGlide(toPos: THREE.Vector3, toTarget: THREE.Vector3, ms: number) {
+  private startGlide(toPos: THREE.Vector3, toTarget: THREE.Vector3, ms: number, rotateView = false) {
     this.glide = null
     this.clearMotion()
     this.awaitingRest = true
@@ -351,6 +405,7 @@ export class MapCameraRig {
       toTarget,
       start: performance.now(),
       ms,
+      rotateView,
     }
   }
 
@@ -374,8 +429,9 @@ export class MapCameraRig {
   dispose() {
     this.disposed = true
     if (this.raf) cancelAnimationFrame(this.raf)
+    if (this.touchFrame) cancelAnimationFrame(this.touchFrame)
     this.wrapper.removeEventListener('wheel', this.onWheelCapture, { capture: true })
-    this.input.removeEventListener('keydown', this.onKey)
+    this.input.removeEventListener('click', this.onClick, true)
     this.input.removeEventListener('pointerdown', this.onPointerIntent, true)
     this.input.removeEventListener('pointermove', this.onPointerMove, true)
     this.input.removeEventListener('pointerup', this.onPointerUp, true)

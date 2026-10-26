@@ -4,12 +4,44 @@ import { bodyFocusCamera, bodyFocusTarget, DEFAULT_BODY_FOCUS, orbitFrame } from
 import { defaultCamera } from './space-camera'
 import { drawRadiusFor, TAN_HALF_FOV } from './space-projection'
 import { buildSceneModel } from './space-scene'
+import { viewBasisOf } from './space-projection'
 import type { SceneMark } from './space-scene'
 
 const scene = buildSceneModel({ interior: null, fleets: [], worldTimeMs: 0, reducedMotion: false, selection: null, log: () => {} })
 const body: SceneMark = { id: 'planet', kind: 'body', radius: 2, position: { x: 50, y: 0, z: 0 }, pickable: true, selected: false }
 
 describe('body camera framing', () => {
+  it.each([-0.4, 0.25, 1])('preserves both orbit angle and a player tilt of %s', pitch => {
+    const initial = { ...defaultCamera(500), pitch }
+    const star = { ...body, id: 'sun', kind: 'star' as const, position: { x: 0, y: 0, z: 0 } }
+    const focused = bodyFocusCamera(initial, { ...scene, marks: [star, body] }, body, 500, 1200, 900)
+    expect(focused.pitch).toBe(pitch)
+    expect(focused.yaw).toBe(initial.yaw)
+  })
+  it('preserves the full viewing direction for targets on either side of the star', () => {
+    const star = { ...body, id: 'sun', kind: 'star' as const, position: { x: 10, y: 3, z: -5 } }
+    for (const position of [{ x: 50, y: 0, z: 20 }, { x: -50, y: 10, z: -20 }]) {
+      const mark = { ...body, position }
+      const camera = bodyFocusCamera(defaultCamera(500), { ...scene, marks: [star, mark] }, mark, 500, 1200, 900)
+      const basis = viewBasisOf(camera, { width: 1200, height: 900 })
+      const offset = new THREE.Vector3().copy(basis.eye).sub(position).normalize()
+      const original = viewBasisOf(defaultCamera(500), { width: 1200, height: 900 })
+      expect(offset.dot(new THREE.Vector3().copy(original.eye).normalize())).toBeCloseTo(1)
+      expect(basis.eye.y).toBeGreaterThan(position.y)
+      expect(camera.pitch).toBeCloseTo(defaultCamera(500).pitch)
+      expect(camera.focusRequest?.alignView).toBeUndefined()
+    }
+  })
+  it('retains the viewing angle for a star, empty point or a target without a sun direction', () => {
+    const initial = defaultCamera(500)
+    const star = { ...body, kind: 'star' as const }
+    for (const mark of [star, { ...body, kind: 'point-selection' as const }, body]) {
+      const camera = bodyFocusCamera(initial, { ...scene, marks: [star] }, mark, 500, 1200, 900)
+      expect(camera.yaw).toBe(initial.yaw)
+      expect(camera.pitch).toBe(initial.pitch)
+      expect(camera.focusRequest?.alignView).toBeUndefined()
+    }
+  })
   it.each([[1200, 900], [390, 844]])('frames rendered size to one third on a %s × %s viewport', (width, height) => {
     const camera = bodyFocusCamera(defaultCamera(500), scene, body, 500, width, height)
     const radius = drawRadiusFor(body, 500)

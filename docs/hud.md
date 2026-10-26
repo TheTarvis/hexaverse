@@ -1217,6 +1217,61 @@ fields, unrestricted zoom, mounted drafts and command/inspection independence re
 [Evidence](../.scratch/scene-navigation/README.md) records checks, service refresh and
 protected deployment separately from physical-iPhone/full-emulator acceptance.
 
+## Camera control simplification — 2026-10-26
+
+Accepted intent from Travis's design interview, with shared understanding confirmed
+before implementation. Both production scenes now use these controls.
+This supersedes the earlier input mappings and inspection/focus separation below
+where they conflict.
+
+- Both Galaxy and System retain one shared camera input implementation.
+- A single click/tap inspects the object or selects the empty-space point and
+  makes it the orbit pivot without changing zoom. Double-click
+  retains fit-to-object framing. Neither changes the command fleet.
+- Per Travis's latest playtest follow-up, target changes preserve the full current
+  viewing direction: both tilt and orbit angle. This supersedes the sun-facing
+  rotation experiment for selection, swiping and explicit focus. Initial fleet
+  framing still starts on the sun-facing side, 30 degrees above the map plane.
+  Selection/swiping retain zoom; double-click retains fit-to-object framing.
+  Manual orbit remains free. Existing ambient fill and sunlight remain unchanged.
+- Desktop vertical trackpad scrolling and mouse wheel zoom. Horizontal trackpad
+  scrolling switches targets. On phones, one-finger drag orbits, pinch zooms and
+  a two-finger horizontal swipe switches targets. Mobile free panning is removed;
+  no mobile pan buttons are added.
+- Per Travis’s follow-up, camera keyboard controls are removed from both canvases:
+  WASD, arrows, +/- zoom, Home recenter and System Enter-to-select-center. Free
+  panning is unavailable on desktop and mobile. Normal keyboard activation of
+  object/HUD buttons remains.
+- Horizontal switching chooses the nearest visible eligible object in the swiped
+  screen direction, measured by screen distance from the current pivot's projected
+  position; after free panning, use the viewport center. Exclude the current target
+  and stay put if no candidate exists.
+- Switching updates inspection and the orbit pivot, gliding to the new object
+  while preserving zoom and using the scene's framing direction, then following
+  its movement. It never changes the command fleet, enters a system or commits travel.
+- Eligible targets are currently disclosed, selectable objects: systems in Galaxy;
+  stars, bodies, structures, fleets and selectable contacts in System. Undisclosed
+  objects, decorative elements and arbitrary empty-space coordinates are excluded.
+- Each horizontal gesture switches at most once; trailing momentum cannot trigger
+  another switch. Diagonal movement locks to its initial dominant direction.
+  Orbit drag begins without a timed hold, using a small movement threshold, and
+  suppresses release-click selection.
+- Parallel two-finger vertical swipes on phones also zoom: up zooms in, down zooms
+  out. Pinch remains available. A gesture locks to zoom or horizontal switching
+  and cannot perform both.
+- A disappearing target or clearing selection releases following, preserves camera
+  orientation and zoom, and leaves the last pivot as a fixed point. No replacement
+  target is automatically selected. Before selection, use the scene's default pivot.
+- Right-drag panning and middle-drag zoom remain removed.
+
+MapCameraRig owns gesture recognition, directional target choice, momentum
+suppression. Scene adapters supply disclosed targets and
+selection callbacks, preserving their coordinate systems and bounds. Fleet marker
+activation now inspects the fleet independently of the command fleet. Anonymous
+contacts currently have no selection action and therefore do not join switching.
+Touch recognition thresholds and the 220 ms wheel inactivity boundary are initial
+tuning; physical phone/trackpad feel still needs device playtesting.
+
 ## Shared Galaxy camera controls — 2026-10-18
 
 Travis requests Galaxy's controls in System and one shared implementation (DRY).

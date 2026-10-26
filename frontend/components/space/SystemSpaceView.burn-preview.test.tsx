@@ -456,16 +456,16 @@ it('retains the accepted travel response when status is closed and reopened befo
 })
 
 
-it('keeps the accepted status for a same-fleet selection but never applies it to another command fleet', async () => {
+it('keeps command-fleet travel status when canvas activation inspects either fleet', async () => {
   const ready = fleet('fleet_1'), other = fleet('fleet_b')
   mount([{ ...ready, roster: { ...ready.roster, cargo: { fuel: 1000 } } }, other]); await flush()
   await click('mock-select-point'); await click('travel-review-entry'); await click('travel-start')
   await click('mock-activate-fleet_1')
   expect(screen.getByTestId('travel-stop')).toBeVisible()
   await click('mock-activate-fleet_b')
-  expect(screen.queryByTestId('travel-stop')).not.toBeInTheDocument()
-  expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('leet_b')
-  expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('On station')
+  expect(screen.getByTestId('travel-stop')).toBeVisible()
+  expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('leet_1')
+  expect(screen.getByTestId('fleet-status-card')).toHaveTextContent('Under way')
   expect(mocks.stop).not.toHaveBeenCalled()
 })
 

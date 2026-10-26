@@ -57,6 +57,7 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
   const routeCanvasRef = useRef<HTMLCanvasElement>(null)
   const latest = useRef(props)
   latest.current = props
+  const selectionRef = useRef<(() => void) | null>(null)
   const rebuildRef = useRef<(() => void) | null>(null)
   useEffect(() => {
     const wrap = wrapRef.current
@@ -198,6 +199,21 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       const node = latest.current.galaxy.nodes.find(node => node.id === id)
       return node ? { position: node } : null
     }, 240)
+    const pivotSystem = (id: string, ms = 0) => {
+      if (!rig) return
+      rig.follow(() => {
+        const node = latest.current.galaxy.nodes.find(node => node.id === id)
+        return node ? { position: node } : null
+      }, camera.position.distanceTo(rig.controls.target), ms)
+    }
+    let pivotedId = latest.current.selectedId
+    selectionRef.current = () => {
+      const id = latest.current.selectedId
+      if (id === pivotedId) return
+      pivotedId = id
+      if (id) pivotSystem(id)
+      else rig?.stopFollowing()
+    }
     const controller: GalaxyGraphController = {
       recenter: () => { const node = home(); if (node) rig?.recenter(node); else rig?.frameBounds(latest.current.galaxy.bounds) },
       focusSystem,
@@ -250,11 +266,19 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
         canvas = next
         next.style.cssText = 'width:100%;height:100%;display:block'
         next.tabIndex = 0
-        next.setAttribute('aria-label', 'Interactive galaxy map. Arrow keys orbit; Shift and arrow keys pan. Plus and minus zoom. Home recenters.')
+        next.setAttribute('aria-label', 'Interactive galaxy map. Drag to orbit. Scroll vertically to zoom; swipe horizontally to switch systems.')
         wrap.prepend(next)
-        rig = new CameraRig(camera, next, wrap, null, false, { onHome: () => controller.recenter() })
+        rig = new CameraRig(camera, next, wrap, null, false, {
+          selectedId: () => rig?.isFollowing ? latest.current.selectedId : null,
+          targets: () => latest.current.galaxy.nodes.map(node => ({ id: node.id, position: node, activate: () => {
+            pivotedId = node.id
+            latest.current.onSelect(node)
+            pivotSystem(node.id, 600)
+          } })),
+        })
         if (target) { rig.controls.target.copy(target); rig.controls.update() }
         else { const node = home(); if (node) rig.recenter(node, 0); else rig.frameBounds(latest.current.galaxy.bounds) }
+        if (latest.current.selectedId) pivotSystem(latest.current.selectedId)
         const raycaster = new THREE.Raycaster()
         const pick = (event: PointerEvent) => {
           const rect = next.getBoundingClientRect()
@@ -272,7 +296,7 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
           if (!down) return
           const movement = Math.hypot(event.clientX - down.x, event.clientY - down.y)
           down = null
-          if (movement > 6 || owner?.snapshot().phase !== 'ready') return
+          if (movement > 6 || rig?.gestureActive || owner?.snapshot().phase !== 'ready') return
           const node = pick(event)
           const now = event.timeStamp
           if (node && last.id === node.id && now - last.time < 350) {
@@ -335,9 +359,11 @@ export function GalaxyGraph(props: GalaxyGraphProps) {
       detach(); rig?.dispose(); owner?.dispose(); canvas?.remove(); disposeGroup(content)
       if (environment) disposeStellarArt(environment)
       rebuildRef.current = null
+      selectionRef.current = null
       latest.current.onController?.(null)
     }
   }, [props.rendererFactory, props.artStyle])
+  useEffect(() => { selectionRef.current?.() }, [props.selectedId])
   useEffect(() => { rebuildRef.current?.() }, [props.galaxy, props.selectedId, props.fleetSystemIds, props.gridMode])
   return <div ref={wrapRef} data-testid="galaxy-graph" className="absolute inset-0">
     {(props.artStyle === 'stellar' || props.route) && <canvas ref={routeCanvasRef} data-testid="galaxy-route-overlay" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />}

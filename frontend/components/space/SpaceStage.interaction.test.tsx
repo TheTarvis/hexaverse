@@ -3,8 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 
-// Camera input lives on the focusable canvas: arrows orbit, Shift+arrows pan,
-// +/- zoom, Home recenters and Enter selects the center. No camera buttons.
+// Camera input uses pointer/touch gestures. Normal button keyboard activation remains.
 const onSelect = vi.fn()
 
 const marks = [
@@ -74,7 +73,12 @@ async function stage(over: Record<string, unknown> = {}) {
 }
 
 const region = () => screen.getByTestId('space-canvas-region')
-const cameraKey = (key: string) => { region().focus(); fireEvent.keyDown(region(), { key }) }
+const dragCamera = () => {
+  fireEvent.pointerDown(region(), { button: 0, pointerId: 1, clientX: 400, clientY: 400 })
+  fireEvent.pointerMove(region(), { pointerId: 1, clientX: 440, clientY: 420 })
+  fireEvent.pointerUp(region(), { pointerId: 1, clientX: 440, clientY: 420 })
+}
+const zoomCamera = (deltaY = -100) => fireEvent.wheel(region(), { deltaY })
 
 describe('SpaceStage — keyboard tab order', () => {
   it('Scenario: Tab reaches hit targets in the defined order', async () => {
@@ -132,138 +136,15 @@ describe('SpaceStage — keyboard tab order', () => {
 
 })
 
-describe('SpaceStage — the keyboard point-selection control', () => {
-  it('Scenario: A keyboard control selects the point at the camera\'s pan target', async () => {
+describe('SpaceStage — camera input', () => {
+  it('ignores retired camera keys without moving or selecting', async () => {
     await stage()
-    const orbit = region()
-    orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    onSelect.mockClear()
-    cameraKey('Enter')
-
-    expect(onSelect).toHaveBeenCalledTimes(1)
-    const sel = onSelect.mock.calls[0][0]
-    expect(sel).toHaveProperty('point')
-    expect(sel.bodyId).toBeUndefined()
-    expect(
-      Math.hypot(sel.point.x, sel.point.y, sel.point.z),
-      'the selected point must be the PANNED-TO point, not the star',
-    ).toBeGreaterThan(0)
-  })
-
-  it('Scenario: A keyboard-only player can pan to a point away from the star', async () => {
-    await stage()
-    const orbit = region()
-    orbit.focus()
-    for (let i = 0; i < 5; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
-    cameraKey('Enter')
-    const sel = onSelect.mock.calls.at(-1)![0]
-    const r = Math.hypot(sel.point.x, sel.point.y, sel.point.z)
-    expect(r).toBeGreaterThan(EXTENT / 100)
-  })
-})
-
-describe('SpaceStage — keyboard camera', () => {
-  const cameraOf = () => JSON.parse(region().getAttribute('data-camera')!)
-
-  it('Scenario: Arrow keys orbit the camera', async () => {
-    await stage()
-    const before = cameraOf()
+    const before = region().getAttribute('data-camera')
     region().focus()
-    await userEvent.keyboard('{ArrowRight}')
-    const after = cameraOf()
-    expect(after.yaw).not.toBe(before.yaw)
-    expect(after.target, 'orbiting does not translate the pan target').toEqual(before.target)
-  })
-
-  it('Scenario: Pan keys translate the camera\'s target', async () => {
-    await stage()
-    const before = cameraOf()
-    const orbit = region()
-    orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    const after = cameraOf()
-    expect(after.target).not.toEqual(before.target)
-    expect(after.yaw, 'the viewing angle is unchanged').toBe(before.yaw)
-  })
-
-  it('SDET-added (rewritten for the camera-cluster shrink): the pan input is a DISTINCT input from the orbit input on the one surviving camera-orbit cell — bare arrow orbits (yaw changes, target unchanged), Shift+arrow pans (target changes, yaw unchanged)', async () => {
-    await stage()
-    const orbit = region()
-    orbit.focus()
-    const initial = cameraOf()
-
-    await userEvent.keyboard('{ArrowRight}')
-    const afterOrbit = cameraOf()
-    expect(afterOrbit.yaw, 'a bare arrow must orbit').not.toBe(initial.yaw)
-    expect(afterOrbit.target, 'a bare arrow must NOT pan').toEqual(initial.target)
-
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    const afterPan = cameraOf()
-    expect(afterPan.target, 'Shift+arrow must pan').not.toEqual(afterOrbit.target)
-    expect(afterPan.yaw, 'Shift+arrow must NOT orbit').toBe(afterOrbit.yaw)
-  })
-
-  it('Scenario: Zoom keys zoom the camera', async () => {
-    await stage()
-    const before = cameraOf()
-    cameraKey('+')
-    expect(cameraOf().distance).toBeLessThan(before.distance)
-    cameraKey('-')
-    cameraKey('-')
-    expect(cameraOf().distance).toBeGreaterThan(before.distance)
-  })
-
-  it('Scenario: A focused camera control shows a focus indicator', async () => {
-    await stage()
-    const zoom = region()
-    zoom.focus()
-    expect(document.activeElement).toBe(zoom)
-    expect(zoom.className).toMatch(/focus[-:]/)
-  })
-
-  it('Scenario: Keyboard input at a clamp is distinguishable from no input', async () => {
-    await stage()
-    const orbit = region()
-    const status = screen.getByTestId('camera-limit-status')
-    orbit.focus()
-    await userEvent.keyboard('{ArrowRight}')
-    expect(status.textContent?.trim() ?? '').toBe('')
-    expect(orbit).not.toHaveAttribute('data-orbit-at-limit')
-    expect(orbit).not.toHaveAttribute('data-pan-at-limit')
-
-    for (let i = 0; i < 200; i++) cameraKey('+')
-    await waitFor(() => expect(status.textContent?.trim() ?? '').not.toBe(''))
-    expect(region()).toHaveAttribute('data-zoom-at-limit', 'min')
-
-    for (let i = 0; i < 500; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
-    await waitFor(() => expect(orbit.getAttribute('data-pan-at-limit') ?? '').toMatch(/\bright\b/))
-    expect(orbit.getAttribute('data-pan-at-limit') ?? '').not.toMatch(/\bleft\b/)
-  })
-
-  it('Scenario: A pan limit is still observable while the camera is also at the zoom clamp', async () => {
-    await stage()
-    const orbit = region()
-    orbit.focus()
-    for (let i = 0; i < 200; i++) cameraKey('+')
-    await waitFor(() => expect(region()).toHaveAttribute('data-zoom-at-limit', 'min'))
-    expect(screen.getByTestId('camera-limit-status').textContent?.trim() ?? '').not.toBe('')
-
-    for (let i = 0; i < 500; i++) fireEvent.keyDown(orbit, { key: 'ArrowRight', shiftKey: true })
-    await waitFor(() => expect(orbit.getAttribute('data-pan-at-limit') ?? '').toMatch(/\bright\b/))
-    expect(orbit.getAttribute('data-pan-at-limit') ?? '').not.toMatch(/\bleft\b/)
-    expect(screen.getByTestId('camera-limit-status').textContent?.trim() ?? '').not.toBe('')
-  })
-
-  it('Scenario: The camera group\'s accessible description names the pan binding', async () => {
-    await stage()
-    const orbit = region()
-    const label = orbit.getAttribute('aria-label') ?? ''
-    const describedBy = orbit.getAttribute('aria-describedby')
-    const description = describedBy ? (document.getElementById(describedBy)?.textContent ?? '') : ''
-    const accessibleText = `${label} ${description}`
-    expect(accessibleText, 'the binding must name the modifier key').toMatch(/shift/i)
-    expect(accessibleText, 'the binding must name what it does (pan/arrow)').toMatch(/pan|arrow/i)
+    for (const key of ['w', 'a', 's', 'd', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '-', 'Home', 'Enter']) fireEvent.keyDown(region(), { key })
+    expect(region().getAttribute('data-camera')).toBe(before)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(region()).not.toHaveAccessibleName(/WASD|Arrow keys|Home|Enter/)
   })
 
   it('has no camera button cluster on desktop', async () => {
@@ -285,60 +166,15 @@ describe('SpaceStage — keyboard camera', () => {
   })
 })
 
-describe('SpaceStage — recenter', () => {
-  it('Scenario: Recenter restores default framing on demand', async () => {
-    await stage()
-    expect(region().getAttribute('data-camera')).not.toBeNull()
-    const before = JSON.parse(region().getAttribute('data-camera')!)
-    const orbit = region()
-    orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    cameraKey('+')
-    expect(JSON.parse(region().getAttribute('data-camera')!)).not.toEqual(before)
-    cameraKey('Home')
-    expect(JSON.parse(region().getAttribute('data-camera')!)).toEqual(before)
-    expect(region()).toHaveAttribute('data-reframe-animated', 'false')
-  })
-
-  it('Scenario: Recenter is reachable from the keyboard', async () => {
-    await stage()
-    const orbit = region()
-    orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    const moved = JSON.parse(region().getAttribute('data-camera')!)
-    region().focus()
-    await userEvent.keyboard('{Home}')
-    expect(JSON.parse(region().getAttribute('data-camera')!)).not.toEqual(moved)
-  })
-
-  it('Scenario: Recentering while already at default framing is a no-op', async () => {
-    await stage({ selection: { bodyId: 'feat-body-0' } })
-    const before = region().getAttribute('data-camera')
-    expect(before).not.toBeNull()
-    onSelect.mockClear()
-    cameraKey('Home')
-    expect(region().getAttribute('data-camera')).toBe(before)
-    expect(region()).toHaveAttribute('data-selection', 'feat-body-0')
-    expect(onSelect, 'recentering must not touch the selection').not.toHaveBeenCalled()
-  })
-
-  it('camera shortcuts do not change selection', async () => {
-    await stage({ selection: { bodyId: 'feat-body-0' } })
-    onSelect.mockClear()
-    for (const key of ['Home', '+', '-', 'ArrowRight']) cameraKey(key)
-    fireEvent.keyDown(region(), { key: 'ArrowRight', shiftKey: true })
-    expect(onSelect).not.toHaveBeenCalled()
-    expect(region()).toHaveAttribute('data-selection', 'feat-body-0')
-  })
-
-  it('Scenario: Camera state survives a selection change and a realtime refetch', async () => {
+describe('SpaceStage — selection and framing', () => {
+  it('Scenario: Selection changes pivot, preserves tilt/orbit/zoom and follows realtime positions', async () => {
     const { rerender } = await stage()
     const initial = region().getAttribute('data-camera')
     expect(initial, 'the stage must expose its camera state to be asserted on at all').not.toBeNull()
     const orbit = region()
     orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    cameraKey('+')
+    dragCamera()
+    zoomCamera()
     const moved = region().getAttribute('data-camera')
     expect(moved, 'the camera must actually have moved before "it survives" means anything').not.toBe(
       initial,
@@ -348,7 +184,11 @@ describe('SpaceStage — recenter', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       <SpaceStage systemId="sys_-7_17" scene={scene as any} extent={EXTENT} worldTime={1} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} frameSource={null} />,
     )
-    expect(region().getAttribute('data-camera')).toBe(moved)
+    const focused = JSON.parse(region().getAttribute('data-camera')!)
+    expect(focused.distance).toBeCloseTo(JSON.parse(moved!).distance)
+    expect(focused.yaw).toBeCloseTo(JSON.parse(moved!).yaw)
+    expect(focused.pitch).toBeCloseTo(JSON.parse(moved!).pitch)
+    expect(focused.target).toEqual(marks.find(mark => mark.id === 'feat-body-1')!.position)
 
     const moved2 = {
       ...scene,
@@ -359,7 +199,9 @@ describe('SpaceStage — recenter', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       <SpaceStage systemId="sys_-7_17" scene={moved2 as any} extent={EXTENT} worldTime={2} scale={1} selection={{ bodyId: 'feat-body-1' }} onSelect={onSelect} frameSource={null} />,
     )
-    expect(region().getAttribute('data-camera')).toBe(moved)
+    const followed = JSON.parse(region().getAttribute('data-camera')!)
+    expect(followed.distance).toBeCloseTo(focused.distance)
+    await waitFor(() => expect(JSON.parse(region().getAttribute('data-map-camera')!).target[0]).toBeCloseTo(focused.target.x + 3))
   })
 
   it('Scenario: Camera resets when the system changes', async () => {
@@ -368,7 +210,7 @@ describe('SpaceStage — recenter', () => {
     expect(initial).not.toBeNull()
     const orbit = region()
     orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
+    dragCamera()
     expect(region().getAttribute('data-camera')).not.toBe(initial)
     rerender(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -419,10 +261,10 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
     await stage()
     const orbit = region()
     orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    cameraKey('+')
+    dragCamera()
+    zoomCamera()
     orbit.focus()
-    await userEvent.keyboard('{ArrowRight}')
+    dragCamera()
     onSelect.mockClear()
 
     const hit = screen.getByTestId('body-hit-feat-body-0')
@@ -435,8 +277,8 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
     await stage()
     const orbit = region()
     orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    await userEvent.keyboard('{ArrowUp}')
+    dragCamera()
+    dragCamera()
     onSelect.mockClear()
     fireEvent.pointerDown(region(), { clientX: 610, clientY: 460, button: 0, pointerId: 10 })
     fireEvent.pointerUp(region(), { clientX: 610, clientY: 460, pointerId: 10 })
@@ -449,10 +291,10 @@ describe('SpaceStage — picking stays correct after the camera moves', () => {
     await stage({ selection: { bodyId: 'feat-body-0' } })
     const orbit = region()
     orbit.focus()
-    await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}')
-    for (let i = 0; i < 12; i++) cameraKey('-')
+    dragCamera()
+    for (let i = 0; i < 12; i++) zoomCamera(100)
     orbit.focus()
-    await userEvent.keyboard('{ArrowRight}')
+    dragCamera()
     onSelect.mockClear()
     fireEvent.pointerDown(region(), { clientX: 2, clientY: 2, button: 0, pointerId: 11 })
     fireEvent.pointerUp(region(), { clientX: 2, clientY: 2, pointerId: 11 })
@@ -466,7 +308,7 @@ it('has no mobile camera buttons or hidden rotate state', async () => {
   try {
     await stage()
     for (const id of ['space-camera-controls', 'space-pan-controls', 'camera-touch-rotate', 'select-pan-target-point']) expect(screen.queryByTestId(id)).not.toBeInTheDocument()
-    expect(screen.getByTestId('touch-camera-hint')).toHaveTextContent('One finger orbits. Two fingers pan and pinch zooms.')
+    expect(screen.getByTestId('touch-camera-hint')).toHaveTextContent('One finger orbits. Pinch or swipe two fingers vertically to zoom.')
   } finally { window.matchMedia = previousMedia }
 })
 
@@ -478,13 +320,17 @@ describe('SpaceStage — shared Galaxy touch controls', () => {
     touch('pointerDown', region(), 300, 300); touch('pointerMove', region(), 360, 330); touch('pointerUp', region(), 360, 330)
     expect(read().yaw).not.toBe(before.yaw); expect(read().target).toEqual(before.target); expect(onSelect).not.toHaveBeenCalled()
   })
-  it('two fingers pan and pinch without changing orbit or selecting on release', async () => {
-    await stage(); const before = read()
+  it('two fingers zoom without panning, orbiting or selecting on release', async () => {
+    await stage()
+    const read = () => JSON.parse(region().getAttribute('data-camera')!)
+    const before = read()
     touch('pointerDown', region(), 200, 400); touch('pointerDown', region(), 300, 400, 2)
-    touch('pointerMove', region(), 230, 420); touch('pointerMove', region(), 330, 420, 2)
-    expect(read().target).not.toEqual(before.target); expect(read().yaw).toBeCloseTo(before.yaw); expect(read().pitch).toBeCloseTo(before.pitch)
-    touch('pointerMove', region(), 410, 420, 2); expect(read().distance).toBeLessThan(before.distance)
-    touch('pointerUp', region(), 410, 420, 2); touch('pointerUp', region(), 230, 420); expect(onSelect).not.toHaveBeenCalled()
+    touch('pointerMove', region(), 200, 370); touch('pointerMove', region(), 300, 370, 2)
+    expect(read().target).toEqual(before.target)
+    expect(read().yaw).toBeCloseTo(before.yaw)
+    expect(read().distance).toBeLessThan(before.distance)
+    touch('pointerUp', region(), 300, 370, 2); touch('pointerUp', region(), 200, 370)
+    expect(onSelect).not.toHaveBeenCalled()
   })
   it('touch cancellation cannot select and the next independent tap selects once', async () => {
     await stage(); const hit = screen.getByTestId('body-hit-feat-body-0')
@@ -585,4 +431,18 @@ it('double-clicking the selected-point reticle glides closer and makes the exact
   expect(focused.target).toEqual(point)
   expect(focused.distance).toBeLessThan(before.distance)
   expect(onSelect).not.toHaveBeenCalled()
+})
+
+it('horizontal scrolling selects the nearest visible body and glides without changing zoom', async () => {
+  await stage()
+  const before = JSON.parse(region().getAttribute('data-camera')!)
+  fireEvent.wheel(region(), { deltaX: 40 })
+  expect(onSelect).toHaveBeenCalledWith({ bodyId: 'feat-body-0' })
+  const after = JSON.parse(region().getAttribute('data-camera')!)
+  expect(after.followBodyId).toBe('feat-body-0')
+  expect(after.distance).toBeCloseTo(before.distance)
+  expect(after.yaw).toBeCloseTo(before.yaw)
+  expect(after.focusRequest.durationMs).toBe(600)
+  fireEvent.wheel(region(), { deltaX: 100 })
+  expect(onSelect).toHaveBeenCalledOnce()
 })

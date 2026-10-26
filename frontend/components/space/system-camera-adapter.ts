@@ -1,14 +1,14 @@
 import * as THREE from 'three'
-import { MapCameraRig, type CameraIntent } from '@/components/map/map-camera-rig'
+import { MapCameraRig, type MapCameraOptions } from '@/components/map/map-camera-rig'
 import { PITCH_MAX, PITCH_MIN, panBound, zoomRange, type SpaceCamera } from './space-camera'
 import { TAN_HALF_FOV, viewBasisOf } from './space-projection'
 
-/** Coordinate/limit adapter only: gestures, damping and keyboard live in MapCameraRig. */
+/** Coordinate/limit adapter only: gestures and damping live in MapCameraRig. */
 export function createSystemCameraAdapter(host: HTMLElement, extent: number, initial: SpaceCamera, callbacks: {
+  targets?: MapCameraOptions['targets']
+  selectedId?: MapCameraOptions['selectedId']
   onChange: (camera: SpaceCamera) => void
   onRest?: (camera: SpaceCamera) => void
-  onHome: () => void
-  onConfirm: () => void
 }) {
   const camera = new THREE.PerspectiveCamera(Math.atan(TAN_HALF_FOV) * 360 / Math.PI, 1, 0.01, Math.max(10000, extent * 100))
   const range = zoomRange(extent)
@@ -30,14 +30,12 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
     lastRequested = current
     callbacks.onChange(current)
   }
-  const intent = (kind: CameraIntent) => {
-    if (kind === 'pan') current = { ...current, followFleetId: undefined, followBodyId: undefined, focusPoint: undefined }
-  }
   const rig = new MapCameraRig(camera, host, host, null, false, {
+    targets: callbacks.targets, selectedId: callbacks.selectedId,
     up: new THREE.Vector3(0, 1, 0), minDistance: range.min, maxDistance: range.max,
     minPolarAngle: Math.PI / 2 - PITCH_MAX, maxPolarAngle: Math.PI / 2 - PITCH_MIN,
-    maxTargetRadius: panBound(extent), keyPanDistance: extent * 0.05,
-    onIntent: intent, onChange: changed, onRest: () => callbacks.onRest?.(read()), onHome: callbacks.onHome, onConfirm: callbacks.onConfirm,
+    maxTargetRadius: panBound(extent),
+    onChange: changed, onRest: () => callbacks.onRest?.(read()),
   })
   const sync = (requested: SpaceCamera) => {
     current = requested
@@ -54,6 +52,8 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
     step(resolved: SpaceCamera, advance = true, requested = resolved) {
       stepping = true
       try {
+        camera.aspect = (host.clientWidth || 1) / (host.clientHeight || 1)
+        camera.updateProjectionMatrix()
         liveBody = resolved
         rig.controls.minDistance = resolved.minDistance ?? range.min
         rig.controls.maxTargetRadius = Math.max(panBound(extent), Math.hypot(resolved.target.x, resolved.target.y, resolved.target.z))
@@ -62,7 +62,12 @@ export function createSystemCameraAdapter(host: HTMLElement, extent: number, ini
           if (requested.focusRequest !== focusRequest) {
             focusRequest = requested.focusRequest
             if (requested.focusRequest?.from) sync({ ...resolved, ...requested.focusRequest.from })
-            rig.follow(bodyPose, requested.distance, requested.focusRequest?.durationMs ?? 600)
+            const viewDirection = requested.focusRequest?.alignView ? {
+              x: Math.sin(requested.yaw) * Math.cos(requested.pitch),
+              y: Math.sin(requested.pitch),
+              z: Math.cos(requested.yaw) * Math.cos(requested.pitch),
+            } : undefined
+            rig.follow(bodyPose, requested.distance, requested.focusRequest?.durationMs ?? 600, viewDirection)
           }
           lastRequested = requested
         } else if (requested !== lastRequested) { rig.stopFollowing(); rig.clearMotion(); sync(resolved); lastRequested = requested }

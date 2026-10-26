@@ -149,6 +149,25 @@ describe('GalaxyGraph owned renderer', () => {
     expect(gpu.candidates[0].dispose).toHaveBeenCalled()
   })
 
+  it('selection sets the pivot without changing zoom and a directional swipe selects the next system', async () => {
+    const onSelect = vi.fn()
+    const view = render(<GalaxyGraph galaxy={galaxy} selectedId={null} onSelect={onSelect} />)
+    await frames()
+    const candidate = gpu.candidates[0]
+    const [, camera] = candidate.render.mock.calls.at(-1)!
+    const before = JSON.parse(candidate.canvas.dataset.mapCamera!)
+    const distance = camera.position.distanceTo(new THREE.Vector3(...before.target))
+    view.rerender(<GalaxyGraph galaxy={galaxy} selectedId="a" onSelect={onSelect} />)
+    await frames()
+    expect(JSON.parse(candidate.canvas.dataset.mapCamera!).target).toEqual([nodeA.x, nodeA.y, nodeA.z])
+    expect(camera.position.distanceTo(new THREE.Vector3(nodeA.x, nodeA.y, nodeA.z))).toBeCloseTo(distance)
+    fireEvent.wheel(candidate.canvas, { deltaX: 40 })
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(onSelect).toHaveBeenCalledWith(nodeB)
+    fireEvent.wheel(candidate.canvas, { deltaX: 100 })
+    expect(onSelect).toHaveBeenCalledOnce()
+  })
+
   it('Scenario: Galaxy graph preserves visual and input behavior — double-click focuses with the 600ms glide', async () => {
     const focus = vi.spyOn(CameraRig.prototype, 'focus')
     const onSelect = vi.fn()
@@ -164,7 +183,7 @@ describe('GalaxyGraph owned renderer', () => {
     clickAt(candidate.canvas, x, y)
     await frames(20) // 340ms, just inside the 350ms double-click window.
     clickAt(candidate.canvas, x, y)
-    expect(focus).toHaveBeenLastCalledWith(nodeA, 600, 240)
+    expect(focus).toHaveBeenLastCalledWith(nodeA, 600, 240, undefined)
     expect(onSelect).toHaveBeenLastCalledWith(nodeA)
   })
 

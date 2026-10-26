@@ -54,7 +54,7 @@ describe('SpaceStage — the state it publishes', () => {
     )
     const region = screen.getByTestId('space-canvas-region')
     const camera = JSON.parse(region.getAttribute('data-camera')!)
-    expect(camera).toMatchObject({ target: { x: 0, y: 0, z: 0 } })
+    expect(camera).toMatchObject({ target: { x: 18, y: -3, z: -15 }, followBodyId: 'feat-body-0' })
     expect(camera.distance).toBeGreaterThan(0)
     expect(region).toHaveAttribute('data-selection', 'feat-body-0')
     expect(region).toHaveAttribute('data-draw-world-time', '4242')
@@ -105,7 +105,7 @@ describe('SpaceStage — the state it publishes', () => {
   })
 })
 
-it('focuses the enrolled starter once and leaves recenter and later refetches under player control', async () => {
+it('focuses the enrolled starter once and preserves user zoom through later refetches', async () => {
   const starter = { id: 'starter', kind: 'fleet' as const, position: { x: 50, y: 2, z: 10 }, radius: 1, pickable: false, selected: false }
   const props = { systemId: 'home', scene: { ...scene, marks: [...scene.marks, starter] }, extent: 658.7, worldTime: 1, scale: 1, selection: null, frameSource: null, initialFocusFleetId: 'starter' }
   const { rerender } = render(<SpaceStage {...props} />)
@@ -114,10 +114,10 @@ it('focuses the enrolled starter once and leaves recenter and later refetches un
   expect(camera().target).toEqual(starter.position)
   await waitFor(() => expect(screen.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true'))
   await waitFor(() => expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('tabindex', '0'))
-  fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'Home' })
-  expect(camera().target).toEqual({ x: 0, y: 0, z: 0 })
+  fireEvent.wheel(screen.getByTestId('space-canvas-region'), { deltaY: -100 })
+  const distance = camera().distance
   rerender(<SpaceStage {...props} scene={{ ...scene, marks: [{ ...starter, position: { x: 80, y: 0, z: 0 } }] }} />)
-  expect(camera().target).toEqual({ x: 0, y: 0, z: 0 })
+  expect(camera().distance).toBeCloseTo(distance)
 })
 
 it('refocuses the same fleet on request at its latest position with a close camera', async () => {
@@ -129,7 +129,7 @@ it('refocuses the same fleet on request at its latest position with a close came
   expect(camera().distance).toBeCloseTo(props.extent * 0.3)
   await waitFor(() => expect(screen.getByTestId('space-canvas')).toHaveAttribute('data-renderer-ready', 'true'))
   await waitFor(() => expect(screen.getByTestId('space-canvas-region')).toHaveAttribute('tabindex', '0'))
-  fireEvent.keyDown(screen.getByTestId('space-canvas-region'), { key: 'Home' })
+  fireEvent.wheel(screen.getByTestId('space-canvas-region'), { deltaY: -100 })
   const moved = { ...fleet, position: { x: 90, y: 0, z: 20 } }
   rerender(<SpaceStage {...props} scene={{ ...scene, marks: [moved] }} focusFleetRequest={{ fleetId: 'active', sequence: 2 }} />)
   expect(camera().target).toEqual(moved.position)

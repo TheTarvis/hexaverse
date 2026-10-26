@@ -8,7 +8,7 @@ export interface SpaceCamera {
   followBodyId?: string
   followOrientation?: 'steady' | 'orbit'
   followRotation?: { x: number; y: number; z: number; w: number }
-  focusRequest?: { durationMs: number; from?: Pick<SpaceCamera, 'yaw' | 'pitch' | 'distance' | 'target'> }
+  focusRequest?: { durationMs: number; alignView?: boolean; from?: Pick<SpaceCamera, 'yaw' | 'pitch' | 'distance' | 'target'> }
   /** Close body views retain their safe minimum after a pan releases follow. */
   minDistance?: number
 
@@ -45,6 +45,8 @@ export const PITCH_MAX = 1.45
 // sit off-screen — which is what the off-screen reach affordance exists for.
 export const DEFAULT_YAW = 0.6
 export const DEFAULT_PITCH = 0.72
+/** Initial fleet view; later target changes preserve the full viewing direction. */
+export const SUNWARD_VIEW_PITCH = Math.PI / 6
 
 /** Extent-scaled step used only to predict directional limit announcements. */
 export const KEY_PAN_STEP_MULT = 0.05
@@ -77,16 +79,21 @@ export function defaultCamera(extent: number): SpaceCamera {
   }
 }
 
-/** Start behind the fleet, looking inward toward the star, slightly above its plane. */
-export function fleetCamera(extent: number, fleetId: string, position: SpaceCamera['target']): SpaceCamera {
-  const horizontal = Math.hypot(position.x, position.z)
+/** Favor the sun-facing azimuth while retaining the current camera tilt. */
+export function sunwardCameraAngles(target: SpaceCamera['target'], star: SpaceCamera['target'], fallback: Pick<SpaceCamera, 'yaw' | 'pitch'>) {
+  const x = star.x - target.x, y = star.y - target.y, z = star.z - target.z
+  const horizontal = Math.hypot(x, z)
+  if (Math.hypot(horizontal, y) < 1e-9) return { yaw: fallback.yaw, pitch: fallback.pitch }
+  return { yaw: horizontal > 1e-9 ? Math.atan2(x, z) : fallback.yaw,
+    pitch: fallback.pitch }
+}
+
+/** Start on the star-facing side of a fleet, looking outward at the fleet. */
+export function fleetCamera(extent: number, fleetId: string, position: SpaceCamera['target'], star: SpaceCamera['target'] = { x: 0, y: 0, z: 0 }, view?: Pick<SpaceCamera, 'yaw' | 'pitch'>): SpaceCamera {
+  const initial = { ...defaultCamera(extent), pitch: SUNWARD_VIEW_PITCH, ...view }
   return {
-    ...clampCamera({
-      ...defaultCamera(extent),
-      yaw: horizontal > 0 ? Math.atan2(position.x, position.z) : DEFAULT_YAW,
-      pitch: Math.atan2(position.y, horizontal) + 0.2,
-      distance: extent * 0.3,
-      target: { ...position },
+    ...clampCamera({ ...initial, ...(view ?? sunwardCameraAngles(position, star, initial)),
+      distance: extent * 0.3, target: { ...position },
     }, extent),
     followFleetId: fleetId,
   }
